@@ -1,0 +1,22 @@
+const eurFmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+const dateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+export const formatEur = (cents: number) => eurFmt.format(cents / 100)
+export const formatDate = (iso: string) => dateFmt.format(new Date(iso))
+export const formatMonth = (ym: string) => {
+  const [year, month] = ym.split('-')
+  return new Date(Number(year), Number(month) - 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+}
+
+export function currentMonth(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+export function prevMonths(n: number, from = currentMonth()): string[] {
+  const [y, m] = from.split('-').map(Number)
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(y, m - 1 - (n - 1 - i))
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+}
