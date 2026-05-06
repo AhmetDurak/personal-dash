@@ -6,6 +6,7 @@ import { LedgerAgent } from '../agents/ledger/LedgerAgent'
 import { entriesRouter } from './routes/entries'
 import { summaryRouter } from './routes/summary'
 import { bankRouter } from './routes/bank'
+import { chartsRouter } from './routes/charts'
 
 const app = express()
 app.use(express.json())
@@ -16,6 +17,7 @@ const ledger = new LedgerAgent(repo)
 app.use('/api/entries', entriesRouter(ledger))
 app.use('/api', summaryRouter(ledger))
 app.use('/api/bank', bankRouter(ledger))
+app.use('/api/charts', chartsRouter(ledger))
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
 
