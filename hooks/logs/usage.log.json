@@ -1,0 +1,42 @@
+[
+  {
+    "tool": "Bash",
+    "query": "test",
+    "duration": 0,
+    "size": 10,
+    "status": "completed",
+    "timestamp": "2026-05-06T22:13:56.177Z"
+  },
+  {
+    "tool": "Edit",
+    "query": "{\"file_path\":\"test.ts\"}",
+    "duration": 0,
+    "size": 16,
+    "status": "completed",
+    "timestamp": "2026-05-06T22:14:10.067Z"
+  },
+  {
+    "tool": "Bash",
+    "query": "{\"command\":\"rm -rf /home/ahmetdrk/MEGA/Coding/ClaudeCode/FinanceDash/mcp-proxy\",\"description\":\"Delete mcp-proxy folder\"}",
+    "duration": 0,
+    "size": 85,
+    "status": "completed",
+    "timestamp": "2026-05-06T22:14:21.389Z"
+  },
+  {
+    "tool": "Edit",
+    "query": "{\"file_path\":\"/home/ahmetdrk/MEGA/Coding/ClaudeCode/FinanceDash/.claude/settings.json\",\"old_string\":\"  \\\"mcpServers\\\": {",
+    "duration": 0,
+    "size": 1703,
+    "status": "completed",
+    "timestamp": "2026-05-06T22:14:31.298Z"
+  },
+  {
+    "tool": "Bash",
+    "query": "{\"command\":\"jq . /home/ahmetdrk/MEGA/Coding/ClaudeCode/FinanceDash/.claude/settings.json\",\"description\":\"Validate final ",
+    "duration": 0,
+    "size": 717,
+    "status": "completed",
+    "timestamp": "2026-05-06T22:14:35.814Z"
+  }
+]

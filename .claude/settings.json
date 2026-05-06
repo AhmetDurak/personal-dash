@@ -1,14 +1,28 @@
 {
-  "mcpServers": {
-    "filesystem": {
-      "command": "false"
-    },
-    "github": {
-      "command": "false"
-    },
-    "proxy": {
-      "command": "node",
-      "args": ["./mcp-proxy/index.js"]
-    }
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /home/ahmetdrk/MEGA/Coding/ClaudeCode/FinanceDash/hooks/hook.js",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /home/ahmetdrk/MEGA/Coding/ClaudeCode/FinanceDash/hooks/hook.js",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   }
 }

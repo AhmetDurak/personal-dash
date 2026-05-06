@@ -1,0 +1,12 @@
+{
+  "Edit": {
+    "hits": 2,
+    "success": 2,
+    "successRate": 1
+  },
+  "Bash": {
+    "hits": 2,
+    "success": 2,
+    "successRate": 1
+  }
+}
