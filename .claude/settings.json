@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "false"
+    },
+    "github": {
+      "command": "false"
+    },
+    "proxy": {
+      "command": "node",
+      "args": ["./mcp-proxy/index.js"]
+    }
+  }
+}
