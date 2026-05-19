@@ -1,17 +1,20 @@
-export type Tab = 'overview' | 'cashflow' | 'simplified' | 'transactions'
+export type Tab = 'overview' | 'cashflow' | 'simplified' | 'transactions' | 'etf' | 'news' | 'learn'
 
 const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: 'overview',     label: 'Profit & Loss', icon: '⊞' },
   { id: 'cashflow',     label: 'Cash Flow',      icon: '⇌' },
   { id: 'simplified',   label: 'Simplified',     icon: '≡' },
   { id: 'transactions', label: 'Transactions',   icon: '↕' },
+  { id: 'etf',          label: 'ETF Monitor',    icon: '◈' },
+  { id: 'news',         label: 'News Feed',      icon: '📰' },
+  { id: 'learn',        label: 'Finance Academy', icon: '🎓' },
 ]
 
-interface Props { active: Tab; onChange: (t: Tab) => void }
+interface Props { active: Tab; onChange: (t: Tab) => void; dark: boolean; onToggleDark: () => void }
 
-export function Sidebar({ active, onChange }: Props) {
+export function Sidebar({ active, onChange, dark, onToggleDark }: Props) {
   return (
-    <aside className="w-[220px] min-h-screen bg-xero-navy flex flex-col flex-shrink-0">
+    <aside className="w-[220px] h-full bg-xero-navy flex flex-col flex-shrink-0">
       <div className="px-6 py-5 border-b border-xero-navy-light">
         <p className="text-white font-bold text-lg tracking-tight">Finance</p>
         <p className="text-xero-green text-xs font-medium mt-0.5">Dashboard</p>
@@ -35,8 +38,14 @@ export function Sidebar({ active, onChange }: Props) {
           )
         })}
       </nav>
-      <div className="px-6 py-4 border-t border-xero-navy-light">
-        <p className="text-gray-500 text-xs">Personal Finance</p>
+      <div className="px-4 py-4 border-t border-xero-navy-light">
+        <button
+          onClick={onToggleDark}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light transition-colors text-sm"
+        >
+          <span className="text-base">{dark ? '☀️' : '🌙'}</span>
+          <span className="font-medium">{dark ? 'Light Mode' : 'Dark Mode'}</span>
+        </button>
       </div>
     </aside>
   )

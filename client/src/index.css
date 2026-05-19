@@ -1,3 +1,96 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Dark mode overrides ────────────────────────────────────────────────────────
+   .dark is set on <html>. Using ".dark .<class>" beats the single-class
+   specificity of Tailwind utilities (0,2,0 vs 0,1,0), so no !important needed.
+   The sidebar uses bg-xero-navy (not bg-white) and text-gray-400 (already
+   light) so these overrides don't affect it.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Page & card backgrounds */
+.dark .bg-xero-bg   { background-color: #0F172A; }
+.dark .bg-white     { background-color: #1E293B; }
+.dark .bg-gray-50   { background-color: #162032; }
+.dark .bg-gray-100  { background-color: #1E2A3E; }
+
+/* Borders */
+.dark .border-xero-border { border-color: #334155; }
+.dark .border-gray-50  { border-color: #1E293B; }
+.dark .border-gray-100 { border-color: #273348; }
+.dark .border-gray-200 { border-color: #334155; }
+.dark .border-gray-300 { border-color: #3F4F66; }
+
+/* Primary text — not used in sidebar nav, safe to override globally */
+.dark .text-gray-900 { color: #F1F5F9; }
+.dark .text-gray-800 { color: #E2E8F0; }
+.dark .text-gray-700 { color: #CBD5E1; }
+.dark .text-gray-600 { color: #94A3B8; }
+.dark .text-gray-500 { color: #64748B; }
+
+/* Hover states */
+.dark .hover\:bg-gray-50:hover  { background-color: #1E2A3E; }
+.dark .hover\:bg-gray-100:hover { background-color: #253047; }
+.dark .hover\:bg-gray-200:hover { background-color: #334155; }
+.dark .hover\:shadow-md:hover   { box-shadow: 0 4px 6px -1px rgba(0,0,0,.5); }
+.dark .hover\:border-gray-300:hover { border-color: #3F4F66; }
+
+/* Inputs & text areas */
+.dark input, .dark textarea, .dark select {
+  background-color: #1E293B;
+  color: #F1F5F9;
+  border-color: #334155;
+}
+.dark input::placeholder, .dark textarea::placeholder { color: #475569; }
+.dark input:focus, .dark textarea:focus { border-color: #00B087; }
+
+/* Recharts tooltip */
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+  color: #F1F5F9 !important;
+}
+
+/* Colored accent backgrounds used in LearnTab golden rules */
+.dark .bg-emerald-50  { background-color: rgba(16, 185, 129, 0.1); }
+.dark .bg-blue-50     { background-color: rgba(59, 130, 246, 0.1); }
+.dark .bg-violet-50   { background-color: rgba(139, 92, 246, 0.1); }
+.dark .bg-amber-50    { background-color: rgba(245, 158, 11, 0.1); }
+.dark .bg-red-50      { background-color: rgba(239, 68, 68, 0.1); }
+.dark .bg-cyan-50     { background-color: rgba(6, 182, 212, 0.1); }
+.dark .bg-orange-50   { background-color: rgba(249, 115, 22, 0.1); }
+.dark .bg-teal-50     { background-color: rgba(20, 184, 166, 0.1); }
+.dark .bg-indigo-50   { background-color: rgba(99, 102, 241, 0.1); }
+.dark .bg-pink-50     { background-color: rgba(236, 72, 153, 0.1); }
+
+.dark .border-emerald-200 { border-color: rgba(16, 185, 129, 0.3); }
+.dark .border-blue-200    { border-color: rgba(59, 130, 246, 0.3); }
+.dark .border-violet-200  { border-color: rgba(139, 92, 246, 0.3); }
+.dark .border-amber-200   { border-color: rgba(245, 158, 11, 0.3); }
+.dark .border-red-200     { border-color: rgba(239, 68, 68, 0.3); }
+.dark .border-cyan-200    { border-color: rgba(6, 182, 212, 0.3); }
+.dark .border-orange-200  { border-color: rgba(249, 115, 22, 0.3); }
+.dark .border-teal-200    { border-color: rgba(20, 184, 166, 0.3); }
+.dark .border-indigo-200  { border-color: rgba(99, 102, 241, 0.3); }
+.dark .border-pink-200    { border-color: rgba(236, 72, 153, 0.3); }
+
+/* Misc accent surfaces */
+.dark .bg-red-50    { background-color: rgba(239, 68, 68, 0.1); }
+.dark .border-red-200 { border-color: rgba(239, 68, 68, 0.3); }
+.dark .bg-xero-green\/5   { background-color: rgba(0, 176, 135, 0.08); }
+.dark .bg-xero-green\/10  { background-color: rgba(0, 176, 135, 0.12); }
+.dark .bg-blue-50         { background-color: rgba(59, 130, 246, 0.1); }
+.dark .bg-amber-100       { background-color: rgba(245, 158, 11, 0.15); }
+.dark .bg-violet-100      { background-color: rgba(139, 92, 246, 0.15); }
+.dark .bg-blue-100        { background-color: rgba(59, 130, 246, 0.15); }
+.dark .bg-emerald-100     { background-color: rgba(16, 185, 129, 0.15); }
+
+/* DashboardHeader specifically */
+.dark header.border-b { background-color: #1E293B; }
+
+/* Scrollbar in dark mode */
+.dark ::-webkit-scrollbar { width: 6px; height: 6px; }
+.dark ::-webkit-scrollbar-track { background: #0F172A; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
