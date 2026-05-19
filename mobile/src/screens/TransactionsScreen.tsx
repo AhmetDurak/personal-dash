@@ -6,6 +6,7 @@ import { useTransactions } from '../hooks/useTransactions'
 import { TransactionList } from '../components/native/TransactionList'
 import { AddEntryModal } from '../components/native/AddEntryModal'
 import { formatMonth } from '../utils/format'
+import { API_BASE } from '../config'
 
 interface Props { month: string }
 
@@ -15,18 +16,20 @@ export function TransactionsScreen({ month }: Props) {
   const { data: transactions, isLoading, mutate: mutateList } = useTransactions(month)
 
   function onSaved() { mutateList() }
-  function onDeleted() { mutate(`/api/summary/${month}`); mutateList() }
+  function onDeleted() { mutate(`${API_BASE}/api/summary/${month}`); mutateList() }
 
   return (
-    <SafeAreaView style={s.root} edges={['bottom']}>
+    <SafeAreaView style={s.root} edges={['top', 'bottom']}>
       <View style={s.header}>
         <Text style={s.heading}>{formatMonth(month)}</Text>
         <Text style={s.count}>{transactions ? `${transactions.length} entries` : ''}</Text>
       </View>
       <TransactionList
-        data={transactions ?? []}
-        isLoading={isLoading}
-        onDeleted={onDeleted}
+        transactions={transactions ?? []}
+        onDelete={async (id) => {
+          await fetch(`${API_BASE}/api/entries/${id}`, { method: 'DELETE' })
+          onDeleted()
+        }}
       />
       <TouchableOpacity style={s.fab} onPress={() => setModal(true)} activeOpacity={0.8}>
         <Text style={s.fabText}>+</Text>

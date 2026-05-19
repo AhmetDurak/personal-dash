@@ -1,17 +1,22 @@
 import axios, { AxiosError } from 'axios'
 import { OAuthToken, BankAccount, RawTransaction, BankError } from './types'
 
-const BASE = process.env.DB_API_BASE ?? 'https://simulator-api.db.com/gw'
+const BASE = (process.env.DB_API_BASE ?? 'https://simulator-api.db.com').replace(/\/gw\/?$/, '') + '/gw'
 
 export class BankAgent {
-  async getToken(code: string): Promise<OAuthToken> {
-    return this.post<OAuthToken>('/oidc/token', new URLSearchParams({
+  async getToken(code: string, codeVerifier?: string): Promise<OAuthToken> {
+    const body: Record<string, string> = {
       grant_type: 'authorization_code',
       code,
       client_id: process.env.DB_CLIENT_ID!,
-      client_secret: process.env.DB_CLIENT_SECRET!,
       redirect_uri: process.env.DB_REDIRECT_URI!,
-    }))
+    }
+    if (codeVerifier) {
+      body.code_verifier = codeVerifier
+    } else {
+      body.client_secret = process.env.DB_CLIENT_SECRET!
+    }
+    return this.post<OAuthToken>('/oidc/token', new URLSearchParams(body))
   }
 
   async refreshToken(refresh: string): Promise<OAuthToken> {
@@ -25,7 +30,7 @@ export class BankAgent {
 
   async getAccounts(token: string): Promise<BankAccount[]> {
     const { data } = await this.get<{ accounts: BankAccount[] }>(
-      '/dbapi/banking/v2/accounts',
+      '/dbapi/banking/cashAccounts/v2',
       token
     )
     return data.accounts
@@ -38,7 +43,7 @@ export class BankAgent {
     to: string
   ): Promise<RawTransaction[]> {
     const { data } = await this.get<{ transactions: RawTransaction[] }>(
-      '/dbapi/banking/v2/transactions',
+      '/dbapi/banking/transactions/v2',
       token,
       { iban, bookingDateFrom: from, bookingDateTo: to }
     )

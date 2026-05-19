@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express'
 import { BankAgent } from '../../agents/bank/BankAgent'
 import { CategoryAgent } from '../../agents/category/CategoryAgent'
 import { LedgerAgent } from '../../agents/ledger/LedgerAgent'
-import { buildAuthUrl } from '../../agents/bank/auth'
+import { buildAuthUrl, consumeVerifier } from '../../agents/bank/auth'
+import { performSimulatorLogin } from '../../agents/bank/simulator'
 
 export function bankRouter(ledger: LedgerAgent): Router {
   const router = Router()
@@ -15,13 +16,24 @@ export function bankRouter(ledger: LedgerAgent): Router {
 
   router.get('/auth/callback', async (req: Request, res: Response) => {
     const code = req.query.code as string
+    const state = req.query.state as string
     if (!code) {
       res.status(400).json({ error: 'Missing code' })
       return
     }
     try {
-      const token = await bank.getToken(code)
+      const verifier = consumeVerifier(state)
+      const token = await bank.getToken(code, verifier)
       res.json(token)
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message })
+    }
+  })
+
+  router.post('/connect', async (_req: Request, res: Response) => {
+    try {
+      const { accessToken, refreshToken } = await performSimulatorLogin()
+      res.json({ access_token: accessToken, refresh_token: refreshToken })
     } catch (err) {
       res.status(502).json({ error: (err as Error).message })
     }

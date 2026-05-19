@@ -12,3 +12,9 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tx_month ON transactions(month);
+
+CREATE TABLE IF NOT EXISTS etf_watchlist (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticker     TEXT NOT NULL UNIQUE,
+  added_at   TIMESTAMPTZ DEFAULT now()
+);

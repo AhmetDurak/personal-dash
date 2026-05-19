@@ -1,8 +1,12 @@
 export type TxType = 'income' | 'expense'
 
 export type Category =
-  | 'Income' | 'Fixed' | 'Market' | 'Health'
-  | 'Investment' | 'Education' | 'Entertainment' | 'Others'
+  | 'Income' | 'Salary' | 'Freelance' | 'Investment Income' | 'Other Income'
+  | 'Fixed' | 'Market' | 'Health' | 'Investment' | 'Education' | 'Entertainment' | 'Others'
+
+export const INCOME_CATS: Category[] = [
+  'Salary', 'Freelance', 'Investment Income', 'Other Income', 'Income',
+]
 
 export const EXPENSE_CATS: Category[] = [
   'Fixed', 'Market', 'Health', 'Investment', 'Education', 'Entertainment', 'Others',
@@ -27,6 +31,7 @@ export interface MonthSummary {
   net: number
   endBalance: number
   investmentsYTD: number
+  savingsRate: number
 }
 
 export interface BalanceSeries { labels: string[]; balance: number[]; investmentsYTD: number[] }

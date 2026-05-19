@@ -8,6 +8,7 @@ import { summaryRouter } from './routes/summary'
 import { bankRouter } from './routes/bank'
 import { chartsRouter } from './routes/charts'
 import { importPdfRouter } from './routes/importPdf'
+import { etfRouter } from './routes/etf'
 
 const app = express()
 app.use(express.json())
@@ -20,6 +21,7 @@ app.use('/api', summaryRouter(ledger))
 app.use('/api/bank', bankRouter(ledger))
 app.use('/api/charts', chartsRouter(ledger))
 app.use('/api/import/pdf', importPdfRouter(ledger))
+app.use('/api/etf', etfRouter())
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
 

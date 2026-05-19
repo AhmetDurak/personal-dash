@@ -20,7 +20,7 @@ export function OverviewScreen({ month }: Props) {
   function onSaved() { mutateSummary() }
 
   return (
-    <SafeAreaView style={s.root} edges={['bottom']}>
+    <SafeAreaView style={s.root} edges={['top', 'bottom']}>
       <ScrollView
         contentContainerStyle={s.content}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={() => mutate(`/api/summary/${month}`)} />}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
 import * as Haptics from 'expo-haptics'
-import { EXPENSE_CATS } from '../../types'
+import { EXPENSE_CATS, INCOME_CATS } from '../../types'
 import { API_BASE } from '../../config'
 import type { Category, TxType } from '../../types'
 
@@ -20,7 +20,7 @@ export function AddEntryModal({ month, visible, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false)
 
   const set = (patch: Partial<Form>) => setForm(f => ({ ...f, ...patch }))
-  const cats = form.type === 'income' ? (['Income'] as Category[]) : EXPENSE_CATS
+  const cats = form.type === 'income' ? INCOME_CATS : EXPENSE_CATS
 
   async function handleSave() {
     const err = validate(form)
@@ -57,7 +57,7 @@ export function AddEntryModal({ month, visible, onClose, onSaved }: Props) {
             {(['expense', 'income'] as TxType[]).map(t => (
               <TouchableOpacity
                 key={t} style={[s.toggleBtn, form.type === t && s.toggleActive]}
-                onPress={() => set({ type: t, category: t === 'income' ? 'Income' : 'Others' })}
+                onPress={() => set({ type: t, category: t === 'income' ? 'Salary' : 'Others' })}
               >
                 <Text style={[s.toggleText, form.type === t && s.toggleTextActive]}>{t}</Text>
               </TouchableOpacity>

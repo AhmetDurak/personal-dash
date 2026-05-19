@@ -6,12 +6,12 @@ interface Props { summary: MonthSummary }
 
 export function KPIGrid({ summary }: Props) {
   const cards = [
-    { label: 'Income', value: formatEur(summary.income), color: '#1D9E75' },
-    { label: 'Expenses', value: formatEur(summary.totalExpenses), color: '#D85A30' },
-    { label: 'Net', value: formatEur(summary.net), color: summary.net >= 0 ? '#1D9E75' : '#D85A30' },
-    { label: 'Balance', value: formatEur(summary.endBalance), color: '#111' },
-    { label: 'Investments', value: formatEur(summary.byCategory.Investment ?? 0), color: '#534AB7' },
-    { label: 'YTD Invest.', value: formatEur(summary.investmentsYTD), color: '#7B72D4' },
+    { label: 'Income',       value: formatEur(summary.income),                     color: '#1D9E75' },
+    { label: 'Expenses',     value: formatEur(summary.totalExpenses),               color: '#D85A30' },
+    { label: 'Net',          value: formatEur(summary.net),                         color: summary.net >= 0 ? '#1D9E75' : '#D85A30' },
+    { label: 'Savings Rate', value: `${(summary.savingsRate * 100).toFixed(1)}%`,   color: '#0EA5E9' },
+    { label: 'Balance',      value: formatEur(summary.endBalance),                  color: '#534AB7' },
+    { label: 'YTD Invest.',  value: formatEur(summary.investmentsYTD),              color: '#7B72D4' },
   ]
 
   return (
