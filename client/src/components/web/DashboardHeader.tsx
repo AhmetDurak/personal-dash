@@ -1,15 +1,26 @@
-import { formatMonth } from '../../utils/format'
+import { MonthSelector } from './MonthSelector'
 
-interface Props { month: string }
+const TITLES: Record<string, string> = {
+  overview:     'Profit & Loss',
+  cashflow:     'Cash Flow',
+  simplified:   'Simplified',
+  transactions: 'Transactions',
+}
 
-export function DashboardHeader({ month }: Props) {
+interface Props {
+  tab: string
+  month: string
+  onMonthChange: (m: string) => void
+}
+
+export function DashboardHeader({ tab, month, onMonthChange }: Props) {
   return (
-    <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">Finance Dashboard</h1>
-        <p className="text-sm text-gray-500">{formatMonth(month)}</p>
+    <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-xero-border">
+      <h1 className="text-xl font-semibold text-gray-900">{TITLES[tab] ?? 'Dashboard'}</h1>
+      <div className="flex items-center gap-3">
+        {tab !== 'transactions' && <MonthSelector month={month} onChange={onMonthChange} align="right" />}
+        <span className="text-xs font-semibold px-2.5 py-1 bg-xero-green/10 text-xero-green rounded-full">PSD2</span>
       </div>
-      <span className="text-xs font-medium px-2 py-1 bg-blue-50 text-blue-700 rounded">PSD2</span>
     </header>
   )
 }

@@ -40,6 +40,42 @@ export function chartsRouter(ledger: LedgerAgent): Router {
     }
   })
 
+  // GET /api/charts/stacked-expenses?months=2026-01,2026-02,...
+  router.get('/stacked-expenses', async (req: Request, res: Response) => {
+    const months = parseMonths(req.query.months as string)
+    if (!months.length) { res.status(400).json({ error: 'months query param required' }); return }
+    try {
+      const summaries = await Promise.all(months.map(m => ledger.getSummary(m)))
+      res.json(chart.getStackedExpenses(summaries))
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message })
+    }
+  })
+
+  // GET /api/charts/stacked-income?months=2026-01,2026-02,...
+  router.get('/stacked-income', async (req: Request, res: Response) => {
+    const months = parseMonths(req.query.months as string)
+    if (!months.length) { res.status(400).json({ error: 'months query param required' }); return }
+    try {
+      const summaries = await Promise.all(months.map(m => ledger.getSummary(m)))
+      res.json(chart.getStackedIncome(summaries))
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message })
+    }
+  })
+
+  // GET /api/charts/top-payees?month=2026-05&limit=10
+  router.get('/top-payees', async (req: Request, res: Response) => {
+    const month = req.query.month as string
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) { res.status(400).json({ error: 'month query param required (YYYY-MM)' }); return }
+    const limit = Math.min(Number(req.query.limit ?? 10), 50)
+    try {
+      res.json(await ledger.topPayees(month, limit))
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message })
+    }
+  })
+
   return router
 }
 

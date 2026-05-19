@@ -23,9 +23,11 @@ export class PostgresRepository implements TransactionRepository {
   }
 
   async update(id: string, patch: Partial<Transaction>): Promise<Transaction> {
-    const fields = Object.keys(patch) as (keyof Transaction)[]
-    const sets = fields.map((f, i) => `${f} = $${i + 2}`).join(', ')
-    const values = fields.map(f => patch[f])
+    const effective: Record<string, unknown> = { ...patch }
+    if (patch.date) effective['month'] = patch.date.slice(0, 7)
+    const keys = Object.keys(effective)
+    const sets = keys.map((f, i) => `${f} = $${i + 2}`).join(', ')
+    const values = keys.map(k => effective[k])
     const { rows } = await this.pool.query(
       `UPDATE transactions SET ${sets} WHERE id = $1 RETURNING *`,
       [id, ...values]
@@ -36,6 +38,50 @@ export class PostgresRepository implements TransactionRepository {
 
   async delete(id: string): Promise<void> {
     await this.pool.query('DELETE FROM transactions WHERE id = $1', [id])
+  }
+
+  async aggregateNetUpToMonth(month: string): Promise<number> {
+    const { rows } = await this.pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END), 0) AS net
+       FROM transactions WHERE month <= $1`,
+      [month]
+    )
+    return Number(rows[0].net)
+  }
+
+  async aggregateCategoryInRange(category: string, fromMonth: string, toMonth: string): Promise<number> {
+    const { rows } = await this.pool.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM transactions
+       WHERE category = $1 AND month >= $2 AND month <= $3`,
+      [category, fromMonth, toMonth]
+    )
+    return Number(rows[0].total)
+  }
+
+  async findDuplicate(date: string, name: string, amount: number): Promise<Transaction | null> {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM transactions WHERE date = $1 AND LOWER(name) = LOWER($2) AND amount = $3 LIMIT 1`,
+      [date, name, amount]
+    )
+    return rows[0] ? this.toTransaction(rows[0]) : null
+  }
+
+  async recategorizeByName(name: string, category: string): Promise<number> {
+    const { rowCount } = await this.pool.query(
+      `UPDATE transactions SET category = $1 WHERE LOWER(name) = LOWER($2) AND category != $1`,
+      [category, name]
+    )
+    return rowCount ?? 0
+  }
+
+  async getTopPayees(month: string, limit: number): Promise<{ name: string; total: number }[]> {
+    const { rows } = await this.pool.query(
+      `SELECT name, SUM(amount) AS total FROM transactions
+       WHERE month = $1 AND type = 'expense'
+       GROUP BY name ORDER BY total DESC LIMIT $2`,
+      [month, limit]
+    )
+    return rows.map(r => ({ name: r.name as string, total: Number(r.total) }))
   }
 
   private toTransaction(row: Record<string, unknown>): Transaction {

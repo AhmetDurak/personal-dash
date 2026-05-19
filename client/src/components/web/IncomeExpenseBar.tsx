@@ -11,17 +11,17 @@ export function IncomeExpenseBar({ data }: Props) {
   }))
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <p className="text-sm font-medium text-gray-700 mb-3">Income vs Expenses</p>
+    <div className="bg-white rounded-xl shadow-sm border border-xero-border p-6">
+      <h2 className="text-base font-semibold text-gray-800 mb-4">Income vs Expenses</h2>
       <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${v}€`} />
-          <Tooltip formatter={(v: number) => `${v.toFixed(2)} €`} />
-          <Legend />
-          <Bar dataKey="income" fill="#1D9E75" name="Income" radius={[3, 3, 0, 0]} />
-          <Bar dataKey="expenses" fill="#D85A30" name="Expenses" radius={[3, 3, 0, 0]} />
+        <BarChart data={chartData} barGap={4}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#E8EBF0" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} />
+          <Tooltip formatter={(v: number) => `${v.toFixed(2)} €`} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0' }} />
+          <Legend iconType="circle" iconSize={8} />
+          <Bar dataKey="income" fill="#00B087" name="Income" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="expenses" fill="#EF4444" name="Expenses" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
