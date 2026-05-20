@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express'
 import multer from 'multer'
 import { parsePDF, ParsedTx } from '../../agents/bank/pdfParser'
-import { LedgerAgent } from '../../agents/ledger/LedgerAgent'
 import { Transaction } from '../../types'
 import { unlink } from 'fs/promises'
 import os from 'os'
@@ -13,7 +12,7 @@ interface ConfirmEntry {
   overrideId?: string  // if set: PATCH that existing entry instead of creating new
 }
 
-export function importPdfRouter(ledger: LedgerAgent): Router {
+export function importPdfRouter(): Router {
   const router = Router()
 
   // Phase 1: parse PDF and return ready entries + conflicts for user review
@@ -26,7 +25,7 @@ export function importPdfRouter(ledger: LedgerAgent): Router {
       const conflicts: { existing: Transaction; incoming: ParsedTx }[] = []
 
       for (const tx of txs) {
-        const dupe = await ledger.findDuplicate(tx.date, tx.name, tx.amount)
+        const dupe = await req.ledger.findDuplicate(tx.date, tx.name, tx.amount)
         if (dupe) conflicts.push({ existing: dupe, incoming: tx })
         else ready.push(tx)
       }
@@ -51,7 +50,7 @@ export function importPdfRouter(ledger: LedgerAgent): Router {
     for (const { tx, overrideId } of entries) {
       try {
         if (overrideId) {
-          await ledger.updateEntry(overrideId, {
+          await req.ledger.updateEntry(overrideId, {
             date: tx.date,
             name: tx.name,
             amount: tx.amount,
@@ -60,7 +59,7 @@ export function importPdfRouter(ledger: LedgerAgent): Router {
           })
           overridden++
         } else {
-          await ledger.addEntry({
+          await req.ledger.addEntry({
             date: tx.date,
             name: tx.name,
             amount: tx.amount,

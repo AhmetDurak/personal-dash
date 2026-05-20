@@ -1,11 +1,10 @@
 import { Router, Request, Response } from 'express'
 import { BankAgent } from '../../agents/bank/BankAgent'
 import { CategoryAgent } from '../../agents/category/CategoryAgent'
-import { LedgerAgent } from '../../agents/ledger/LedgerAgent'
 import { buildAuthUrl, consumeVerifier } from '../../agents/bank/auth'
 import { performSimulatorLogin } from '../../agents/bank/simulator'
 
-export function bankRouter(ledger: LedgerAgent): Router {
+export function bankRouter(): Router {
   const router = Router()
   const bank = new BankAgent()
   const category = new CategoryAgent()
@@ -49,7 +48,7 @@ export function bankRouter(ledger: LedgerAgent): Router {
     try {
       const raw = await bank.getTransactions(token, iban, from, to)
       const txs = category.classifyBatch(raw)
-      const saved = await ledger.saveBankTransactions(txs)
+      const saved = await req.ledger.saveBankTransactions(txs)
       res.json({ synced: saved.length, transactions: saved })
     } catch (err) {
       res.status(502).json({ error: (err as Error).message })

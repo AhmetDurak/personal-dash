@@ -105,24 +105,30 @@ async function safeQuoteSummary(ticker: string, modules: string[]): Promise<Reco
 }
 
 export class ETFAgent {
-  constructor(private pool: Pool) {}
+  constructor(private pool: Pool, private userId: number) {}
 
   // ── Watchlist ──────────────────────────────────────────────────────────────
 
   async list(): Promise<string[]> {
-    const { rows } = await this.pool.query('SELECT ticker FROM etf_watchlist ORDER BY added_at')
+    const { rows } = await this.pool.query(
+      'SELECT ticker FROM etf_watchlist WHERE user_id = $1 ORDER BY added_at',
+      [this.userId]
+    )
     return rows.map(r => r.ticker as string)
   }
 
   async add(ticker: string): Promise<void> {
     await this.pool.query(
-      'INSERT INTO etf_watchlist (ticker) VALUES ($1) ON CONFLICT (ticker) DO NOTHING',
-      [ticker.toUpperCase()]
+      'INSERT INTO etf_watchlist (ticker, user_id) VALUES ($1, $2) ON CONFLICT (ticker) DO NOTHING',
+      [ticker.toUpperCase(), this.userId]
     )
   }
 
   async remove(ticker: string): Promise<void> {
-    await this.pool.query('DELETE FROM etf_watchlist WHERE ticker = $1', [ticker.toUpperCase()])
+    await this.pool.query(
+      'DELETE FROM etf_watchlist WHERE ticker = $1 AND user_id = $2',
+      [ticker.toUpperCase(), this.userId]
+    )
   }
 
   // ── Data fetching ──────────────────────────────────────────────────────────

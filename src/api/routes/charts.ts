@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express'
-import { LedgerAgent } from '../../agents/ledger/LedgerAgent'
 import { ChartAgent } from '../../agents/chart/ChartAgent'
 
-export function chartsRouter(ledger: LedgerAgent): Router {
+export function chartsRouter(): Router {
   const router = Router()
   const chart = new ChartAgent()
 
@@ -11,7 +10,7 @@ export function chartsRouter(ledger: LedgerAgent): Router {
     const months = parseMonths(req.query.months as string)
     if (!months.length) { res.status(400).json({ error: 'months query param required (YYYY-MM,...)' }); return }
     try {
-      const summaries = await Promise.all(months.map(m => ledger.getSummary(m)))
+      const summaries = await Promise.all(months.map(m => req.ledger.getSummary(m)))
       res.json(chart.getBalanceSeries(summaries))
     } catch (err) {
       res.status(500).json({ error: (err as Error).message })
@@ -21,7 +20,7 @@ export function chartsRouter(ledger: LedgerAgent): Router {
   // GET /api/charts/donut/:month
   router.get('/donut/:month', async (req: Request, res: Response) => {
     try {
-      const summary = await ledger.getSummary(req.params.month)
+      const summary = await req.ledger.getSummary(req.params.month)
       res.json(chart.getCategoryDonut(summary))
     } catch (err) {
       res.status(500).json({ error: (err as Error).message })
@@ -33,7 +32,7 @@ export function chartsRouter(ledger: LedgerAgent): Router {
     const months = parseMonths(req.query.months as string)
     if (!months.length) { res.status(400).json({ error: 'months query param required (YYYY-MM,...)' }); return }
     try {
-      const summaries = await Promise.all(months.map(m => ledger.getSummary(m)))
+      const summaries = await Promise.all(months.map(m => req.ledger.getSummary(m)))
       res.json(chart.getIncomeVsExpenseBar(summaries))
     } catch (err) {
       res.status(500).json({ error: (err as Error).message })
@@ -45,7 +44,7 @@ export function chartsRouter(ledger: LedgerAgent): Router {
     const months = parseMonths(req.query.months as string)
     if (!months.length) { res.status(400).json({ error: 'months query param required' }); return }
     try {
-      const summaries = await Promise.all(months.map(m => ledger.getSummary(m)))
+      const summaries = await Promise.all(months.map(m => req.ledger.getSummary(m)))
       res.json(chart.getStackedExpenses(summaries))
     } catch (err) {
       res.status(500).json({ error: (err as Error).message })
@@ -57,7 +56,7 @@ export function chartsRouter(ledger: LedgerAgent): Router {
     const months = parseMonths(req.query.months as string)
     if (!months.length) { res.status(400).json({ error: 'months query param required' }); return }
     try {
-      const summaries = await Promise.all(months.map(m => ledger.getSummary(m)))
+      const summaries = await Promise.all(months.map(m => req.ledger.getSummary(m)))
       res.json(chart.getStackedIncome(summaries))
     } catch (err) {
       res.status(500).json({ error: (err as Error).message })
@@ -70,7 +69,7 @@ export function chartsRouter(ledger: LedgerAgent): Router {
     if (!month || !/^\d{4}-\d{2}$/.test(month)) { res.status(400).json({ error: 'month query param required (YYYY-MM)' }); return }
     const limit = Math.min(Number(req.query.limit ?? 10), 50)
     try {
-      res.json(await ledger.topPayees(month, limit))
+      res.json(await req.ledger.topPayees(month, limit))
     } catch (err) {
       res.status(500).json({ error: (err as Error).message })
     }

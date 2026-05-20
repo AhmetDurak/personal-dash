@@ -1,3 +1,23 @@
+CREATE TABLE IF NOT EXISTS users (
+  id            SERIAL PRIMARY KEY,
+  google_id     TEXT NOT NULL UNIQUE,
+  email         TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  picture       TEXT,
+  bearer_token  TEXT UNIQUE DEFAULT gen_random_uuid()::text,
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
+-- Backfill bearer_token for rows created before this column existed
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bearer_token TEXT UNIQUE DEFAULT gen_random_uuid()::text;
+UPDATE users SET bearer_token = gen_random_uuid()::text WHERE bearer_token IS NULL;
+
+CREATE TABLE IF NOT EXISTS sessions (
+  sid    TEXT NOT NULL PRIMARY KEY,
+  sess   JSONB NOT NULL,
+  expire TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_expire_idx ON sessions(expire);
+
 CREATE TABLE IF NOT EXISTS transactions (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   date        DATE NOT NULL,
@@ -58,3 +78,11 @@ CREATE TABLE IF NOT EXISTS vocabulary (
   due_at       DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at   TIMESTAMPTZ DEFAULT now()
 );
+
+-- User isolation columns (added after initial schema)
+ALTER TABLE reminders      ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+ALTER TABLE vocabulary     ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+ALTER TABLE transactions   ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+ALTER TABLE etf_watchlist  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);

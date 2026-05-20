@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express'
-import { LedgerAgent } from '../../agents/ledger/LedgerAgent'
 
-export function entriesRouter(ledger: LedgerAgent): Router {
+export function entriesRouter(): Router {
   const router = Router()
 
   router.post('/', async (req: Request, res: Response) => {
@@ -10,7 +9,7 @@ export function entriesRouter(ledger: LedgerAgent): Router {
       const skip = skipDuplicate === true || req.query.skipDuplicate === 'true'
 
       if (!skip && !repeat) {
-        const dupe = await ledger.findDuplicate(entry.date, entry.name, Math.round(Number(entry.amount)))
+        const dupe = await req.ledger.findDuplicate(entry.date, entry.name, Math.round(Number(entry.amount)))
         if (dupe) { res.status(409).json({ conflict: dupe }); return }
       }
 
@@ -20,12 +19,12 @@ export function entriesRouter(ledger: LedgerAgent): Router {
             const d = new Date(entry.date)
             d.setMonth(d.getMonth() + i * repeat)
             const date = d.toISOString().slice(0, 10)
-            return ledger.addEntry({ ...entry, date })
+            return req.ledger.addEntry({ ...entry, date })
           })
         )
         res.status(201).json(txs)
       } else {
-        const tx = await ledger.addEntry(entry)
+        const tx = await req.ledger.addEntry(entry)
         res.status(201).json(tx)
       }
     } catch (err) {
@@ -37,7 +36,7 @@ export function entriesRouter(ledger: LedgerAgent): Router {
     const { name, category } = req.body as { name: string; category: string }
     if (!name || !category) { res.status(400).json({ error: 'name and category required' }); return }
     try {
-      const updated = await ledger.recategorizeByName(name, category)
+      const updated = await req.ledger.recategorizeByName(name, category)
       res.json({ updated })
     } catch (err) {
       res.status(400).json({ error: (err as Error).message })
@@ -46,7 +45,7 @@ export function entriesRouter(ledger: LedgerAgent): Router {
 
   router.patch('/:id', async (req: Request, res: Response) => {
     try {
-      const tx = await ledger.updateEntry(req.params.id, req.body)
+      const tx = await req.ledger.updateEntry(req.params.id, req.body)
       res.json(tx)
     } catch (err) {
       res.status(404).json({ error: (err as Error).message })
@@ -55,7 +54,7 @@ export function entriesRouter(ledger: LedgerAgent): Router {
 
   router.delete('/:id', async (req: Request, res: Response) => {
     try {
-      await ledger.deleteEntry(req.params.id)
+      await req.ledger.deleteEntry(req.params.id)
       res.status(204).send()
     } catch (err) {
       res.status(404).json({ error: (err as Error).message })
