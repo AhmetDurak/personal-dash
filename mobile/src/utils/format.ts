@@ -19,6 +19,12 @@ export function prevMonths(n: number, from = currentMonth()): string[] {
   })
 }
 
+export function formatEurCompact(cents: number): string {
+  const euros = cents / 100
+  if (Math.abs(euros) >= 1000) return `${(euros / 1000).toFixed(1)}k€`
+  return `${euros.toFixed(0)}€`
+}
+
 export function prevMonth(ym: string): string {
   const [y, m] = ym.split('-').map(Number)
   const d = new Date(y, m - 2)

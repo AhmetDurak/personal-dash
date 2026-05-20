@@ -1,37 +1,50 @@
-import { View, Text, StyleSheet, Dimensions } from 'react-native'
-import { VictoryBar, VictoryChart, VictoryAxis, VictoryGroup, VictoryLegend } from 'victory-native'
+import { View, Text, StyleSheet, useWindowDimensions } from 'react-native'
+import { VictoryBar, VictoryChart, VictoryAxis, VictoryGroup } from 'victory-native'
+import { formatEurCompact } from '../../utils/format'
 import type { BarDataset } from '../../types'
 
 interface Props { data: BarDataset }
 
-const W = Dimensions.get('window').width - 32
-
 export function IncomeExpenseBar({ data }: Props) {
+  const { width } = useWindowDimensions()
+  const W = width - 32
+
   const income = data.labels.map((x, i) => ({ x, y: data.income[i] }))
   const expenses = data.labels.map((x, i) => ({ x, y: data.expenses[i] }))
 
   return (
     <View style={s.card}>
       <Text style={s.title}>Income vs Expenses</Text>
-      <VictoryChart width={W} height={200} padding={{ top: 10, bottom: 40, left: 50, right: 10 }}>
-        <VictoryAxis style={{ tickLabels: { fontSize: 10 } }} />
-        <VictoryAxis dependentAxis style={{ tickLabels: { fontSize: 10 } }} tickFormat={v => `${v}€`} />
-        <VictoryGroup offset={12}>
-          <VictoryBar data={income} style={{ data: { fill: '#1D9E75' } }} />
-          <VictoryBar data={expenses} style={{ data: { fill: '#D85A30' } }} />
+      <View style={s.legend}>
+        <View style={s.legendItem}><View style={[s.dot, { backgroundColor: '#1D9E75' }]} /><Text style={s.legendText}>Income</Text></View>
+        <View style={s.legendItem}><View style={[s.dot, { backgroundColor: '#D85A30' }]} /><Text style={s.legendText}>Expenses</Text></View>
+      </View>
+      <VictoryChart width={W} height={190} padding={{ top: 8, bottom: 36, left: 58, right: 10 }}>
+        <VictoryAxis style={{ tickLabels: { fontSize: 9, fill: '#9ca3af' } }} />
+        <VictoryAxis dependentAxis
+          style={{ tickLabels: { fontSize: 9, fill: '#9ca3af' } }}
+          tickFormat={v => formatEurCompact(v)}
+        />
+        <VictoryGroup offset={10}>
+          <VictoryBar data={income}
+            style={{ data: { fill: '#1D9E75', borderRadius: 2 } }}
+            barWidth={8}
+          />
+          <VictoryBar data={expenses}
+            style={{ data: { fill: '#D85A30', borderRadius: 2 } }}
+            barWidth={8}
+          />
         </VictoryGroup>
       </VictoryChart>
-      <VictoryLegend
-        x={0} y={0} width={W} height={24}
-        orientation="horizontal"
-        data={[{ name: 'Income', symbol: { fill: '#1D9E75' } }, { name: 'Expenses', symbol: { fill: '#D85A30' } }]}
-        style={{ labels: { fontSize: 11 } }}
-      />
     </View>
   )
 }
 
 const s = StyleSheet.create({
-  card: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e5e7eb', padding: 12 },
-  title: { fontSize: 13, fontWeight: '500', color: '#374151', marginBottom: 4 },
+  card: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', padding: 14 },
+  title: { fontSize: 13, fontWeight: '600', color: '#111827', marginBottom: 8 },
+  legend: { flexDirection: 'row', gap: 16, marginBottom: 4 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: 11, color: '#6b7280' },
 })

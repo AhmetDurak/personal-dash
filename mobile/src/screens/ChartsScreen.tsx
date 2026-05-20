@@ -4,9 +4,14 @@ import { useBalanceSeries, useCategoryDonut, useIncomeExpenseBar } from '../hook
 import { BalanceChart } from '../components/native/BalanceChart'
 import { CategoryDonut } from '../components/native/CategoryDonut'
 import { IncomeExpenseBar } from '../components/native/IncomeExpenseBar'
+import { SavingsRateChart } from '../components/native/SavingsRateChart'
 import { prevMonths, formatMonth } from '../utils/format'
 
 interface Props { month: string }
+
+function SectionHeader({ title }: { title: string }) {
+  return <Text style={s.sectionHeader}>{title}</Text>
+}
 
 export function ChartsScreen({ month }: Props) {
   const months = prevMonths(6, month)
@@ -22,14 +27,43 @@ export function ChartsScreen({ month }: Props) {
       <ScrollView
         contentContainerStyle={s.content}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} />}
+        showsVerticalScrollIndicator={false}
       >
         <Text style={s.heading}>{formatMonth(month)}</Text>
-        {series && <BalanceChart data={series} />}
-        {donut && <View style={{ marginTop: 12 }}><CategoryDonut data={donut} /></View>}
-        {bar && <View style={{ marginTop: 12 }}><IncomeExpenseBar data={bar} /></View>}
+
         {isLoading && !series && !donut && !bar && (
           <Text style={s.loading}>Loading charts…</Text>
         )}
+
+        {bar && (
+          <>
+            <SectionHeader title="Savings Rate — 6 months" />
+            <SavingsRateChart data={bar} />
+          </>
+        )}
+
+        {series && (
+          <>
+            <SectionHeader title="Balance Trend" />
+            <BalanceChart data={series} />
+          </>
+        )}
+
+        {bar && (
+          <>
+            <SectionHeader title="Income vs Expenses" />
+            <IncomeExpenseBar data={bar} />
+          </>
+        )}
+
+        {donut && (
+          <>
+            <SectionHeader title="This Month by Category" />
+            <CategoryDonut data={donut} />
+          </>
+        )}
+
+        <View style={{ height: 16 }} />
       </ScrollView>
     </SafeAreaView>
   )
@@ -37,7 +71,8 @@ export function ChartsScreen({ month }: Props) {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
-  heading: { fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 4 },
+  content: { padding: 16, paddingBottom: 32 },
+  heading: { fontSize: 18, fontWeight: '600', color: '#111827', marginBottom: 16 },
+  sectionHeader: { fontSize: 11, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, marginTop: 8 },
   loading: { color: '#9ca3af', fontSize: 14, textAlign: 'center', marginTop: 40 },
 })
