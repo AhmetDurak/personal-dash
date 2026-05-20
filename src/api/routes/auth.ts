@@ -11,7 +11,7 @@ export function authRouter() {
   router.get('/google/callback',
     passport.authenticate('google', { failureRedirect: '/login' }),
     (_req, res) => {
-      res.redirect(process.env.FRONTEND_URL ?? 'http://localhost:5173')
+      res.redirect(process.env.FRONTEND_URL ?? '/')
     }
   )
 
