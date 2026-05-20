@@ -4,10 +4,15 @@
     "slug": "finance-dash",
     "version": "1.0.0",
     "orientation": "portrait",
-    "platforms": ["ios"],
+    "platforms": [
+      "ios"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.financedash.app"
-    }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

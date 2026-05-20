@@ -1,15 +1,16 @@
+import { useState } from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { Text } from 'react-native'
+import { Text, View, TouchableOpacity, StyleSheet } from 'react-native'
 import { OverviewScreen } from '../screens/OverviewScreen'
 import { TransactionsScreen } from '../screens/TransactionsScreen'
 import { ChartsScreen } from '../screens/ChartsScreen'
-import { currentMonth } from '../utils/format'
+import { ProfileScreen } from '../screens/ProfileScreen'
+import { currentMonth, prevMonth, nextMonth, formatMonth } from '../utils/format'
 
 const Tab = createBottomTabNavigator()
-const MONTH = currentMonth()
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  const icons: Record<string, string> = { Overview: '⊡', Transactions: '≡', Charts: '∿' }
+  const icons: Record<string, string> = { Overview: '⊡', Transactions: '≡', Charts: '∿', Profile: '◉' }
   return (
     <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.45 }}>
       {icons[label] ?? '●'}
@@ -17,7 +18,35 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   )
 }
 
+function MonthHeader({ month, onChange }: { month: string; onChange: (m: string) => void }) {
+  return (
+    <View style={s.monthBar}>
+      <TouchableOpacity onPress={() => onChange(prevMonth(month))} style={s.arrow}>
+        <Text style={s.arrowText}>‹</Text>
+      </TouchableOpacity>
+      <Text style={s.monthLabel}>{formatMonth(month)}</Text>
+      <TouchableOpacity
+        onPress={() => onChange(nextMonth(month))}
+        style={s.arrow}
+        disabled={month >= currentMonth()}
+      >
+        <Text style={[s.arrowText, month >= currentMonth() && s.arrowDisabled]}>›</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+const s = StyleSheet.create({
+  monthBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  arrow: { padding: 8 },
+  arrowText: { fontSize: 22, color: '#374151', lineHeight: 26 },
+  arrowDisabled: { color: '#D1D5DB' },
+  monthLabel: { fontSize: 15, fontWeight: '600', color: '#111827', minWidth: 110, textAlign: 'center' },
+})
+
 export function AppNavigator() {
+  const [month, setMonth] = useState(currentMonth())
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -30,14 +59,30 @@ export function AppNavigator() {
       })}
     >
       <Tab.Screen name="Overview">
-        {() => <OverviewScreen month={MONTH} />}
+        {() => (
+          <>
+            <MonthHeader month={month} onChange={setMonth} />
+            <OverviewScreen month={month} />
+          </>
+        )}
       </Tab.Screen>
       <Tab.Screen name="Transactions">
-        {() => <TransactionsScreen month={MONTH} />}
+        {() => (
+          <>
+            <MonthHeader month={month} onChange={setMonth} />
+            <TransactionsScreen month={month} />
+          </>
+        )}
       </Tab.Screen>
       <Tab.Screen name="Charts">
-        {() => <ChartsScreen month={MONTH} />}
+        {() => (
+          <>
+            <MonthHeader month={month} onChange={setMonth} />
+            <ChartsScreen month={month} />
+          </>
+        )}
       </Tab.Screen>
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   )
 }

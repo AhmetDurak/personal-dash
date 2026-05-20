@@ -18,7 +18,7 @@ export function ChartsScreen({ month }: Props) {
   function refresh() { r1(); r2(); r3() }
 
   return (
-    <SafeAreaView style={s.root} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.root} edges={['bottom']}>
       <ScrollView
         contentContainerStyle={s.content}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refresh} />}

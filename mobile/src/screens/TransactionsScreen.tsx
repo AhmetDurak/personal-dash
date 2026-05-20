@@ -7,19 +7,21 @@ import { TransactionList } from '../components/native/TransactionList'
 import { AddEntryModal } from '../components/native/AddEntryModal'
 import { formatMonth } from '../utils/format'
 import { API_BASE } from '../config'
+import { useAuthContext } from '../auth/AuthContext'
 
 interface Props { month: string }
 
 export function TransactionsScreen({ month }: Props) {
   const [modal, setModal] = useState(false)
   const { mutate } = useSWRConfig()
+  const { token } = useAuthContext()
   const { data: transactions, isLoading, mutate: mutateList } = useTransactions(month)
 
   function onSaved() { mutateList() }
-  function onDeleted() { mutate(`${API_BASE}/api/summary/${month}`); mutateList() }
+  function onDeleted() { mutate(`/api/summary/${month}`); mutateList() }
 
   return (
-    <SafeAreaView style={s.root} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.root} edges={['bottom']}>
       <View style={s.header}>
         <Text style={s.heading}>{formatMonth(month)}</Text>
         <Text style={s.count}>{transactions ? `${transactions.length} entries` : ''}</Text>
@@ -27,7 +29,10 @@ export function TransactionsScreen({ month }: Props) {
       <TransactionList
         transactions={transactions ?? []}
         onDelete={async (id) => {
-          await fetch(`${API_BASE}/api/entries/${id}`, { method: 'DELETE' })
+          await fetch(`${API_BASE}/api/entries/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          })
           onDeleted()
         }}
       />
