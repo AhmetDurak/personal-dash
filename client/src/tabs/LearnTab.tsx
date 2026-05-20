@@ -546,13 +546,15 @@ export function LearnTab() {
       ? CATEGORIES.find(c => c.id === selection.catId)?.topics.find(t => t.id === selection.topicId) ?? null
       : null
 
+  const [mobileShowContent, setMobileShowContent] = useState(false)
+
   return (
     <div className="flex h-full min-h-0">
       {/* Sidebar */}
-      <div className="w-60 flex-shrink-0 border-r border-xero-border bg-white flex flex-col overflow-y-auto">
+      <div className={`${mobileShowContent ? 'hidden md:flex' : 'flex'} w-full md:w-60 flex-shrink-0 border-r border-xero-border bg-white flex-col overflow-y-auto`}>
         {/* Golden Rules entry */}
         <button
-          onClick={() => setSelection({ type: 'rules' })}
+          onClick={() => { setSelection({ type: 'rules' }); setMobileShowContent(true) }}
           className={`flex items-center gap-3 px-4 py-3 text-sm font-semibold border-b border-gray-100 w-full text-left transition-colors ${
             selection.type === 'rules'
               ? 'bg-amber-50 text-amber-700 border-l-2 border-l-amber-400'
@@ -584,7 +586,7 @@ export function LearnTab() {
                     return (
                       <button
                         key={t.id}
-                        onClick={() => setSelection({ type: 'topic', catId: cat.id, topicId: t.id })}
+                        onClick={() => { setSelection({ type: 'topic', catId: cat.id, topicId: t.id }); setMobileShowContent(true) }}
                         className={`w-full text-left px-6 py-2 text-sm transition-colors ${
                           isActive
                             ? 'text-xero-green font-semibold bg-xero-green/5 border-l-2 border-xero-green'
@@ -610,7 +612,13 @@ export function LearnTab() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto bg-xero-bg">
+      <div className={`${!mobileShowContent ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto bg-xero-bg`}>
+        <button
+          onClick={() => setMobileShowContent(false)}
+          className="md:hidden flex items-center gap-2 px-4 py-3 text-sm text-gray-500 border-b border-gray-100 bg-white hover:bg-gray-50"
+        >
+          <span>←</span> Back
+        </button>
         {selection.type === 'rules' && <GoldenRulesView />}
         {activeTopic && <TopicView topic={activeTopic} />}
       </div>
