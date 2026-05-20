@@ -7,6 +7,7 @@ import { AddEntryModal } from '../components/web/AddEntryModal'
 import { formatEur } from '../utils/format'
 import { MonthSelector } from '../components/web/MonthSelector'
 import { PdfImportModal } from '../components/web/PdfImportModal'
+import { RecurringTemplates } from '../components/web/RecurringTemplates'
 import { CAT_COLORS } from '../constants/categories'
 import { EXPENSE_CATS, INCOME_CATS } from '../types'
 import type { Transaction, Category, PdfPreview } from '../types'
@@ -275,6 +276,7 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
             onToggleAll={handleToggleAll}
           />
       }
+      <div className="mt-4"><RecurringTemplates month={month} /></div>
       {addModal && <AddEntryModal month={month} onClose={() => setAddModal(false)} onSaved={refresh} />}
       {editTx && <AddEntryModal month={month} transaction={editTx} onClose={() => setEditTx(null)} onSaved={refresh} />}
       {pdfPreview && <PdfImportModal preview={pdfPreview} onClose={() => setPdfPreview(null)} onImported={handlePdfImported} />}

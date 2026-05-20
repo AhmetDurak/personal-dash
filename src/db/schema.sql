@@ -79,6 +79,16 @@ CREATE TABLE IF NOT EXISTS vocabulary (
   created_at   TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS recurring_templates (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER REFERENCES users(id),
+  name       TEXT NOT NULL,
+  amount     INTEGER NOT NULL,
+  type       TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+  category   TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS budgets (
   id         SERIAL PRIMARY KEY,
   user_id    INTEGER REFERENCES users(id),

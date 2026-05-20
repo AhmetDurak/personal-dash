@@ -18,6 +18,7 @@ import { etfRouter } from './routes/etf'
 import { notificationsRouter } from './routes/notifications'
 import { notebookRouter } from './routes/notebook'
 import { budgetsRouter } from './routes/budgets'
+import { templatesRouter } from './routes/templates'
 import { authRouter } from './routes/auth'
 
 const PgSession = connectPgSimple(session)
@@ -78,6 +79,7 @@ app.use('/api/etf',           etfRouter())
 app.use('/api/notifications', notificationsRouter(pool))
 app.use('/api/notebook',      notebookRouter(pool))
 app.use('/api/budgets',       budgetsRouter(pool))
+app.use('/api/templates',     templatesRouter(pool))
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
 
