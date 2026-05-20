@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/api/app.ts",
     "build": "npm run build:client && tsc",
-    "build:client": "cd client && npm ci --include=dev && npm run build",
+    "build:client": "cd client && npm ci && npm run build",
     "start": "node dist/api/app.js",
     "db:migrate": "psql $DATABASE_URL -f src/db/schema.sql",
     "import:pdf": "npx tsx scripts/import-db-pdf.ts",
