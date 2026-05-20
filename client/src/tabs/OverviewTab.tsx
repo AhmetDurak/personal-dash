@@ -13,6 +13,7 @@ import { SavingsRateLine } from '../components/web/SavingsRateLine'
 import { CategoryTrendLines } from '../components/web/CategoryTrendLines'
 import { TopPayeesBar } from '../components/web/TopPayeesBar'
 import { AddEntryModal } from '../components/web/AddEntryModal'
+import { BudgetBars } from '../components/web/BudgetBars'
 import type { Span } from '../components/web/BalanceChart'
 
 const SPAN_MONTHS: Record<Span, number> = { '3M': 3, '6M': 6, '1Y': 12, '3Y': 36, '5Y': 60 }
@@ -44,6 +45,7 @@ export function OverviewTab({ month, span, onSpanChange }: Props) {
         ? <div className="text-sm text-gray-400 py-12">Loading…</div>
         : <>
             <KPIGrid summary={summary} barData={bar} />
+            <BudgetBars summary={summary} />
             {bar && <IncomeExpenseCombo data={bar} span={span} onSpanChange={onSpanChange} />}
             {bar && <NetSavingsLine data={bar} />}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">

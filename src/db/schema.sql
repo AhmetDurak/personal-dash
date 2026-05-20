@@ -79,6 +79,14 @@ CREATE TABLE IF NOT EXISTS vocabulary (
   created_at   TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS budgets (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER REFERENCES users(id),
+  category   TEXT NOT NULL,
+  amount     INTEGER NOT NULL,
+  UNIQUE(user_id, category)
+);
+
 -- User isolation columns (added after initial schema)
 ALTER TABLE reminders      ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);

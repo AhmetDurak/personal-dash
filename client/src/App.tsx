@@ -47,7 +47,7 @@ function FinanceDashboard() {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <DashboardHeader month={month} onMonthChange={setMonth} onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
           <Routes>
             <Route path="overview"     element={<OverviewTab month={month} span={span} onSpanChange={setSpan} />} />
             <Route path="cashflow"     element={<CashFlowTab month={month} span={span} onSpanChange={setSpan} />} />
@@ -70,7 +70,7 @@ export function App() {
   if (!user)     return <LoginPage />
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-dvh overflow-hidden">
       <TopBar />
       <div className="flex-1 overflow-hidden">
         <Routes>
