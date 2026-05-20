@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useSWRConfig } from 'swr'
 import { useTransactions } from '../hooks/useTransactions'
 import { useSummary } from '../hooks/useSummary'
@@ -26,10 +26,23 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkCategory, setBulkCategory] = useState<Category>('Others')
   const [bulkWorking, setBulkWorking] = useState(false)
-  const [importing, setImporting]     = useState(false)
-  const [importResult, setImportResult] = useState<{ imported: number; overridden: number } | null>(null)
-  const [pdfPreview, setPdfPreview]   = useState<PdfPreview | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting]       = useState(false)
+  const [importResult, setImportResult] = useState<{ imported: number; overridden: number; skipped?: number } | null>(null)
+  const [pdfPreview, setPdfPreview]     = useState<PdfPreview | null>(null)
+  const [showImportMenu, setShowImportMenu] = useState(false)
+  const fileInputRef    = useRef<HTMLInputElement>(null)
+  const csvInputRef     = useRef<HTMLInputElement>(null)
+  const importMenuRef   = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showImportMenu) return
+    function handleClick(e: MouseEvent) {
+      if (importMenuRef.current && !importMenuRef.current.contains(e.target as Node))
+        setShowImportMenu(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showImportMenu])
   const { mutate } = useSWRConfig()
   const { data: txs, isLoading } = useTransactions(month)
   const { data: summary } = useSummary(month)
@@ -122,6 +135,26 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
     refresh()
   }
 
+  async function handleImportCsv(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const form = new FormData()
+      form.append('csv', file)
+      const res = await fetch('/api/import/csv', { method: 'POST', body: form })
+      const data = await res.json() as { imported: number; skipped: number; errors?: string[] }
+      setImportResult({ imported: data.imported, overridden: 0, skipped: data.skipped })
+      refresh()
+    } catch {
+      setImportResult({ imported: 0, overridden: -1 })
+    } finally {
+      setImporting(false)
+      if (csvInputRef.current) csvInputRef.current.value = ''
+    }
+  }
+
   const sorted = useMemo(() => {
     if (!txs) return []
     return [...txs].sort((a, b) => {
@@ -154,15 +187,39 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
             <span className={`text-xs font-medium px-2 py-1 rounded-full ${importResult.overridden === -1 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
               {importResult.overridden === -1
                 ? 'Import failed'
-                : `✓ ${importResult.imported} imported${importResult.overridden > 0 ? `, ${importResult.overridden} overridden` : ''}`}
+                : `✓ ${importResult.imported} imported${importResult.overridden > 0 ? `, ${importResult.overridden} overridden` : ''}${importResult.skipped ? `, ${importResult.skipped} skipped` : ''}`}
             </span>
           )}
           <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleImportPdf} />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            className="text-sm border border-xero-border text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
-          >{importing ? 'Importing…' : '↑ Import PDF'}</button>
+          <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImportCsv} />
+          <div className="relative" ref={importMenuRef}>
+            <button
+              onClick={() => setShowImportMenu(v => !v)}
+              disabled={importing}
+              className="text-sm border border-xero-border text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {importing ? 'Importing…' : '↑ Import'}
+              <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showImportMenu && (
+              <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-xero-border rounded-xl shadow-lg z-20 overflow-hidden">
+                <button
+                  onClick={() => { setShowImportMenu(false); fileInputRef.current?.click() }}
+                  className="w-full text-left text-sm px-4 py-2.5 hover:bg-gray-50 transition-colors"
+                >
+                  📄 PDF
+                </button>
+                <button
+                  onClick={() => { setShowImportMenu(false); csvInputRef.current?.click() }}
+                  className="w-full text-left text-sm px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
+                >
+                  📊 CSV
+                </button>
+              </div>
+            )}
+          </div>
           <a
             href={`/api/entries/export?month=${month}`}
             download

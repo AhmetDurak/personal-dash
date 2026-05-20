@@ -14,6 +14,7 @@ import { summaryRouter } from './routes/summary'
 import { bankRouter } from './routes/bank'
 import { chartsRouter } from './routes/charts'
 import { importPdfRouter } from './routes/importPdf'
+import { importCsvRouter } from './routes/importCsv'
 import { etfRouter } from './routes/etf'
 import { notificationsRouter } from './routes/notifications'
 import { notebookRouter } from './routes/notebook'
@@ -75,6 +76,7 @@ app.use('/api',               summaryRouter())
 app.use('/api/bank',          bankRouter())
 app.use('/api/charts',        chartsRouter())
 app.use('/api/import/pdf',    importPdfRouter())
+app.use('/api/import/csv',    importCsvRouter())
 app.use('/api/etf',           etfRouter())
 app.use('/api/notifications', notificationsRouter(pool))
 app.use('/api/notebook',      notebookRouter(pool))
