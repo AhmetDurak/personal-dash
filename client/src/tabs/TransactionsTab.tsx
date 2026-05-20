@@ -162,6 +162,11 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
             disabled={importing}
             className="text-sm border border-xero-border text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50"
           >{importing ? 'Importing…' : '↑ Import PDF'}</button>
+          <a
+            href={`/api/entries/export?month=${month}`}
+            download
+            className="text-sm border border-xero-border text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+          >↓ Export CSV</a>
           <button
             onClick={() => setAddModal(true)}
             className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg hover:bg-xero-green-dark font-medium transition-colors"

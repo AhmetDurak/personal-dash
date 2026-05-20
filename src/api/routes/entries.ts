@@ -3,6 +3,33 @@ import { Router, Request, Response } from 'express'
 export function entriesRouter(): Router {
   const router = Router()
 
+  router.get('/export', async (req: Request, res: Response) => {
+    const month = req.query.month as string | undefined
+    try {
+      const txs = month
+        ? await req.ledger.getTransactions(month)
+        : await req.ledger.getAllTransactions()
+      const rows = [
+        ['Date', 'Name', 'Amount (€)', 'Type', 'Category', 'Source'],
+        ...txs.map(t => [
+          t.date,
+          `"${t.name.replace(/"/g, '""')}"`,
+          (t.amount / 100).toFixed(2),
+          t.type,
+          t.category,
+          t.source,
+        ]),
+      ]
+      const csv = rows.map(r => r.join(',')).join('\n')
+      const filename = month ? `transactions-${month}.csv` : 'transactions-all.csv'
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+      res.send(csv)
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message })
+    }
+  })
+
   router.post('/', async (req: Request, res: Response) => {
     try {
       const { repeat, repeatCount, skipDuplicate, ...entry } = req.body

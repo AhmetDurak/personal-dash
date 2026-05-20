@@ -23,6 +23,10 @@ export class LedgerAgent {
     return this.repo.findByMonth(month)
   }
 
+  async getAllTransactions(): Promise<Transaction[]> {
+    return this.repo.findAll()
+  }
+
   async findDuplicate(date: string, name: string, amount: number): Promise<Transaction | null> {
     return this.repo.findDuplicate(date, name, amount)
   }

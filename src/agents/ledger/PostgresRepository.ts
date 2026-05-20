@@ -13,6 +13,14 @@ export class PostgresRepository implements TransactionRepository {
     return rows.map(this.toTransaction)
   }
 
+  async findAll(): Promise<Transaction[]> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM transactions WHERE user_id = $1 ORDER BY date DESC',
+      [this.userId]
+    )
+    return rows.map(this.toTransaction)
+  }
+
   async save(tx: Transaction): Promise<Transaction> {
     const { rows } = await this.pool.query(
       `INSERT INTO transactions (id, date, name, amount, type, category, source, raw, month, user_id)
