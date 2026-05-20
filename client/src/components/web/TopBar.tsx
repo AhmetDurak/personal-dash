@@ -8,12 +8,30 @@ const APPS = [
   { to: () => '/news',                                                                label: 'News Feed',         isActive: (p: string) => p.startsWith('/news') },
 ]
 
+function Logo() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect x="1" y="1"  width="8" height="8" rx="1.5" fill="#13B5EA" />
+      <rect x="11" y="1"  width="8" height="8" rx="1.5" fill="white" fillOpacity="0.22" />
+      <rect x="1"  y="11" width="8" height="8" rx="1.5" fill="white" fillOpacity="0.22" />
+      <rect x="11" y="11" width="8" height="8" rx="1.5" fill="white" fillOpacity="0.22" />
+    </svg>
+  )
+}
+
 export function TopBar() {
   const { pathname } = useLocation()
   const { dark, toggle } = useDarkMode()
 
   return (
     <div className="h-10 bg-gray-950 flex items-center px-4 gap-1 flex-shrink-0 border-b border-gray-800">
+      {/* Brand */}
+      <div className="flex items-center gap-2 pr-4 mr-2 border-r border-gray-800 flex-shrink-0">
+        <Logo />
+        <span className="text-sm font-semibold text-white tracking-tight">Personal Dashboard</span>
+      </div>
+
+      {/* App switcher */}
       {APPS.map(app => {
         const active = app.isActive(pathname)
         const href   = app.to()
@@ -31,6 +49,8 @@ export function TopBar() {
           </Link>
         )
       })}
+
+      {/* Right side */}
       <div className="ml-auto flex items-center gap-1">
         <NotificationsPanel />
         <button
