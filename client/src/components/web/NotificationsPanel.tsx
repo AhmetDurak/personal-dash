@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNotifications } from '../../hooks/useNotifications'
+import { ConfirmDialog } from './ConfirmDialog'
 
 function fmtEur(cents: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(cents / 100)
@@ -31,6 +32,7 @@ export function NotificationsPanel() {
   const [open, setOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDue, setNewDue] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const { data, isLoading, badgeCount, addReminder, toggleDone, deleteReminder } = useNotifications()
 
@@ -147,7 +149,7 @@ export function NotificationsPanel() {
                       )}
                     </div>
                     <button
-                      onClick={() => deleteReminder(r.id)}
+                      onClick={() => setConfirmDeleteId(r.id)}
                       className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none flex-shrink-0"
                     >
                       ×
@@ -183,6 +185,14 @@ export function NotificationsPanel() {
           </div>
         </div>
       )}
+    {confirmDeleteId !== null && (
+      <ConfirmDialog
+        message="This reminder will be permanently deleted."
+        confirmLabel="Delete"
+        onConfirm={() => { deleteReminder(confirmDeleteId); setConfirmDeleteId(null) }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
+    )}
     </div>
   )
 }

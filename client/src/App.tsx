@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-
+import { useAuth } from './hooks/useAuth'
+import { LoginPage } from './pages/LoginPage'
 import { TopBar } from './components/web/TopBar'
 import { Sidebar } from './components/web/Sidebar'
 import { DashboardHeader } from './components/web/DashboardHeader'
@@ -39,12 +40,13 @@ function useLocalState<T>(key: string, fallback: T) {
 function FinanceDashboard() {
   const [month, setMonth] = useLocalState<string>('fd:month', currentMonth())
   const [span, setSpan]   = useLocalState<Span>('fd:span', '6M')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
     <div className="flex h-full bg-xero-bg overflow-hidden">
-      <Sidebar />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader month={month} onMonthChange={setMonth} />
+        <DashboardHeader month={month} onMonthChange={setMonth} onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route path="overview"     element={<OverviewTab month={month} span={span} onSpanChange={setSpan} />} />
@@ -62,6 +64,11 @@ function FinanceDashboard() {
 }
 
 export function App() {
+  const { user, isLoading } = useAuth()
+
+  if (isLoading) return <div className="h-screen bg-gray-950" />
+  if (!user)     return <LoginPage />
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <TopBar />

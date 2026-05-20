@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useDarkMode } from '../../hooks/useDarkMode'
+import { useAuth } from '../../hooks/useAuth'
 import { NotificationsPanel } from './NotificationsPanel'
+import { ConfirmDialog } from './ConfirmDialog'
 
 const APPS = [
-  { to: () => '/finance/overview',                                                    label: 'Finance Dashboard', isActive: (p: string) => p.startsWith('/finance') },
-  { to: () => localStorage.getItem('notebook:lastPath') ?? '/notebook/notes',         label: 'My Notebook',       isActive: (p: string) => p.startsWith('/notebook') },
-  { to: () => '/news',                                                                label: 'News Feed',         isActive: (p: string) => p.startsWith('/news') },
+  { to: () => '/finance/overview',                                                    label: 'Finance', isActive: (p: string) => p.startsWith('/finance') },
+  { to: () => localStorage.getItem('notebook:lastPath') ?? '/notebook/notes',         label: 'Notebook', isActive: (p: string) => p.startsWith('/notebook') },
+  { to: () => '/news',                                                                label: 'News',     isActive: (p: string) => p.startsWith('/news') },
 ]
 
 function Logo() {
@@ -22,13 +25,26 @@ function Logo() {
 export function TopBar() {
   const { pathname } = useLocation()
   const { dark, toggle } = useDarkMode()
+  const { user, logout } = useAuth()
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [tokenCopied, setTokenCopied] = useState(false)
+
+  async function copyMobileToken() {
+    const res = await fetch('/auth/me/token')
+    if (!res.ok) return
+    const { token } = await res.json() as { token: string }
+    await navigator.clipboard.writeText(token)
+    setTokenCopied(true)
+    setTimeout(() => setTokenCopied(false), 2000)
+  }
 
   return (
-    <div className="h-10 bg-gray-950 flex items-center px-4 gap-1 flex-shrink-0 border-b border-gray-800">
+    <>
+    <div className="h-10 bg-gray-950 flex items-center px-3 md:px-4 gap-1 flex-shrink-0 border-b border-gray-800">
       {/* Brand */}
-      <div className="flex items-center gap-2 pr-4 mr-2 border-r border-gray-800 flex-shrink-0">
+      <div className="flex items-center gap-2 pr-3 md:pr-4 mr-1 md:mr-2 border-r border-gray-800 flex-shrink-0">
         <Logo />
-        <span className="text-sm font-semibold text-white tracking-tight">Personal Dashboard</span>
+        <span className="hidden sm:inline text-sm font-semibold text-white tracking-tight">Personal Dashboard</span>
       </div>
 
       {/* App switcher */}
@@ -39,7 +55,7 @@ export function TopBar() {
           <Link
             key={app.label}
             to={href}
-            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+            className={`px-2.5 md:px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
               active
                 ? 'bg-white/10 text-white'
                 : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
@@ -55,12 +71,44 @@ export function TopBar() {
         <NotificationsPanel />
         <button
           onClick={toggle}
-          className="flex items-center gap-1.5 px-3 py-1 rounded text-sm text-gray-500 hover:text-gray-200 hover:bg-white/5 transition-colors"
+          className="flex items-center gap-1 px-2 md:px-3 py-1 rounded text-sm text-gray-500 hover:text-gray-200 hover:bg-white/5 transition-colors"
         >
           <span>{dark ? '☀️' : '🌙'}</span>
-          <span className="font-medium">{dark ? 'Light' : 'Dark'}</span>
+          <span className="hidden md:inline font-medium">{dark ? 'Light' : 'Dark'}</span>
         </button>
+        {user && (
+          <div className="flex items-center gap-1.5 md:gap-2 pl-2 ml-1 border-l border-gray-800">
+            {user.picture
+              ? <img src={user.picture} alt={user.name} className="w-6 h-6 rounded-full flex-shrink-0" />
+              : <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px] text-gray-300 font-bold flex-shrink-0">{user.name[0]}</div>
+            }
+            <span className="hidden md:inline text-xs text-gray-400 max-w-[100px] truncate">{user.name}</span>
+            <button
+              onClick={copyMobileToken}
+              className="hidden sm:block text-xs text-gray-500 hover:text-gray-300 transition-colors px-1"
+              title="Copy mobile access token"
+            >
+              {tokenCopied ? '✓' : '📱'}
+            </button>
+            <button
+              onClick={() => setShowLogoutConfirm(true)}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors px-1"
+            >
+              <span className="hidden sm:inline">Sign out</span>
+              <span className="sm:hidden">↪</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
+    {showLogoutConfirm && (
+      <ConfirmDialog
+        message="You will be signed out of your account."
+        confirmLabel="Sign out"
+        onConfirm={logout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+    )}
+    </>
   )
 }

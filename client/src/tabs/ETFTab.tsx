@@ -7,6 +7,7 @@ import {
   useETFWatchlist, useETFSnapshot, useETFChart, useETFComposition, useETFRisk, useETFSearch,
 } from '../hooks/useETF'
 import type { ETFSnapshot, ETFCandle } from '../types'
+import { ConfirmDialog } from '../components/web/ConfirmDialog'
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -659,6 +660,7 @@ function ComparePanel({ tickers }: { tickers: string[] }) {
 // ── Detail panel (single scrolling page) ──────────────────────────────────────
 
 function ETFDetailPanel({ ticker, onRemove }: { ticker: string; onRemove: () => void }) {
+  const [confirmRemove, setConfirmRemove] = useState(false)
   const { data: snap, isLoading, error } = useETFSnapshot(ticker)
   const containerRef = useRef<HTMLDivElement>(null)
   const sectionRefs = useRef<Partial<Record<SubTab, HTMLDivElement>>>({})
@@ -701,9 +703,17 @@ function ETFDetailPanel({ ticker, onRemove }: { ticker: string; onRemove: () => 
           <span className="text-lg font-bold text-gray-900">{ticker}</span>
           {snap && <span className="ml-2 text-sm text-gray-400">{snap.name}</span>}
         </div>
-        <button onClick={onRemove} className="text-xs text-red-400 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50">
-          Entfernen
+        <button onClick={() => setConfirmRemove(true)} className="text-xs text-red-400 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50">
+          Remove
         </button>
+        {confirmRemove && (
+          <ConfirmDialog
+            message={`${ticker} will be removed from your watchlist.`}
+            confirmLabel="Remove"
+            onConfirm={() => { setConfirmRemove(false); onRemove() }}
+            onCancel={() => setConfirmRemove(false)}
+          />
+        )}
       </div>
 
       {/* Anchor nav — outside scroll area so it doesn't affect scroll calculations */}

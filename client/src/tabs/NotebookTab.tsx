@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useNotes, useMindmap, useVocabulary, useAllReminders } from '../hooks/useNotebook'
 import type { MMNode, VocabCard } from '../hooks/useNotebook'
+import { ConfirmDialog } from '../components/web/ConfirmDialog'
 
 // ─── Mindmap helpers ──────────────────────────────────────────────────────────
 
@@ -136,6 +137,8 @@ function NotesView() {
     setSelectedId(note.id)
   }
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+
   async function handleDelete(id: number) {
     await deleteNote(id)
     if (selectedId === id) setSelectedId(null)
@@ -143,8 +146,8 @@ function NotesView() {
 
   return (
     <div className="flex h-full">
-      {/* Sidebar list */}
-      <div className="w-60 border-r border-gray-100 flex flex-col bg-gray-50 flex-shrink-0">
+      {/* Sidebar list — hidden on mobile when a note is open */}
+      <div className={`${selectedId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-60 border-r border-gray-100 flex-col bg-gray-50 flex-shrink-0`}>
         <div className="p-3 border-b border-gray-100">
           <button
             onClick={handleNew}
@@ -172,8 +175,8 @@ function NotesView() {
         </div>
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Editor — hidden on mobile when no note is open */}
+      <div className={`${selectedId === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-hidden`}>
         {selectedId === null ? (
           <div className="flex-1 flex items-center justify-center text-gray-400">
             <div className="text-center">
@@ -183,21 +186,36 @@ function NotesView() {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 flex-shrink-0 bg-white">
+            <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-gray-100 flex-shrink-0 bg-white gap-2">
+              <button
+                onClick={() => setSelectedId(null)}
+                className="md:hidden flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-1 -ml-1"
+                aria-label="Back to notes"
+              >
+                ←
+              </button>
               <input
                 value={localTitle}
                 onChange={e => { setLocalTitle(e.target.value); scheduleSave(e.target.value, localContent) }}
                 placeholder="Note title…"
-                className="text-lg font-semibold text-gray-900 bg-transparent flex-1 outline-none placeholder-gray-300"
+                className="text-lg font-semibold text-gray-900 bg-transparent flex-1 outline-none placeholder-gray-300 min-w-0"
               />
               <div className="flex items-center gap-3">
                 {saving && <span className="text-xs text-gray-400">Saving…</span>}
                 <button
-                  onClick={() => handleDelete(selectedId)}
+                  onClick={() => setConfirmDeleteId(selectedId)}
                   className="text-xs text-red-400 hover:text-red-600 transition-colors"
                 >
                   Delete
                 </button>
+                {confirmDeleteId !== null && (
+                  <ConfirmDialog
+                    message="This note will be permanently deleted."
+                    confirmLabel="Delete"
+                    onConfirm={() => { handleDelete(confirmDeleteId); setConfirmDeleteId(null) }}
+                    onCancel={() => setConfirmDeleteId(null)}
+                  />
+                )}
               </div>
             </div>
             <textarea
@@ -257,6 +275,8 @@ function MindmapView() {
     setEditingLabel('New Topic')
     setIsEditing(true)
   }
+
+  const [confirmDeleteNode, setConfirmDeleteNode] = useState(false)
 
   function handleDeleteSelected() {
     if (!selectedId) return
@@ -406,12 +426,22 @@ function MindmapView() {
               + Add Child Node
             </button>
             {selectedNode.parentId !== null && (
+              <>
               <button
-                onClick={handleDeleteSelected}
+                onClick={() => setConfirmDeleteNode(true)}
                 className="text-xs text-red-400 border border-red-200 rounded-lg py-2 hover:bg-red-50 transition-colors"
               >
                 Delete Node
               </button>
+              {confirmDeleteNode && (
+                <ConfirmDialog
+                  message="This node and all its children will be deleted."
+                  confirmLabel="Delete"
+                  onConfirm={() => { handleDeleteSelected(); setConfirmDeleteNode(false) }}
+                  onCancel={() => setConfirmDeleteNode(false)}
+                />
+              )}
+              </>
             )}
           </>
         ) : (
@@ -435,6 +465,7 @@ type NewWord = { word: string; translation: string; language: string; example: s
 
 function VocabView() {
   const { vocab, isLoading, addWord, deleteWord, review } = useVocabulary()
+  const [confirmDeleteVocabId, setConfirmDeleteVocabId] = useState<number | null>(null)
   const [langFilter, setLangFilter] = useState<string | null>(null)
   const [reviewMode, setReviewMode] = useState(false)
   const [flipped, setFlipped] = useState(false)
@@ -614,11 +645,19 @@ function VocabView() {
                 {LANG_LABELS[card.language] ?? card.language}
               </span>
               <button
-                onClick={() => deleteWord(card.id)}
+                onClick={() => setConfirmDeleteVocabId(card.id)}
                 className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none"
               >
                 ×
               </button>
+              {confirmDeleteVocabId === card.id && (
+                <ConfirmDialog
+                  message={`"${card.word}" will be permanently deleted.`}
+                  confirmLabel="Delete"
+                  onConfirm={() => { deleteWord(card.id); setConfirmDeleteVocabId(null) }}
+                  onCancel={() => setConfirmDeleteVocabId(null)}
+                />
+              )}
             </div>
             <p className="text-base font-bold text-gray-900 mt-1">{card.word}</p>
             <p className="text-sm text-gray-500">{card.translation}</p>
@@ -649,6 +688,7 @@ const MINS  = ['00', '15', '30', '45']
 
 function RemindersView() {
   const { reminders, isLoading, toggle, remove, add } = useAllReminders()
+  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newNote,  setNewNote]  = useState('')
@@ -714,7 +754,7 @@ function RemindersView() {
                 )}
               </div>
               <button
-                onClick={() => remove(r.id)}
+                onClick={() => setConfirmRemoveId(r.id)}
                 className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none flex-shrink-0 mt-0.5"
               >
                 ×
@@ -839,7 +879,7 @@ function RemindersView() {
                     {r.note && <p className="text-xs text-gray-400 mt-0.5">{r.note}</p>}
                   </div>
                   <button
-                    onClick={() => remove(r.id)}
+                    onClick={() => setConfirmRemoveId(r.id)}
                     className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none flex-shrink-0 mt-0.5"
                   >
                     ×
@@ -865,7 +905,7 @@ function RemindersView() {
                   <p className="text-sm text-gray-500 line-through flex-1">{r.title}</p>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                     <button onClick={() => toggle(r.id)} className="text-[10px] text-gray-400 hover:text-xero-green transition-colors">undo</button>
-                    <button onClick={() => remove(r.id)} className="text-gray-300 hover:text-red-400 transition-colors text-base leading-none">×</button>
+                    <button onClick={() => setConfirmRemoveId(r.id)} className="text-gray-300 hover:text-red-400 transition-colors text-base leading-none">×</button>
                   </div>
                 </div>
               ))}
@@ -881,6 +921,14 @@ function RemindersView() {
           </div>
         )}
       </div>
+      {confirmRemoveId !== null && (
+        <ConfirmDialog
+          message="This reminder will be permanently deleted."
+          confirmLabel="Delete"
+          onConfirm={() => { remove(confirmRemoveId); setConfirmRemoveId(null) }}
+          onCancel={() => setConfirmRemoveId(null)}
+        />
+      )}
     </div>
   )
 }

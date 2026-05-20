@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { formatEur, formatDate } from '../../utils/format'
 import { CAT_COLORS, CAT_ICONS } from '../../constants/categories'
 import type { Transaction } from '../../types'
+import { ConfirmDialog } from './ConfirmDialog'
 
 type SortField = 'date' | 'amount' | 'name' | 'category'
 type SortDir = 'asc' | 'desc'
@@ -29,6 +31,8 @@ export function TransactionList({
   transactions, onDelete, onEdit, sortField, sortDir = 'desc', onSort,
   selectedIds, onToggleSelect, onToggleAll,
 }: Props) {
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+
   if (!transactions.length) {
     return <p className="text-sm text-gray-400 py-12 text-center">No transactions this month</p>
   }
@@ -49,8 +53,10 @@ export function TransactionList({
   }
 
   return (
+    <>
     <div className="bg-white rounded-xl shadow-sm border border-xero-border overflow-hidden">
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full text-sm min-w-[600px]">
         <thead>
           <tr className="bg-xero-bg text-xs uppercase tracking-wide text-gray-500 border-b border-xero-border">
             <th className="pl-4 pr-2 py-2.5 w-8">
@@ -108,7 +114,7 @@ export function TransactionList({
                 <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => onEdit(tx)} className="p-1 text-gray-400 hover:text-blue-500 rounded" title="Edit">✎</button>
-                    <button onClick={() => onDelete(tx.id)} className="p-1 text-gray-400 hover:text-red-500 rounded" title="Delete">×</button>
+                    <button onClick={() => setConfirmId(tx.id)} className="p-1 text-gray-400 hover:text-red-500 rounded" title="Delete">×</button>
                   </div>
                 </td>
               </tr>
@@ -116,6 +122,16 @@ export function TransactionList({
           })}
         </tbody>
       </table>
+      </div>
     </div>
+    {confirmId && (
+      <ConfirmDialog
+        message="This transaction will be permanently deleted."
+        confirmLabel="Delete"
+        onConfirm={() => { onDelete(confirmId); setConfirmId(null) }}
+        onCancel={() => setConfirmId(null)}
+      />
+    )}
+    </>
   )
 }

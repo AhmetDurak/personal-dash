@@ -30,7 +30,7 @@ export function SimplifiedTab({ month, span, onSpanChange }: Props) {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6">
       {isLoading || !summary
         ? <div className="text-sm text-gray-400 py-12">Loading…</div>
         : <>

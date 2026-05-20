@@ -9,9 +9,14 @@ const NAV = [
   { path: '/finance/learn',        label: 'Finance Academy',  icon: '🎓' },
 ]
 
-export function Sidebar() {
+interface Props {
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+function NavItems({ onClose }: { onClose?: () => void }) {
   return (
-    <aside className="w-[220px] h-full bg-xero-navy flex flex-col flex-shrink-0">
+    <>
       <div className="px-6 py-5 border-b border-xero-navy-light">
         <p className="text-white font-bold text-lg tracking-tight">Finance</p>
         <p className="text-xero-green text-xs font-medium mt-0.5">Dashboard</p>
@@ -21,6 +26,7 @@ export function Sidebar() {
           <NavLink
             key={item.path}
             to={item.path}
+            onClick={onClose}
             className={({ isActive }) =>
               `w-full flex items-center gap-3 px-6 py-3 text-sm transition-colors text-left border-l-[3px] ${
                 isActive
@@ -34,6 +40,27 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-    </aside>
+    </>
+  )
+}
+
+export function Sidebar({ isOpen = false, onClose }: Props) {
+  return (
+    <>
+      {/* Desktop: static sidebar */}
+      <aside className="hidden md:flex w-[220px] h-full bg-xero-navy flex-col flex-shrink-0">
+        <NavItems />
+      </aside>
+
+      {/* Mobile: overlay drawer */}
+      {isOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+          <aside className="relative w-[220px] h-full bg-xero-navy flex flex-col shadow-2xl">
+            <NavItems onClose={onClose} />
+          </aside>
+        </div>
+      )}
+    </>
   )
 }

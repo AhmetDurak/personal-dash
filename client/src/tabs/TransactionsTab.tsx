@@ -143,7 +143,7 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
   }, [summary])
 
   return (
-    <div className="p-8 space-y-4">
+    <div className="p-4 md:p-8 space-y-4">
       {/* Top bar */}
       <div className="flex items-center justify-between">
         <MonthSelector month={month} onChange={onMonthChange} />

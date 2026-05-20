@@ -24,7 +24,7 @@ export function CashFlowTab({ month, span, onSpanChange }: Props) {
   const { data: donut } = useCategoryDonut(month)
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6">
       {summary && <CashFlowKPIs summary={summary} barData={bar} />}
       {balance && <BalanceChart data={balance} span={span} onSpanChange={onSpanChange} />}
       {stackedExp && <CategoryStackedBar data={stackedExp} />}

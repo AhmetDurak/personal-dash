@@ -39,14 +39,14 @@ export function OverviewTab({ month, span, onSpanChange }: Props) {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6">
       {isLoading || !summary
         ? <div className="text-sm text-gray-400 py-12">Loading…</div>
         : <>
             <KPIGrid summary={summary} barData={bar} />
             {bar && <IncomeExpenseCombo data={bar} span={span} onSpanChange={onSpanChange} />}
             {bar && <NetSavingsLine data={bar} />}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
               {donutCurrent && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">This Month</p>
