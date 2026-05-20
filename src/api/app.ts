@@ -11,6 +11,7 @@ import { chartsRouter } from './routes/charts'
 import { importPdfRouter } from './routes/importPdf'
 import { etfRouter } from './routes/etf'
 import { notificationsRouter } from './routes/notifications'
+import { notebookRouter } from './routes/notebook'
 
 const app = express()
 app.use(express.json())
@@ -26,6 +27,7 @@ app.use('/api/charts',        chartsRouter(ledger))
 app.use('/api/import/pdf',    importPdfRouter(ledger))
 app.use('/api/etf',           etfRouter(etf))
 app.use('/api/notifications', notificationsRouter(ledger, etf, pool))
+app.use('/api/notebook',      notebookRouter(pool))
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
 

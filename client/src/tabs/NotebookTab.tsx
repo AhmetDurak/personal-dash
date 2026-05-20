@@ -1,0 +1,950 @@
+import { useState, useRef, useEffect } from 'react'
+import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useNotes, useMindmap, useVocabulary, useAllReminders } from '../hooks/useNotebook'
+import type { MMNode, VocabCard } from '../hooks/useNotebook'
+
+// ─── Mindmap helpers ──────────────────────────────────────────────────────────
+
+const DEPTH_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899']
+const NODE_W = 140
+const NODE_H = 36
+
+function getDepth(nodes: MMNode[], id: string, depth = 0): number {
+  const node = nodes.find(n => n.id === id)
+  if (!node || node.parentId === null) return depth
+  return getDepth(nodes, node.parentId, depth + 1)
+}
+
+function nodeColor(nodes: MMNode[], id: string): string {
+  return DEPTH_COLORS[getDepth(nodes, id) % DEPTH_COLORS.length]
+}
+
+function getDescendantIds(nodes: MMNode[], id: string): string[] {
+  const children = nodes.filter(n => n.parentId === id)
+  return [id, ...children.flatMap(c => getDescendantIds(nodes, c.id))]
+}
+
+interface LayoutPos { x: number; y: number }
+
+function layoutTree(nodes: MMNode[], svgH: number): Map<string, LayoutPos> {
+  const pos = new Map<string, LayoutPos>()
+  if (nodes.length === 0) return pos
+  const root = nodes.find(n => n.parentId === null)
+  if (!root) return pos
+
+  const childrenOf = new Map<string, MMNode[]>()
+  nodes.forEach(n => {
+    if (n.parentId) {
+      const list = childrenOf.get(n.parentId) ?? []
+      list.push(n)
+      childrenOf.set(n.parentId, list)
+    }
+  })
+
+  function leafCount(id: string): number {
+    const ch = childrenOf.get(id) ?? []
+    return ch.length === 0 ? 1 : ch.reduce((s, c) => s + leafCount(c.id), 0)
+  }
+
+  const totalLeaves = leafCount(root.id)
+  const vUnit = Math.max(54, (svgH - 40) / totalLeaves)
+  const totalH = totalLeaves * vUnit
+  const yOff = Math.max(20, (svgH - totalH) / 2)
+
+  function place(id: string, depth: number, yFrom: number, yTo: number) {
+    const yMid = (yFrom + yTo) / 2
+    pos.set(id, { x: 60 + depth * 200, y: yMid })
+    const children = childrenOf.get(id) ?? []
+    const total = leafCount(id)
+    let cursor = yFrom
+    children.forEach(child => {
+      const slice = (leafCount(child.id) / total) * (yTo - yFrom)
+      place(child.id, depth + 1, cursor, cursor + slice)
+      cursor += slice
+    })
+  }
+
+  place(root.id, 0, yOff, yOff + totalH)
+  return pos
+}
+
+// ─── Reminder helpers ──────────────────────────────────────────────────────────
+
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+}
+
+function isBeforeDay(a: Date, b: Date): boolean {
+  const ad = new Date(a.getFullYear(), a.getMonth(), a.getDate())
+  const bd = new Date(b.getFullYear(), b.getMonth(), b.getDate())
+  return ad < bd
+}
+
+function fmtTime(due: string): string {
+  const d = new Date(due)
+  if (d.getHours() === 0 && d.getMinutes() === 0) return ''
+  return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+}
+
+function fmtDueLabel(due: string, group: 'overdue' | 'today' | 'upcoming'): string {
+  const d   = new Date(due)
+  const time = fmtTime(due)
+  if (group === 'today') return time || 'All day'
+  const date = d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
+  return time ? `${date} · ${time}` : date
+}
+
+// ─── NotesView ────────────────────────────────────────────────────────────────
+
+function NotesView() {
+  const { notes, isLoading, createNote, saveNote, deleteNote } = useNotes()
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [localTitle, setLocalTitle] = useState('')
+  const [localContent, setLocalContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    if (selectedId === null) return
+    const note = notes.find(n => n.id === selectedId)
+    if (note) {
+      setLocalTitle(note.title)
+      setLocalContent(note.content)
+    }
+  }, [selectedId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+  }, [])
+
+  function scheduleSave(title: string, content: string) {
+    const id = selectedId
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      if (!id) return
+      setSaving(true)
+      await saveNote(id, title, content)
+      setSaving(false)
+    }, 1000)
+  }
+
+  async function handleNew() {
+    const note = await createNote()
+    setSelectedId(note.id)
+  }
+
+  async function handleDelete(id: number) {
+    await deleteNote(id)
+    if (selectedId === id) setSelectedId(null)
+  }
+
+  return (
+    <div className="flex h-full">
+      {/* Sidebar list */}
+      <div className="w-60 border-r border-gray-100 flex flex-col bg-gray-50 flex-shrink-0">
+        <div className="p-3 border-b border-gray-100">
+          <button
+            onClick={handleNew}
+            className="w-full text-sm bg-xero-green text-white rounded-lg py-2 font-medium hover:bg-xero-green-dark transition-colors"
+          >
+            + New Note
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {isLoading && <p className="text-xs text-gray-400 p-4">Loading…</p>}
+          {notes.map(n => (
+            <button
+              key={n.id}
+              onClick={() => setSelectedId(n.id)}
+              className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-white transition-colors ${
+                selectedId === n.id ? 'bg-white border-l-2 border-l-xero-green' : ''
+              }`}
+            >
+              <p className="text-sm font-medium text-gray-800 truncate">{n.title || 'Untitled'}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {new Date(n.updated_at).toLocaleDateString('de-DE')}
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Editor */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {selectedId === null ? (
+          <div className="flex-1 flex items-center justify-center text-gray-400">
+            <div className="text-center">
+              <p className="text-5xl mb-3">📓</p>
+              <p className="text-sm">Select a note or create a new one</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 flex-shrink-0 bg-white">
+              <input
+                value={localTitle}
+                onChange={e => { setLocalTitle(e.target.value); scheduleSave(e.target.value, localContent) }}
+                placeholder="Note title…"
+                className="text-lg font-semibold text-gray-900 bg-transparent flex-1 outline-none placeholder-gray-300"
+              />
+              <div className="flex items-center gap-3">
+                {saving && <span className="text-xs text-gray-400">Saving…</span>}
+                <button
+                  onClick={() => handleDelete(selectedId)}
+                  className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            <textarea
+              value={localContent}
+              onChange={e => { setLocalContent(e.target.value); scheduleSave(localTitle, e.target.value) }}
+              placeholder="Write your note here…"
+              className="flex-1 p-6 text-sm text-gray-700 bg-white resize-none outline-none placeholder-gray-300 overflow-y-auto"
+            />
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── MindmapView ──────────────────────────────────────────────────────────────
+
+function MindmapView() {
+  const { mindmap, saveMindmap } = useMindmap()
+  const [nodes, setNodes] = useState<MMNode[]>([])
+  const [mmTitle, setMmTitle] = useState('My Mindmap')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [editingLabel, setEditingLabel] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+  const initialized = useRef(false)
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  useEffect(() => {
+    if (initialized.current) return
+    if (mindmap === undefined) return
+    if (mindmap) {
+      setNodes(mindmap.nodes)
+      setMmTitle(mindmap.title)
+    } else {
+      setNodes([{ id: 'root', label: 'Finance Concepts', parentId: null }])
+    }
+    initialized.current = true
+  }, [mindmap])
+
+  const maxDepth = nodes.reduce((mx, n) => Math.max(mx, getDepth(nodes, n.id)), 0)
+  const svgH = Math.max(500, nodes.length * 60)
+  const svgW = Math.max(900, (maxDepth + 1) * 200 + 200)
+  const positions = layoutTree(nodes, svgH)
+  const selectedNode = nodes.find(n => n.id === selectedId) ?? null
+
+  function persist(newNodes: MMNode[]) {
+    setNodes(newNodes)
+    saveMindmap(mmTitle, newNodes)
+  }
+
+  function handleAddChild() {
+    if (!selectedId) return
+    const newId = `n${Date.now()}`
+    const updated = [...nodes, { id: newId, label: 'New Topic', parentId: selectedId }]
+    persist(updated)
+    setSelectedId(newId)
+    setEditingLabel('New Topic')
+    setIsEditing(true)
+  }
+
+  function handleDeleteSelected() {
+    if (!selectedId) return
+    const toRemove = new Set(getDescendantIds(nodes, selectedId))
+    persist(nodes.filter(n => !toRemove.has(n.id)))
+    setSelectedId(null)
+  }
+
+  function handleRenameConfirm() {
+    if (!selectedId) return
+    persist(nodes.map(n => n.id === selectedId ? { ...n, label: editingLabel } : n))
+    setIsEditing(false)
+  }
+
+  function handleNodeClick(id: string) {
+    setSelectedId(id)
+    const node = nodes.find(n => n.id === id)
+    if (node) setEditingLabel(node.label)
+    setIsEditing(false)
+  }
+
+  return (
+    <div className="flex h-full">
+      {/* SVG canvas */}
+      <div className="flex-1 overflow-auto bg-gray-50">
+        <svg
+          ref={svgRef}
+          width={svgW}
+          height={svgH}
+          className="block"
+          onClick={e => { if (e.target === svgRef.current) setSelectedId(null) }}
+        >
+          {/* Edges */}
+          {nodes.map(n => {
+            if (!n.parentId) return null
+            const from = positions.get(n.parentId)
+            const to   = positions.get(n.id)
+            if (!from || !to) return null
+            const sx = from.x + NODE_W
+            const sy = from.y
+            const tx = to.x
+            const ty = to.y
+            const mx = (sx + tx) / 2
+            return (
+              <path
+                key={`e-${n.id}`}
+                d={`M ${sx} ${sy} C ${mx} ${sy} ${mx} ${ty} ${tx} ${ty}`}
+                fill="none"
+                stroke="#CBD5E1"
+                strokeWidth={1.5}
+              />
+            )
+          })}
+          {/* Nodes */}
+          {nodes.map(n => {
+            const p = positions.get(n.id)
+            if (!p) return null
+            const x = p.x
+            const y = p.y - NODE_H / 2
+            const color = nodeColor(nodes, n.id)
+            const isSel = n.id === selectedId
+            const label = n.label.length > 16 ? n.label.slice(0, 15) + '…' : n.label
+            return (
+              <g
+                key={n.id}
+                onClick={e => { e.stopPropagation(); handleNodeClick(n.id) }}
+                style={{ cursor: 'pointer' }}
+              >
+                <rect
+                  x={x} y={y} width={NODE_W} height={NODE_H} rx={8}
+                  fill={isSel ? color : '#fff'}
+                  stroke={color}
+                  strokeWidth={isSel ? 2.5 : 1.5}
+                />
+                <text
+                  x={x + NODE_W / 2} y={y + NODE_H / 2 + 1}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={11}
+                  fontWeight={isSel ? 600 : 400}
+                  fill={isSel ? '#fff' : '#374151'}
+                >
+                  {label}
+                </text>
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+
+      {/* Control panel */}
+      <div className="w-56 border-l border-gray-100 bg-white flex flex-col p-4 gap-3 flex-shrink-0">
+        <div>
+          <p className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">Mindmap Title</p>
+          <input
+            value={mmTitle}
+            onChange={e => { setMmTitle(e.target.value); saveMindmap(e.target.value, nodes) }}
+            className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+        </div>
+
+        <hr className="border-gray-100" />
+
+        {nodes.length === 0 && (
+          <button
+            onClick={() => persist([{ id: 'root', label: 'Finance Concepts', parentId: null }])}
+            className="text-xs bg-xero-green text-white rounded-lg py-2 font-medium hover:bg-xero-green-dark"
+          >
+            + Create Root Node
+          </button>
+        )}
+
+        {selectedNode ? (
+          <>
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">Selected Node</p>
+              {isEditing ? (
+                <div className="flex gap-1">
+                  <input
+                    autoFocus
+                    value={editingLabel}
+                    onChange={e => setEditingLabel(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleRenameConfirm()
+                      if (e.key === 'Escape') setIsEditing(false)
+                    }}
+                    className="flex-1 text-sm border border-xero-green rounded-lg px-2 py-1.5 focus:outline-none min-w-0"
+                  />
+                  <button onClick={handleRenameConfirm} className="text-xs bg-xero-green text-white px-2 rounded-lg flex-shrink-0">✓</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-800 flex-1 truncate">{selectedNode.label}</p>
+                  <button
+                    onClick={() => { setEditingLabel(selectedNode.label); setIsEditing(true) }}
+                    className="text-sm text-gray-400 hover:text-gray-600 flex-shrink-0"
+                  >
+                    ✏️
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleAddChild}
+              className="text-xs bg-xero-green text-white rounded-lg py-2 font-medium hover:bg-xero-green-dark transition-colors"
+            >
+              + Add Child Node
+            </button>
+            {selectedNode.parentId !== null && (
+              <button
+                onClick={handleDeleteSelected}
+                className="text-xs text-red-400 border border-red-200 rounded-lg py-2 hover:bg-red-50 transition-colors"
+              >
+                Delete Node
+              </button>
+            )}
+          </>
+        ) : (
+          <p className="text-xs text-gray-400 leading-relaxed">
+            Click a node to select it, then add children or edit its label.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── VocabView ────────────────────────────────────────────────────────────────
+
+const LANGS = ['de', 'en', 'tr', 'fr', 'es']
+const LANG_LABELS: Record<string, string> = {
+  de: '🇩🇪 DE', en: '🇬🇧 EN', tr: '🇹🇷 TR', fr: '🇫🇷 FR', es: '🇪🇸 ES',
+}
+
+type NewWord = { word: string; translation: string; language: string; example: string }
+
+function VocabView() {
+  const { vocab, isLoading, addWord, deleteWord, review } = useVocabulary()
+  const [langFilter, setLangFilter] = useState<string | null>(null)
+  const [reviewMode, setReviewMode] = useState(false)
+  const [flipped, setFlipped] = useState(false)
+  const [reviewIdx, setReviewIdx] = useState(0)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newWord, setNewWord] = useState<NewWord>({ word: '', translation: '', language: 'de', example: '' })
+
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const dueCards = vocab.filter(v => new Date(v.due_at) <= today)
+  const filtered = langFilter ? vocab.filter(v => v.language === langFilter) : vocab
+  const reviewCard: VocabCard | null = dueCards[reviewIdx] ?? null
+
+  async function handleRate(quality: number) {
+    if (!reviewCard) return
+    await review(reviewCard.id, quality)
+    setFlipped(false)
+    setReviewIdx(i => i + 1)
+  }
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newWord.word.trim() || !newWord.translation.trim()) return
+    await addWord({ ...newWord, example: newWord.example.trim() || undefined })
+    setNewWord({ word: '', translation: '', language: newWord.language, example: '' })
+    setShowAdd(false)
+  }
+
+  if (reviewMode) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 p-6 h-full">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => { setReviewMode(false); setReviewIdx(0); setFlipped(false) }}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            ← Exit Review
+          </button>
+          <span className="text-sm text-gray-400">{Math.min(reviewIdx, dueCards.length)}/{dueCards.length} reviewed</span>
+        </div>
+
+        {reviewIdx >= dueCards.length ? (
+          <div className="text-center">
+            <p className="text-5xl mb-4">🎉</p>
+            <p className="text-xl font-semibold text-gray-800">All caught up!</p>
+            <p className="text-sm text-gray-400 mt-2">{dueCards.length} card{dueCards.length !== 1 ? 's' : ''} reviewed.</p>
+            <button
+              onClick={() => { setReviewMode(false); setReviewIdx(0) }}
+              className="mt-4 text-sm bg-xero-green text-white px-5 py-2 rounded-lg font-medium"
+            >
+              Done
+            </button>
+          </div>
+        ) : reviewCard && (
+          <div className="w-full max-w-sm">
+            <div
+              onClick={() => setFlipped(f => !f)}
+              className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm cursor-pointer min-h-[180px] flex flex-col items-center justify-center gap-3 select-none hover:shadow-md transition-shadow"
+            >
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                {flipped ? 'Translation' : 'Word'}
+              </p>
+              <p className="text-2xl font-bold text-gray-900 text-center">
+                {flipped ? reviewCard.translation : reviewCard.word}
+              </p>
+              {flipped && reviewCard.example && (
+                <p className="text-xs text-gray-400 text-center italic">"{reviewCard.example}"</p>
+              )}
+              {!flipped && <p className="text-xs text-gray-300 mt-2">Tap to reveal translation</p>}
+            </div>
+
+            {flipped && (
+              <div className="grid grid-cols-4 gap-2 mt-4">
+                {[
+                  { q: 0, label: 'Again', cls: 'bg-red-100 text-red-700 hover:bg-red-200' },
+                  { q: 2, label: 'Hard',  cls: 'bg-amber-100 text-amber-700 hover:bg-amber-200' },
+                  { q: 4, label: 'Good',  cls: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
+                  { q: 5, label: 'Easy',  cls: 'bg-sky-100 text-sky-700 hover:bg-sky-200' },
+                ].map(({ q, label, cls }) => (
+                  <button
+                    key={q}
+                    onClick={() => handleRate(q)}
+                    className={`text-xs font-semibold rounded-lg py-2.5 transition-colors ${cls}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 overflow-y-auto h-full">
+      {/* Header row */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-gray-500">
+            {dueCards.length} card{dueCards.length !== 1 ? 's' : ''} due
+          </p>
+          {dueCards.length > 0 && (
+            <button
+              onClick={() => setReviewMode(true)}
+              className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+            >
+              Review Now
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setLangFilter(null)}
+            className={`text-xs px-2.5 py-1 rounded-full transition-colors ${!langFilter ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            All
+          </button>
+          {LANGS.map(l => (
+            <button
+              key={l}
+              onClick={() => setLangFilter(langFilter === l ? null : l)}
+              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${langFilter === l ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              {LANG_LABELS[l]}
+            </button>
+          ))}
+          <button
+            onClick={() => setShowAdd(v => !v)}
+            className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors ml-1"
+          >
+            + Add Word
+          </button>
+        </div>
+      </div>
+
+      {/* Add form */}
+      {showAdd && (
+        <form onSubmit={handleAdd} className="bg-gray-50 rounded-xl p-4 mb-5 flex flex-wrap items-center gap-3">
+          <input
+            value={newWord.word}
+            onChange={e => setNewWord(p => ({ ...p, word: e.target.value }))}
+            placeholder="Word"
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-36 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          <input
+            value={newWord.translation}
+            onChange={e => setNewWord(p => ({ ...p, translation: e.target.value }))}
+            placeholder="Translation"
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-36 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          <input
+            value={newWord.example}
+            onChange={e => setNewWord(p => ({ ...p, example: e.target.value }))}
+            placeholder="Example sentence (optional)"
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 flex-1 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          <select
+            value={newWord.language}
+            onChange={e => setNewWord(p => ({ ...p, language: e.target.value }))}
+            className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none"
+          >
+            {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+          </select>
+          <button type="submit" className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium">Add</button>
+          <button type="button" onClick={() => setShowAdd(false)} className="text-sm text-gray-400 hover:text-gray-600 px-1">Cancel</button>
+        </form>
+      )}
+
+      {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {filtered.map(card => (
+          <div key={card.id} className="bg-white border border-gray-100 rounded-xl p-4 relative group hover:shadow-sm transition-shadow">
+            <div className="flex items-start justify-between mb-1.5">
+              <span className="text-[10px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">
+                {LANG_LABELS[card.language] ?? card.language}
+              </span>
+              <button
+                onClick={() => deleteWord(card.id)}
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-base font-bold text-gray-900 mt-1">{card.word}</p>
+            <p className="text-sm text-gray-500">{card.translation}</p>
+            {card.example && (
+              <p className="text-[10px] text-gray-400 mt-1.5 italic">"{card.example}"</p>
+            )}
+            <div className="flex items-center justify-between mt-2.5">
+              <span className={`text-[9px] ${new Date(card.due_at) <= today ? 'text-red-400' : 'text-gray-300'}`}>
+                Due {new Date(card.due_at).toLocaleDateString('de-DE')}
+              </span>
+              <span className="text-[9px] text-gray-300">×{card.repetitions}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {filtered.length === 0 && !isLoading && (
+        <p className="text-sm text-gray-400 text-center py-12">No words yet. Add your first word!</p>
+      )}
+    </div>
+  )
+}
+
+// ─── RemindersView ────────────────────────────────────────────────────────────
+
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const MINS  = ['00', '15', '30', '45']
+
+function RemindersView() {
+  const { reminders, isLoading, toggle, remove, add } = useAllReminders()
+  const [showForm, setShowForm] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newNote,  setNewNote]  = useState('')
+  const [newDate,  setNewDate]  = useState('')
+  const [newHour,  setNewHour]  = useState('')
+  const [newMin,   setNewMin]   = useState('00')
+
+  function resetForm() {
+    setNewTitle(''); setNewNote(''); setNewDate(''); setNewHour(''); setNewMin('00')
+    setShowForm(false)
+  }
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newTitle.trim()) return
+    const due_at = newDate
+      ? (newHour !== '' ? `${newDate}T${newHour}:${newMin}:00` : newDate)
+      : undefined
+    await add({ title: newTitle.trim(), note: newNote.trim() || undefined, due_at })
+    resetForm()
+  }
+
+  const now      = new Date()
+  const pending  = reminders.filter(r => !r.done)
+  const done     = reminders.filter(r => r.done)
+  const overdue  = pending.filter(r => r.due_at && isBeforeDay(new Date(r.due_at), now))
+  const todayGrp = pending.filter(r => r.due_at && sameDay(new Date(r.due_at), now))
+  const upcoming = pending.filter(r => r.due_at && !isBeforeDay(new Date(r.due_at), now) && !sameDay(new Date(r.due_at), now))
+  const noDate   = pending.filter(r => !r.due_at)
+
+  type Group = 'overdue' | 'today' | 'upcoming'
+
+  function renderGroup(
+    label: string,
+    items: typeof reminders,
+    group: Group,
+    labelCls: string,
+    badgeCls: string,
+  ) {
+    if (items.length === 0) return null
+    return (
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-2.5">
+          <span className={`text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${badgeCls}`}>
+            {label}
+          </span>
+          <span className="text-[10px] text-gray-400">{items.length}</span>
+        </div>
+        <div className="space-y-2">
+          {items.map(r => (
+            <div key={r.id} className="flex items-start gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 group hover:shadow-sm transition-shadow">
+              <button
+                onClick={() => toggle(r.id)}
+                className="mt-0.5 flex-shrink-0 w-4 h-4 rounded border-2 border-gray-300 hover:border-xero-green transition-colors"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800">{r.title}</p>
+                {r.note && <p className="text-xs text-gray-400 mt-0.5">{r.note}</p>}
+                {r.due_at && (
+                  <p className={`text-[10px] font-semibold mt-1 ${labelCls}`}>
+                    {fmtDueLabel(r.due_at, group)}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => remove(r.id)}
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none flex-shrink-0 mt-0.5"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 overflow-y-auto h-full">
+      <div className="max-w-xl">
+
+        {/* New reminder button / form toggle */}
+        <div className="mb-5">
+          {!showForm ? (
+            <button
+              onClick={() => setShowForm(true)}
+              className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+            >
+              + New Reminder
+            </button>
+          ) : (
+            <form onSubmit={handleAdd} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
+              <input
+                autoFocus
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                placeholder="What do you need to remember?"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-xero-green font-medium placeholder-gray-300"
+              />
+              <textarea
+                value={newNote}
+                onChange={e => setNewNote(e.target.value)}
+                placeholder="Add a note… (optional)"
+                rows={2}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green resize-none placeholder-gray-300"
+              />
+              <div className="flex items-end gap-4 flex-wrap">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Date</p>
+                  <input
+                    type="date"
+                    value={newDate}
+                    onChange={e => { setNewDate(e.target.value); if (!e.target.value) { setNewHour(''); setNewMin('00') } }}
+                    className="text-sm border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+                  />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+                    Time <span className="normal-case font-normal">(optional)</span>
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={newHour}
+                      onChange={e => setNewHour(e.target.value)}
+                      disabled={!newDate}
+                      className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <option value="">--</option>
+                      {HOURS.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                    <span className="text-gray-400 font-bold">:</span>
+                    <input
+                      type="text"
+                      list="minute-opts"
+                      value={newMin}
+                      onChange={e => setNewMin(e.target.value)}
+                      disabled={!newDate || newHour === ''}
+                      placeholder="00"
+                      maxLength={2}
+                      className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green disabled:opacity-40 disabled:cursor-not-allowed w-14 text-center"
+                    />
+                    <datalist id="minute-opts">
+                      {MINS.map(m => <option key={m} value={m} />)}
+                    </datalist>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="text-sm text-gray-400 hover:text-gray-600 px-3 py-2 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newTitle.trim()}
+                  className="text-sm bg-xero-green text-white px-5 py-2 rounded-lg font-medium disabled:opacity-40 hover:bg-xero-green-dark transition-colors"
+                >
+                  Add Reminder
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
+
+        {/* Grouped sections */}
+        {renderGroup('Overdue', overdue,  'overdue',  'text-red-500',      'bg-red-100 text-red-600')}
+        {renderGroup('Today',   todayGrp, 'today',    'text-xero-green',   'bg-xero-green/10 text-xero-green')}
+        {renderGroup('Upcoming',upcoming, 'upcoming', 'text-blue-500',     'bg-blue-50 text-blue-600')}
+
+        {/* No date */}
+        {noDate.length > 0 && (
+          <div className="mb-5">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2.5">No Date</p>
+            <div className="space-y-2">
+              {noDate.map(r => (
+                <div key={r.id} className="flex items-start gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 group hover:shadow-sm transition-shadow">
+                  <button
+                    onClick={() => toggle(r.id)}
+                    className="mt-0.5 flex-shrink-0 w-4 h-4 rounded border-2 border-gray-300 hover:border-xero-green transition-colors"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800">{r.title}</p>
+                    {r.note && <p className="text-xs text-gray-400 mt-0.5">{r.note}</p>}
+                  </div>
+                  <button
+                    onClick={() => remove(r.id)}
+                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none flex-shrink-0 mt-0.5"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Done */}
+        {done.length > 0 && (
+          <div className="mt-2 border-t border-gray-100 pt-4">
+            <p className="text-[11px] font-bold text-gray-300 uppercase tracking-wide mb-2.5">
+              Completed ({done.length})
+            </p>
+            <div className="space-y-1.5">
+              {done.map(r => (
+                <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 rounded-xl group opacity-50 hover:opacity-100 transition-opacity">
+                  <div className="flex-shrink-0 w-4 h-4 rounded bg-xero-green border-2 border-xero-green flex items-center justify-center">
+                    <span className="text-white font-bold" style={{ fontSize: 8 }}>✓</span>
+                  </div>
+                  <p className="text-sm text-gray-500 line-through flex-1">{r.title}</p>
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <button onClick={() => toggle(r.id)} className="text-[10px] text-gray-400 hover:text-xero-green transition-colors">undo</button>
+                    <button onClick={() => remove(r.id)} className="text-gray-300 hover:text-red-400 transition-colors text-base leading-none">×</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {pending.length === 0 && done.length === 0 && !isLoading && (
+          <div className="text-center py-16">
+            <p className="text-4xl mb-3">📝</p>
+            <p className="text-sm font-medium text-gray-600 mb-1">No reminders yet</p>
+            <p className="text-xs text-gray-400">Click "+ New Reminder" to get started</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── NotebookTab ──────────────────────────────────────────────────────────────
+
+const VIEWS = [
+  { path: '/notebook/notes',     label: 'Notes',      icon: '📓' },
+  { path: '/notebook/mindmap',   label: 'Mindmap',    icon: '🧠' },
+  { path: '/notebook/vocab',     label: 'Wortschatz', icon: '📚' },
+  { path: '/notebook/reminders', label: 'Reminders',  icon: '📝' },
+]
+
+export function NotebookTab() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    localStorage.setItem('notebook:lastPath', pathname)
+  }, [pathname])
+
+  const currentLabel = VIEWS.find(v => pathname === v.path)?.label ?? 'Notebook'
+
+  return (
+    <div className="flex h-full overflow-hidden">
+      {/* Sidebar */}
+      <aside className="w-[220px] h-full bg-xero-navy flex flex-col flex-shrink-0">
+        <div className="px-6 py-5 border-b border-xero-navy-light">
+          <p className="text-white font-bold text-lg tracking-tight">Notebook</p>
+        </div>
+        <nav className="flex-1 py-4 overflow-y-auto">
+          {VIEWS.map(v => (
+            <NavLink
+              key={v.path}
+              to={v.path}
+              className={({ isActive }) =>
+                `w-full flex items-center gap-3 px-6 py-3 text-sm transition-colors text-left border-l-[3px] ${
+                  isActive
+                    ? 'border-xero-green text-xero-green bg-xero-navy-light'
+                    : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'
+                }`
+              }
+            >
+              <span className="text-base w-5 text-center">{v.icon}</span>
+              <span className="font-medium">{v.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Content area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-xero-bg">
+        <header className="flex items-center px-8 py-4 bg-white border-b border-xero-border flex-shrink-0">
+          <h1 className="text-xl font-semibold text-gray-900">{currentLabel}</h1>
+        </header>
+        <div className="flex-1 overflow-hidden">
+          <Routes>
+            <Route path="notes"     element={<NotesView />} />
+            <Route path="mindmap"   element={<MindmapView />} />
+            <Route path="vocab"     element={<VocabView />} />
+            <Route path="reminders" element={<RemindersView />} />
+            <Route path="*"         element={<Navigate to="/notebook/notes" replace />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  )
+}

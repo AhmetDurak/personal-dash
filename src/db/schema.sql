@@ -28,3 +28,33 @@ CREATE TABLE IF NOT EXISTS reminders (
   done       BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS notebook_notes (
+  id         SERIAL PRIMARY KEY,
+  title      TEXT NOT NULL DEFAULT 'Untitled',
+  content    TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS mindmaps (
+  id         SERIAL PRIMARY KEY,
+  title      TEXT NOT NULL DEFAULT 'My Mindmap',
+  nodes      JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS vocabulary (
+  id           SERIAL PRIMARY KEY,
+  word         TEXT NOT NULL,
+  translation  TEXT NOT NULL,
+  language     TEXT NOT NULL DEFAULT 'de',
+  image_url    TEXT,
+  example      TEXT,
+  interval     INTEGER NOT NULL DEFAULT 1,
+  repetitions  INTEGER NOT NULL DEFAULT 0,
+  ease_factor  NUMERIC(4,2) NOT NULL DEFAULT 2.5,
+  due_at       DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);

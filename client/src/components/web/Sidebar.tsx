@@ -1,18 +1,15 @@
 import { NavLink } from 'react-router-dom'
 
 const NAV = [
-  { path: '/overview',     label: 'Profit & Loss',   icon: '⊞' },
-  { path: '/cashflow',     label: 'Cash Flow',        icon: '⇌' },
-  { path: '/simplified',   label: 'Simplified',       icon: '≡' },
-  { path: '/transactions', label: 'Transactions',     icon: '↕' },
-  { path: '/etf',          label: 'ETF Monitor',      icon: '◈' },
-  { path: '/news',         label: 'News Feed',        icon: '📰' },
-  { path: '/learn',        label: 'Finance Academy',  icon: '🎓' },
+  { path: '/finance/overview',     label: 'Profit & Loss',   icon: '⊞' },
+  { path: '/finance/cashflow',     label: 'Cash Flow',        icon: '⇌' },
+  { path: '/finance/simplified',   label: 'Simplified',       icon: '≡' },
+  { path: '/finance/transactions', label: 'Transactions',     icon: '↕' },
+  { path: '/finance/etf',          label: 'ETF Monitor',      icon: '◈' },
+  { path: '/finance/learn',        label: 'Finance Academy',  icon: '🎓' },
 ]
 
-interface Props { dark: boolean; onToggleDark: () => void }
-
-export function Sidebar({ dark, onToggleDark }: Props) {
+export function Sidebar() {
   return (
     <aside className="w-[220px] h-full bg-xero-navy flex flex-col flex-shrink-0">
       <div className="px-6 py-5 border-b border-xero-navy-light">
@@ -37,15 +34,6 @@ export function Sidebar({ dark, onToggleDark }: Props) {
           </NavLink>
         ))}
       </nav>
-      <div className="px-4 py-4 border-t border-xero-navy-light">
-        <button
-          onClick={onToggleDark}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light transition-colors text-sm"
-        >
-          <span className="text-base">{dark ? '☀️' : '🌙'}</span>
-          <span className="font-medium">{dark ? 'Light Mode' : 'Dark Mode'}</span>
-        </button>
-      </div>
     </aside>
   )
 }
