@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
+import { useReminderNotifications } from './hooks/useReminderNotifications'
 import { LoginPage } from './pages/LoginPage'
 import { TopBar } from './components/web/TopBar'
 import { Sidebar } from './components/web/Sidebar'
@@ -65,6 +66,7 @@ function FinanceDashboard() {
 
 export function App() {
   const { user, isLoading } = useAuth()
+  useReminderNotifications()
 
   if (isLoading) return <div className="h-screen bg-gray-950" />
   if (!user)     return <LoginPage />

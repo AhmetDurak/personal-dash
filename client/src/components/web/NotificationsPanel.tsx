@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNotifications } from '../../hooks/useNotifications'
+import { requestNotificationPermission } from '../../hooks/useReminderNotifications'
 import { ConfirmDialog } from './ConfirmDialog'
 
 function fmtEur(cents: number) {
@@ -33,8 +34,16 @@ export function NotificationsPanel() {
   const [newTitle, setNewTitle] = useState('')
   const [newDue, setNewDue] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [permState, setPermState] = useState<NotificationPermission>(
+    'Notification' in window ? Notification.permission : 'denied'
+  )
   const panelRef = useRef<HTMLDivElement>(null)
   const { data, isLoading, badgeCount, addReminder, toggleDone, deleteReminder } = useNotifications()
+
+  async function handleEnableNotifications() {
+    const perm = await requestNotificationPermission()
+    setPermState(perm)
+  }
 
   // Close on outside click
   useEffect(() => {
@@ -80,6 +89,29 @@ export function NotificationsPanel() {
             <p className="text-sm font-semibold text-gray-900">Notifications</p>
             <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
           </div>
+
+          {'Notification' in window && permState === 'default' && (
+            <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex items-center justify-between gap-3">
+              <p className="text-xs text-amber-700 flex-1">Enable browser notifications to get alerts for due reminders.</p>
+              <button
+                onClick={handleEnableNotifications}
+                className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors flex-shrink-0"
+              >
+                Enable
+              </button>
+            </div>
+          )}
+          {'Notification' in window && permState === 'denied' && (
+            <div className="px-5 py-2.5 bg-gray-50 border-b border-gray-100">
+              <p className="text-xs text-gray-400">Notifications blocked — allow them in your browser settings to receive reminder alerts.</p>
+            </div>
+          )}
+          {'Notification' in window && permState === 'granted' && (
+            <div className="px-5 py-2 border-b border-gray-100 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-xero-green flex-shrink-0" />
+              <p className="text-[10px] text-gray-400">Browser notifications active</p>
+            </div>
+          )}
 
           <div className="max-h-[70vh] overflow-y-auto">
 
