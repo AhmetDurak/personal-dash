@@ -299,9 +299,9 @@ function MindmapView() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col md:flex-row h-full">
       {/* SVG canvas */}
-      <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="flex-1 overflow-auto bg-gray-50 min-h-0">
         <svg
           ref={svgRef}
           width={svgW}
@@ -367,9 +367,9 @@ function MindmapView() {
         </svg>
       </div>
 
-      {/* Control panel */}
-      <div className="w-56 border-l border-gray-100 bg-white flex flex-col p-4 gap-3 flex-shrink-0">
-        <div>
+      {/* Control panel — full-width strip on mobile, sidebar on desktop */}
+      <div className="border-t md:border-t-0 md:border-l border-gray-100 bg-white flex flex-row flex-wrap md:flex-col md:w-56 p-3 md:p-4 gap-3 flex-shrink-0 overflow-y-auto">
+        <div className="flex-1 min-w-[140px] md:flex-none md:w-full">
           <p className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">Mindmap Title</p>
           <input
             value={mmTitle}
@@ -378,21 +378,21 @@ function MindmapView() {
           />
         </div>
 
-        <hr className="border-gray-100" />
+        <hr className="border-gray-100 hidden md:block w-full" />
 
         {nodes.length === 0 && (
           <button
             onClick={() => persist([{ id: 'root', label: 'Finance Concepts', parentId: null }])}
-            className="text-xs bg-xero-green text-white rounded-lg py-2 font-medium hover:bg-xero-green-dark"
+            className="text-xs bg-xero-green text-white rounded-lg py-2 px-3 font-medium hover:bg-xero-green-dark flex-shrink-0"
           >
             + Create Root Node
           </button>
         )}
 
         {selectedNode ? (
-          <>
-            <div>
-              <p className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">Selected Node</p>
+          <div className="flex flex-row flex-wrap md:flex-col gap-2 flex-1 md:flex-none md:w-full items-center md:items-stretch">
+            <div className="flex-1 min-w-[120px] md:flex-none md:w-full">
+              <p className="text-[10px] text-gray-400 uppercase font-bold mb-1.5 hidden md:block">Selected Node</p>
               {isEditing ? (
                 <div className="flex gap-1">
                   <input
@@ -421,17 +421,17 @@ function MindmapView() {
             </div>
             <button
               onClick={handleAddChild}
-              className="text-xs bg-xero-green text-white rounded-lg py-2 font-medium hover:bg-xero-green-dark transition-colors"
+              className="text-xs bg-xero-green text-white rounded-lg py-2 px-3 font-medium hover:bg-xero-green-dark transition-colors flex-shrink-0 md:w-full"
             >
-              + Add Child Node
+              + Add Child
             </button>
             {selectedNode.parentId !== null && (
               <>
               <button
                 onClick={() => setConfirmDeleteNode(true)}
-                className="text-xs text-red-400 border border-red-200 rounded-lg py-2 hover:bg-red-50 transition-colors"
+                className="text-xs text-red-400 border border-red-200 rounded-lg py-2 px-3 hover:bg-red-50 transition-colors flex-shrink-0 md:w-full"
               >
-                Delete Node
+                Delete
               </button>
               {confirmDeleteNode && (
                 <ConfirmDialog
@@ -443,9 +443,9 @@ function MindmapView() {
               )}
               </>
             )}
-          </>
+          </div>
         ) : (
-          <p className="text-xs text-gray-400 leading-relaxed">
+          <p className="text-xs text-gray-400 leading-relaxed hidden md:block">
             Click a node to select it, then add children or edit its label.
           </p>
         )}
