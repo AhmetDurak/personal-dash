@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import path from 'path'
 import express, { Request, Response, NextFunction } from 'express'
+import { migrate } from '../db/migrate'
 import session from 'express-session'
 import passport from 'passport'
 import connectPgSimple from 'connect-pg-simple'
@@ -91,4 +92,6 @@ app.use(express.static(CLIENT_DIST))
 app.get('*', (_req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')))
 
 const PORT = process.env.PORT ?? 3001
-app.listen(PORT, () => console.log(`API listening on :${PORT}`))
+migrate()
+  .then(() => app.listen(PORT, () => console.log(`API listening on :${PORT}`)))
+  .catch(err => { console.error('Migration failed:', err); process.exit(1) })
