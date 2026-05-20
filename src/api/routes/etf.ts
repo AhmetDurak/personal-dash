@@ -1,10 +1,7 @@
 import { Router, Request, Response } from 'express'
-import { pool } from '../../db/pool'
 import { ETFAgent } from '../../agents/etf/ETFAgent'
 
-const etf = new ETFAgent(pool)
-
-export function etfRouter(): Router {
+export function etfRouter(etf: ETFAgent): Router {
   const router = Router()
 
   router.get('/watchlist', async (_req: Request, res: Response) => {

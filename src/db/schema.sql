@@ -18,3 +18,13 @@ CREATE TABLE IF NOT EXISTS etf_watchlist (
   ticker     TEXT NOT NULL UNIQUE,
   added_at   TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS reminders (
+  id         SERIAL PRIMARY KEY,
+  title      TEXT NOT NULL,
+  note       TEXT,
+  due_at     TIMESTAMPTZ,
+  repeat     TEXT NOT NULL DEFAULT 'none',
+  done       BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);

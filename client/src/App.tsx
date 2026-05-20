@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { useDarkMode } from './hooks/useDarkMode'
 import { Sidebar } from './components/web/Sidebar'
 import { DashboardHeader } from './components/web/DashboardHeader'
@@ -10,7 +11,6 @@ import { ETFTab } from './tabs/ETFTab'
 import { NewsTab } from './tabs/NewsTab'
 import { LearnTab } from './tabs/LearnTab'
 import { currentMonth } from './utils/format'
-import type { Tab } from './components/web/Sidebar'
 import type { Span } from './components/web/BalanceChart'
 
 function useLocalState<T>(key: string, fallback: T) {
@@ -22,24 +22,27 @@ function useLocalState<T>(key: string, fallback: T) {
 }
 
 export function App() {
-  const [tab, setTab]     = useLocalState<Tab>('fd:tab', 'overview')
   const [month, setMonth] = useLocalState<string>('fd:month', currentMonth())
   const [span, setSpan]   = useLocalState<Span>('fd:span', '6M')
   const { dark, toggle }  = useDarkMode()
 
   return (
     <div className="flex h-screen bg-xero-bg overflow-hidden">
-      <Sidebar active={tab} onChange={setTab} dark={dark} onToggleDark={toggle} />
+      <Sidebar dark={dark} onToggleDark={toggle} />
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader tab={tab} month={month} onMonthChange={setMonth} />
+        <DashboardHeader month={month} onMonthChange={setMonth} />
         <main className="flex-1 overflow-y-auto">
-          {tab === 'overview'     && <OverviewTab month={month} span={span} onSpanChange={setSpan} />}
-          {tab === 'cashflow'     && <CashFlowTab month={month} span={span} onSpanChange={setSpan} />}
-          {tab === 'simplified'   && <SimplifiedTab month={month} span={span} onSpanChange={setSpan} />}
-          {tab === 'transactions' && <TransactionsTab month={month} onMonthChange={setMonth} />}
-          {tab === 'etf'          && <ETFTab />}
-          {tab === 'news'         && <NewsTab />}
-          {tab === 'learn'        && <LearnTab />}
+          <Routes>
+            <Route path="/" element={<Navigate to="/overview" replace />} />
+            <Route path="/overview"     element={<OverviewTab month={month} span={span} onSpanChange={setSpan} />} />
+            <Route path="/cashflow"     element={<CashFlowTab month={month} span={span} onSpanChange={setSpan} />} />
+            <Route path="/simplified"   element={<SimplifiedTab month={month} span={span} onSpanChange={setSpan} />} />
+            <Route path="/transactions" element={<TransactionsTab month={month} onMonthChange={setMonth} />} />
+            <Route path="/etf"          element={<ETFTab />} />
+            <Route path="/news"         element={<NewsTab />} />
+            <Route path="/learn"        element={<LearnTab />} />
+            <Route path="*"             element={<Navigate to="/overview" replace />} />
+          </Routes>
         </main>
       </div>
     </div>
