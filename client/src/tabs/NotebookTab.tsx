@@ -951,36 +951,65 @@ export function NotebookTab() {
 
   const currentLabel = VIEWS.find(v => pathname === v.path)?.label ?? 'Notebook'
 
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  function NavItems() {
+    return (
+      <nav className="flex-1 py-4 overflow-y-auto">
+        {VIEWS.map(v => (
+          <NavLink
+            key={v.path}
+            to={v.path}
+            onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) =>
+              `w-full flex items-center gap-3 px-6 py-3 text-sm transition-colors text-left border-l-[3px] ${
+                isActive
+                  ? 'border-xero-green text-xero-green bg-xero-navy-light'
+                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'
+              }`
+            }
+          >
+            <span className="text-base w-5 text-center">{v.icon}</span>
+            <span className="font-medium">{v.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+    )
+  }
+
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-[220px] h-full bg-xero-navy flex flex-col flex-shrink-0">
+      {/* Sidebar — desktop permanent, mobile overlay */}
+      <aside className="hidden md:flex w-[220px] h-full bg-xero-navy flex-col flex-shrink-0">
         <div className="px-6 py-5 border-b border-xero-navy-light">
           <p className="text-white font-bold text-lg tracking-tight">Notebook</p>
         </div>
-        <nav className="flex-1 py-4 overflow-y-auto">
-          {VIEWS.map(v => (
-            <NavLink
-              key={v.path}
-              to={v.path}
-              className={({ isActive }) =>
-                `w-full flex items-center gap-3 px-6 py-3 text-sm transition-colors text-left border-l-[3px] ${
-                  isActive
-                    ? 'border-xero-green text-xero-green bg-xero-navy-light'
-                    : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'
-                }`
-              }
-            >
-              <span className="text-base w-5 text-center">{v.icon}</span>
-              <span className="font-medium">{v.label}</span>
-            </NavLink>
-          ))}
-        </nav>
+        <NavItems />
       </aside>
+
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+          <aside className="relative w-[220px] h-full bg-xero-navy flex flex-col shadow-2xl">
+            <div className="px-6 py-5 border-b border-xero-navy-light">
+              <p className="text-white font-bold text-lg tracking-tight">Notebook</p>
+            </div>
+            <NavItems />
+          </aside>
+        </div>
+      )}
 
       {/* Content area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-xero-bg">
-        <header className="flex items-center px-8 py-4 bg-white border-b border-xero-border flex-shrink-0">
+        <header className="flex items-center gap-3 px-4 md:px-8 py-4 bg-white border-b border-xero-border flex-shrink-0">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
           <h1 className="text-xl font-semibold text-gray-900">{currentLabel}</h1>
         </header>
         <div className="flex-1 overflow-hidden">
