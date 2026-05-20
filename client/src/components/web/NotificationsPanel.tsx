@@ -84,7 +84,7 @@ export function NotificationsPanel() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-11 w-96 bg-white border border-xero-border rounded-2xl shadow-xl z-50 overflow-hidden">
+        <div className="absolute right-0 top-11 w-96 max-w-[calc(100vw-1rem)] bg-white border border-xero-border rounded-2xl shadow-xl z-50 overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-900">Notifications</p>
             <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>

@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body { overflow-x: hidden; }
+
 /* ── Dark mode overrides ────────────────────────────────────────────────────────
    .dark is set on <html>. Using ".dark .<class>" beats the single-class
    specificity of Tailwind utilities (0,2,0 vs 0,1,0), so no !important needed.
