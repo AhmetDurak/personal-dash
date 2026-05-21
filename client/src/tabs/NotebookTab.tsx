@@ -234,9 +234,11 @@ function MindmapView() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
   const initialized = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragState | null>(null)
   const connectRef = useRef<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
+  const panRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null)
   const nodesRef = useRef<MMNode[]>([])
   const edgesRef = useRef<MMEdge[]>([])
   const titleRef = useRef(mmTitle)
@@ -288,6 +290,15 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   }
 
   function handleSvgPointerMove(e: React.PointerEvent) {
+    const p = panRef.current
+    if (p) {
+      const el = containerRef.current
+      if (el) {
+        el.scrollLeft = p.scrollLeft - (e.clientX - p.startX)
+        el.scrollTop  = p.scrollTop  - (e.clientY - p.startY)
+      }
+      return
+    }
     const { x, y } = clientToSvg(e.clientX, e.clientY)
     const d = dragRef.current
     if (d) {
@@ -305,6 +316,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   }
 
   function handleSvgPointerUp(e: React.PointerEvent) {
+    if (panRef.current) { panRef.current = null; return }
     const d = dragRef.current
     if (d) {
       dragRef.current = null
@@ -374,7 +386,9 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     <div className="h-full relative overflow-hidden">
       {/* Canvas */}
       <div
-        className="h-full overflow-auto bg-[#F8FAFC] cursor-default"
+        ref={containerRef}
+        className="h-full overflow-auto bg-[#F8FAFC]"
+        style={{ cursor: panRef.current ? 'grabbing' : 'default' }}
         onPointerMove={handleSvgPointerMove}
         onPointerUp={handleSvgPointerUp}
         onPointerLeave={handleSvgPointerUp}
@@ -395,7 +409,16 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
               <circle cx="14" cy="14" r="1" fill="#CBD5E1" />
             </pattern>
           </defs>
-          <rect width={CANVAS_W} height={CANVAS_H} fill="url(#dots)" />
+          <rect
+            width={CANVAS_W} height={CANVAS_H} fill="url(#dots)"
+            style={{ cursor: 'grab' }}
+            onPointerDown={e => {
+              if (dragRef.current || connectRef.current) return
+              const el = containerRef.current
+              if (!el) return
+              panRef.current = { startX: e.clientX, startY: e.clientY, scrollLeft: el.scrollLeft, scrollTop: el.scrollTop }
+            }}
+          />
 
           {/* Connections */}
           {nodes.map(n => {
