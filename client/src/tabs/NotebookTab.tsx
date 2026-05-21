@@ -10,14 +10,10 @@ const DEPTH_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899']
 const NODE_W = 140
 const NODE_H = 36
 
-function getDepth(nodes: MMNode[], id: string, depth = 0): number {
-  const node = nodes.find(n => n.id === id)
-  if (!node || node.parentId === null) return depth
-  return getDepth(nodes, node.parentId, depth + 1)
-}
-
-function nodeColor(nodes: MMNode[], id: string): string {
-  return DEPTH_COLORS[getDepth(nodes, id) % DEPTH_COLORS.length]
+function nodeColor(id: string): string {
+  let h = 5381
+  for (let i = 0; i < id.length; i++) h = ((h << 5) + h) ^ id.charCodeAt(i)
+  return DEPTH_COLORS[Math.abs(h) % DEPTH_COLORS.length]
 }
 
 function getDescendantIds(nodes: MMNode[], id: string): string[] {
@@ -428,7 +424,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             const x1 = (p.x ?? 0) + NODE_W, y1 = (p.y ?? 0) + NODE_H / 2
             const x2 = n.x ?? 0,            y2 = (n.y ?? 0) + NODE_H / 2
             const t = Math.max(60, Math.abs(x2 - x1) * 0.45)
-            const color = nodeColor(nodes, n.id)
+            const color = nodeColor(n.id)
             const d = `M ${x1} ${y1} C ${x1 + t} ${y1} ${x2 - t} ${y2} ${x2} ${y2}`
             return (
               <g key={`e-${n.id}`}>
@@ -452,7 +448,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             const x2 = fromIsLeft ? (to.x ?? 0) : (to.x ?? 0) + NODE_W
             const y2 = (to.y ?? 0) + NODE_H / 2
             const t  = Math.max(60, Math.abs(x2 - x1) * 0.45)
-            const color = nodeColor(nodes, e.from)
+            const color = nodeColor(e.from)
             const d = `M ${x1} ${y1} C ${x1 + (fromIsLeft ? t : -t)} ${y1} ${x2 + (fromIsLeft ? -t : t)} ${y2} ${x2} ${y2}`
             return (
               <g key={e.id}>
@@ -471,7 +467,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             if (!src) return null
             const x1 = (src.x ?? 0) + NODE_W, y1 = (src.y ?? 0) + NODE_H / 2
             const t = Math.max(60, Math.abs(connectLine.x - x1) * 0.45)
-            const color = nodeColor(nodes, connectLine.sourceId)
+            const color = nodeColor(connectLine.sourceId)
             return (
               <path
                 d={`M ${x1} ${y1} C ${x1+t} ${y1} ${connectLine.x-t} ${connectLine.y} ${connectLine.x} ${connectLine.y}`}
@@ -484,7 +480,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
           {/* Nodes */}
           {nodes.map(n => {
             const x = n.x ?? 0, y = n.y ?? 0
-            const color = nodeColor(nodes, n.id)
+            const color = nodeColor(n.id)
             const isRoot = n.parentId === null
             const isDragging = dragRef.current?.id === n.id
             const isRenaming = renaming?.id === n.id
