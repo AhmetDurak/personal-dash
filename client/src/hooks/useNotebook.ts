@@ -14,6 +14,8 @@ export interface MMNode {
   id: string
   label: string
   parentId: string | null
+  x?: number
+  y?: number
 }
 
 export interface Mindmap {

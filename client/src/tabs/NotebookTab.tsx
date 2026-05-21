@@ -25,49 +25,6 @@ function getDescendantIds(nodes: MMNode[], id: string): string[] {
   return [id, ...children.flatMap(c => getDescendantIds(nodes, c.id))]
 }
 
-interface LayoutPos { x: number; y: number }
-
-function layoutTree(nodes: MMNode[], svgH: number): Map<string, LayoutPos> {
-  const pos = new Map<string, LayoutPos>()
-  if (nodes.length === 0) return pos
-  const root = nodes.find(n => n.parentId === null)
-  if (!root) return pos
-
-  const childrenOf = new Map<string, MMNode[]>()
-  nodes.forEach(n => {
-    if (n.parentId) {
-      const list = childrenOf.get(n.parentId) ?? []
-      list.push(n)
-      childrenOf.set(n.parentId, list)
-    }
-  })
-
-  function leafCount(id: string): number {
-    const ch = childrenOf.get(id) ?? []
-    return ch.length === 0 ? 1 : ch.reduce((s, c) => s + leafCount(c.id), 0)
-  }
-
-  const totalLeaves = leafCount(root.id)
-  const vUnit = Math.max(54, (svgH - 40) / totalLeaves)
-  const totalH = totalLeaves * vUnit
-  const yOff = Math.max(20, (svgH - totalH) / 2)
-
-  function place(id: string, depth: number, yFrom: number, yTo: number) {
-    const yMid = (yFrom + yTo) / 2
-    pos.set(id, { x: 60 + depth * 200, y: yMid })
-    const children = childrenOf.get(id) ?? []
-    const total = leafCount(id)
-    let cursor = yFrom
-    children.forEach(child => {
-      const slice = (leafCount(child.id) / total) * (yTo - yFrom)
-      place(child.id, depth + 1, cursor, cursor + slice)
-      cursor += slice
-    })
-  }
-
-  place(root.id, 0, yOff, yOff + totalH)
-  return pos
-}
 
 // ─── Reminder helpers ──────────────────────────────────────────────────────────
 
@@ -233,223 +190,292 @@ function NotesView() {
 
 // ─── MindmapView ──────────────────────────────────────────────────────────────
 
+const CANVAS_W = 2400
+const CANVAS_H = 1600
+
+interface DragState {
+  id: string
+  offsetX: number
+  offsetY: number
+  startSvgX: number
+  startSvgY: number
+  moved: boolean
+}
+
+interface CtxMenu { nodeId: string; screenX: number; screenY: number }
+
+function initPositions(raw: MMNode[]): MMNode[] {
+  if (raw.every(n => n.x !== undefined)) return raw
+  const root = raw.find(n => n.parentId === null)
+  if (!root) return raw.map(n => ({ ...n, x: n.x ?? 100, y: n.y ?? 100 }))
+  const childrenOf = new Map<string, MMNode[]>()
+  raw.forEach(n => { if (n.parentId) { const l = childrenOf.get(n.parentId) ?? []; l.push(n); childrenOf.set(n.parentId, l) } })
+  function leafCount(id: string): number { const ch = childrenOf.get(id) ?? []; return ch.length === 0 ? 1 : ch.reduce((s, c) => s + leafCount(c.id), 0) }
+  const posMap = new Map<string, { x: number; y: number }>()
+  const totalLeaves = leafCount(root.id)
+  const startY = Math.max(80, (CANVAS_H - totalLeaves * 80) / 2)
+  function place(id: string, depth: number, yFrom: number, yTo: number) {
+    posMap.set(id, { x: 80 + depth * 220, y: (yFrom + yTo) / 2 - NODE_H / 2 })
+    const ch = childrenOf.get(id) ?? []; const total = leafCount(id); let cursor = yFrom
+    ch.forEach(c => { const sl = (leafCount(c.id) / total) * (yTo - yFrom); place(c.id, depth + 1, cursor, cursor + sl); cursor += sl })
+  }
+  place(root.id, 0, startY, startY + totalLeaves * 80)
+  return raw.map(n => ({ ...n, x: n.x ?? (posMap.get(n.id)?.x ?? 100), y: n.y ?? (posMap.get(n.id)?.y ?? 100) }))
+}
+
 function MindmapView() {
   const { mindmap, saveMindmap } = useMindmap()
   const [nodes, setNodes] = useState<MMNode[]>([])
   const [mmTitle, setMmTitle] = useState('My Mindmap')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [editingLabel, setEditingLabel] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
+  const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
+  const [renaming, setRenaming] = useState<{ id: string; label: string } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const initialized = useRef(false)
   const svgRef = useRef<SVGSVGElement>(null)
+  const dragRef = useRef<DragState | null>(null)
+  const nodesRef = useRef<MMNode[]>([])
+  const titleRef = useRef(mmTitle)
+
+  useEffect(() => { nodesRef.current = nodes }, [nodes])
+  useEffect(() => { titleRef.current = mmTitle }, [mmTitle])
 
   useEffect(() => {
-    if (initialized.current) return
-    if (mindmap === undefined) return
-    if (mindmap) {
-      setNodes(mindmap.nodes)
-      setMmTitle(mindmap.title)
-    } else {
-      setNodes([{ id: 'root', label: 'Finance Concepts', parentId: null }])
-    }
+    if (initialized.current || mindmap === undefined) return
+    const raw = mindmap ? mindmap.nodes : [{ id: 'root', label: 'Finance Concepts', parentId: null }]
+    setNodes(initPositions(raw))
+    if (mindmap) setMmTitle(mindmap.title)
     initialized.current = true
   }, [mindmap])
 
-  const maxDepth = nodes.reduce((mx, n) => Math.max(mx, getDepth(nodes, n.id)), 0)
-  const svgH = Math.max(500, nodes.length * 60)
-  const svgW = Math.max(900, (maxDepth + 1) * 200 + 200)
-  const positions = layoutTree(nodes, svgH)
-  const selectedNode = nodes.find(n => n.id === selectedId) ?? null
-
   function persist(newNodes: MMNode[]) {
     setNodes(newNodes)
-    saveMindmap(mmTitle, newNodes)
+    nodesRef.current = newNodes
+    saveMindmap(titleRef.current, newNodes)
+  }
+
+  function clientToSvg(clientX: number, clientY: number) {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return { x: clientX, y: clientY }
+    return { x: clientX - rect.left, y: clientY - rect.top }
+  }
+
+  function handleNodePointerDown(e: React.PointerEvent, id: string) {
+    e.stopPropagation()
+    const node = nodesRef.current.find(n => n.id === id)
+    if (!node) return
+    const { x, y } = clientToSvg(e.clientX, e.clientY)
+    dragRef.current = { id, offsetX: x - (node.x ?? 0), offsetY: y - (node.y ?? 0), startSvgX: x, startSvgY: y, moved: false }
+    setCtxMenu(null)
+  }
+
+  function handleSvgPointerMove(e: React.PointerEvent) {
+    const d = dragRef.current
+    if (!d) return
+    const { x, y } = clientToSvg(e.clientX, e.clientY)
+    if (!d.moved && Math.hypot(x - d.startSvgX, y - d.startSvgY) > 4) dragRef.current = { ...d, moved: true }
+    setNodes(prev => prev.map(n => n.id === d.id ? { ...n, x: Math.max(0, x - d.offsetX), y: Math.max(0, y - d.offsetY) } : n))
+  }
+
+  function handleSvgPointerUp(e: React.PointerEvent) {
+    const d = dragRef.current
+    if (!d) return
+    dragRef.current = null
+    if (!d.moved) {
+      setCtxMenu({ nodeId: d.id, screenX: e.clientX, screenY: e.clientY })
+    } else {
+      saveMindmap(titleRef.current, nodesRef.current)
+    }
   }
 
   function handleAddChild() {
-    if (!selectedId) return
+    if (!ctxMenu) return
+    const parent = nodesRef.current.find(n => n.id === ctxMenu.nodeId)
     const newId = `n${Date.now()}`
-    const updated = [...nodes, { id: newId, label: 'New Topic', parentId: selectedId }]
+    const newNode: MMNode = {
+      id: newId, label: 'New Topic', parentId: ctxMenu.nodeId,
+      x: (parent?.x ?? 200) + 240,
+      y: (parent?.y ?? 200) + (Math.random() - 0.5) * 120,
+    }
+    const updated = [...nodesRef.current, newNode]
     persist(updated)
-    setSelectedId(newId)
-    setEditingLabel('New Topic')
-    setIsEditing(true)
-  }
-
-  const [confirmDeleteNode, setConfirmDeleteNode] = useState(false)
-
-  function handleDeleteSelected() {
-    if (!selectedId) return
-    const toRemove = new Set(getDescendantIds(nodes, selectedId))
-    persist(nodes.filter(n => !toRemove.has(n.id)))
-    setSelectedId(null)
+    setCtxMenu(null)
+    setRenaming({ id: newId, label: 'New Topic' })
   }
 
   function handleRenameConfirm() {
-    if (!selectedId) return
-    persist(nodes.map(n => n.id === selectedId ? { ...n, label: editingLabel } : n))
-    setIsEditing(false)
+    if (!renaming) return
+    persist(nodesRef.current.map(n => n.id === renaming.id ? { ...n, label: renaming.label } : n))
+    setRenaming(null)
   }
 
-  function handleNodeClick(id: string) {
-    setSelectedId(id)
-    const node = nodes.find(n => n.id === id)
-    if (node) setEditingLabel(node.label)
-    setIsEditing(false)
+  function handleDelete(id: string) {
+    const toRemove = new Set(getDescendantIds(nodesRef.current, id))
+    persist(nodesRef.current.filter(n => !toRemove.has(n.id)))
+    setConfirmDelete(null)
+    setCtxMenu(null)
   }
+
+  const ctxNode = ctxMenu ? nodes.find(n => n.id === ctxMenu.nodeId) ?? null : null
 
   return (
-    <div className="flex flex-col md:flex-row h-full">
-      {/* SVG canvas */}
-      <div className="flex-1 overflow-auto bg-gray-50 min-h-0">
+    <div className="h-full relative overflow-hidden">
+      {/* Canvas */}
+      <div
+        className="h-full overflow-auto bg-[#F8FAFC] cursor-default"
+        onPointerMove={handleSvgPointerMove}
+        onPointerUp={handleSvgPointerUp}
+        onPointerLeave={handleSvgPointerUp}
+        onClick={() => setCtxMenu(null)}
+      >
         <svg
           ref={svgRef}
-          width={svgW}
-          height={svgH}
-          className="block"
-          onClick={e => { if (e.target === svgRef.current) setSelectedId(null) }}
+          width={CANVAS_W}
+          height={CANVAS_H}
+          className="block select-none"
+          style={{ touchAction: dragRef.current ? 'none' : 'auto' }}
         >
-          {/* Edges */}
+          {/* Dot grid */}
+          <defs>
+            <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+              <circle cx="14" cy="14" r="1" fill="#CBD5E1" />
+            </pattern>
+          </defs>
+          <rect width={CANVAS_W} height={CANVAS_H} fill="url(#dots)" />
+
+          {/* Connections */}
           {nodes.map(n => {
             if (!n.parentId) return null
-            const from = positions.get(n.parentId)
-            const to   = positions.get(n.id)
-            if (!from || !to) return null
-            const sx = from.x + NODE_W
-            const sy = from.y
-            const tx = to.x
-            const ty = to.y
-            const mx = (sx + tx) / 2
+            const p = nodes.find(p => p.id === n.parentId)
+            if (!p) return null
+            const x1 = (p.x ?? 0) + NODE_W, y1 = (p.y ?? 0) + NODE_H / 2
+            const x2 = n.x ?? 0,            y2 = (n.y ?? 0) + NODE_H / 2
+            const t = Math.max(60, Math.abs(x2 - x1) * 0.45)
+            const color = nodeColor(nodes, n.id)
             return (
               <path
                 key={`e-${n.id}`}
-                d={`M ${sx} ${sy} C ${mx} ${sy} ${mx} ${ty} ${tx} ${ty}`}
-                fill="none"
-                stroke="#CBD5E1"
-                strokeWidth={1.5}
+                d={`M ${x1} ${y1} C ${x1 + t} ${y1} ${x2 - t} ${y2} ${x2} ${y2}`}
+                fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.35} strokeLinecap="round"
               />
             )
           })}
+
           {/* Nodes */}
           {nodes.map(n => {
-            const p = positions.get(n.id)
-            if (!p) return null
-            const x = p.x
-            const y = p.y - NODE_H / 2
+            const x = n.x ?? 0, y = n.y ?? 0
             const color = nodeColor(nodes, n.id)
-            const isSel = n.id === selectedId
-            const label = n.label.length > 16 ? n.label.slice(0, 15) + '…' : n.label
+            const isRoot = n.parentId === null
+            const isDragging = dragRef.current?.id === n.id
+            const isRenaming = renaming?.id === n.id
+            const label = n.label.length > 18 ? n.label.slice(0, 17) + '…' : n.label
             return (
               <g
                 key={n.id}
-                onClick={e => { e.stopPropagation(); handleNodeClick(n.id) }}
-                style={{ cursor: 'pointer' }}
+                onPointerDown={e => handleNodePointerDown(e, n.id)}
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
               >
-                <rect
-                  x={x} y={y} width={NODE_W} height={NODE_H} rx={8}
-                  fill={isSel ? color : '#fff'}
-                  stroke={color}
-                  strokeWidth={isSel ? 2.5 : 1.5}
-                />
-                <text
-                  x={x + NODE_W / 2} y={y + NODE_H / 2 + 1}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize={11}
-                  fontWeight={isSel ? 600 : 400}
-                  fill={isSel ? '#fff' : '#374151'}
-                >
-                  {label}
-                </text>
+                {/* Shadow */}
+                <rect x={x+2} y={y+2} width={NODE_W} height={NODE_H} rx={10} fill="rgba(0,0,0,0.06)" />
+                {/* Card */}
+                <rect x={x} y={y} width={NODE_W} height={NODE_H} rx={10} fill="white" stroke={color} strokeWidth={isRoot ? 2 : 1.5} />
+                {/* Color accent bar */}
+                <rect x={x} y={y} width={5} height={NODE_H} rx={3} fill={color} />
+                <rect x={x+2} y={y} width={3} height={NODE_H} fill={color} />
+
+                {isRenaming ? (
+                  <foreignObject x={x + 12} y={y + 6} width={NODE_W - 20} height={NODE_H - 12}>
+                    <input
+                      autoFocus
+                      value={renaming.label}
+                      onChange={e => setRenaming(r => r ? { ...r, label: e.target.value } : r)}
+                      onKeyDown={e => {
+                        e.stopPropagation()
+                        if (e.key === 'Enter') handleRenameConfirm()
+                        if (e.key === 'Escape') setRenaming(null)
+                      }}
+                      onBlur={handleRenameConfirm}
+                      style={{ width: '100%', fontSize: 11, border: 'none', outline: 'none', background: 'transparent', fontWeight: isRoot ? 600 : 400 }}
+                    />
+                  </foreignObject>
+                ) : (
+                  <text
+                    x={x + 14} y={y + NODE_H / 2}
+                    dominantBaseline="middle"
+                    fontSize={11}
+                    fontWeight={isRoot ? 700 : 400}
+                    fill="#1E293B"
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    {label}
+                  </text>
+                )}
               </g>
             )
           })}
+
+          {/* Empty state */}
+          {nodes.length === 0 && (
+            <text x={CANVAS_W / 2} y={CANVAS_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={14} fill="#94A3B8"
+              style={{ cursor: 'pointer' }}
+              onClick={e => { e.stopPropagation(); persist([{ id: 'root', label: 'Finance Concepts', parentId: null, x: CANVAS_W/2 - NODE_W/2, y: CANVAS_H/2 - NODE_H/2 }]) }}
+            >
+              Click to create your first node
+            </text>
+          )}
         </svg>
       </div>
 
-      {/* Control panel — full-width strip on mobile, sidebar on desktop */}
-      <div className="border-t md:border-t-0 md:border-l border-gray-100 bg-white flex flex-row flex-wrap md:flex-col md:w-56 p-3 md:p-4 gap-3 flex-shrink-0 overflow-y-auto">
-        <div className="flex-1 min-w-[140px] md:flex-none md:w-full">
-          <p className="text-[10px] text-gray-400 uppercase font-bold mb-1.5">Mindmap Title</p>
-          <input
-            value={mmTitle}
-            onChange={e => { setMmTitle(e.target.value); saveMindmap(e.target.value, nodes) }}
-            className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green"
-          />
-        </div>
-
-        <hr className="border-gray-100 hidden md:block w-full" />
-
-        {nodes.length === 0 && (
-          <button
-            onClick={() => persist([{ id: 'root', label: 'Finance Concepts', parentId: null }])}
-            className="text-xs bg-xero-green text-white rounded-lg py-2 px-3 font-medium hover:bg-xero-green-dark flex-shrink-0"
-          >
-            + Create Root Node
-          </button>
-        )}
-
-        {selectedNode ? (
-          <div className="flex flex-row flex-wrap md:flex-col gap-2 flex-1 md:flex-none md:w-full items-center md:items-stretch">
-            <div className="flex-1 min-w-[120px] md:flex-none md:w-full">
-              <p className="text-[10px] text-gray-400 uppercase font-bold mb-1.5 hidden md:block">Selected Node</p>
-              {isEditing ? (
-                <div className="flex gap-1">
-                  <input
-                    autoFocus
-                    value={editingLabel}
-                    onChange={e => setEditingLabel(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleRenameConfirm()
-                      if (e.key === 'Escape') setIsEditing(false)
-                    }}
-                    className="flex-1 text-sm border border-xero-green rounded-lg px-2 py-1.5 focus:outline-none min-w-0"
-                  />
-                  <button onClick={handleRenameConfirm} className="text-xs bg-xero-green text-white px-2 rounded-lg flex-shrink-0">✓</button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-gray-800 flex-1 truncate">{selectedNode.label}</p>
-                  <button
-                    onClick={() => { setEditingLabel(selectedNode.label); setIsEditing(true) }}
-                    className="text-sm text-gray-400 hover:text-gray-600 flex-shrink-0"
-                  >
-                    ✏️
-                  </button>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={handleAddChild}
-              className="text-xs bg-xero-green text-white rounded-lg py-2 px-3 font-medium hover:bg-xero-green-dark transition-colors flex-shrink-0 md:w-full"
-            >
-              + Add Child
-            </button>
-            {selectedNode.parentId !== null && (
-              <>
-              <button
-                onClick={() => setConfirmDeleteNode(true)}
-                className="text-xs text-red-400 border border-red-200 rounded-lg py-2 px-3 hover:bg-red-50 transition-colors flex-shrink-0 md:w-full"
-              >
-                Delete
-              </button>
-              {confirmDeleteNode && (
-                <ConfirmDialog
-                  message="This node and all its children will be deleted."
-                  confirmLabel="Delete"
-                  onConfirm={() => { handleDeleteSelected(); setConfirmDeleteNode(false) }}
-                  onCancel={() => setConfirmDeleteNode(false)}
-                />
-              )}
-              </>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-gray-400 leading-relaxed hidden md:block">
-            Click a node to select it, then add children or edit its label.
-          </p>
-        )}
+      {/* Floating title */}
+      <div className="absolute top-3 left-3 z-10" onClick={e => e.stopPropagation()}>
+        <input
+          value={mmTitle}
+          onChange={e => { setMmTitle(e.target.value); saveMindmap(e.target.value, nodesRef.current) }}
+          placeholder="Map title…"
+          className="text-sm font-semibold bg-white/90 backdrop-blur border border-xero-border rounded-xl px-3 py-1.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-xero-green w-44"
+        />
       </div>
+
+      {/* Context menu */}
+      {ctxMenu && ctxNode && (
+        <div
+          className="fixed z-40 bg-white border border-xero-border rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
+          style={{ left: ctxMenu.screenX, top: ctxMenu.screenY, transform: 'translate(-50%, calc(-100% - 8px))' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="px-4 py-2 border-b border-gray-50">
+            <p className="text-xs font-semibold text-gray-500 truncate max-w-[120px]">{ctxNode.label}</p>
+          </div>
+          <button
+            onClick={() => { setRenaming({ id: ctxNode.id, label: ctxNode.label }); setCtxMenu(null) }}
+            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors"
+          >
+            <span className="text-base">✏️</span> Rename
+          </button>
+          <button
+            onClick={handleAddChild}
+            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
+          >
+            <span className="text-base">➕</span> Add child
+          </button>
+          {ctxNode.parentId !== null && (
+            <button
+              onClick={() => { setConfirmDelete(ctxNode.id); setCtxMenu(null) }}
+              className="flex items-center gap-2.5 w-full text-left text-sm text-red-500 px-4 py-2.5 hover:bg-red-50 transition-colors border-t border-gray-50"
+            >
+              <span className="text-base">🗑</span> Delete
+            </button>
+          )}
+        </div>
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          message="This node and all its children will be deleted."
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
     </div>
   )
 }
