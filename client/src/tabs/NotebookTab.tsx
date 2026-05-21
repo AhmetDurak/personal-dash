@@ -369,6 +369,7 @@ function MindmapView() {
         onPointerUp={handleSvgPointerUp}
         onPointerLeave={handleSvgPointerUp}
         onClick={() => setCtxMenu(null)}
+        onContextMenu={e => e.preventDefault()}
       >
         <svg
           ref={svgRef}
