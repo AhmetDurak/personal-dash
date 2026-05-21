@@ -18,10 +18,17 @@ export interface MMNode {
   y?: number
 }
 
+export interface MMEdge {
+  id: string
+  from: string
+  to: string
+}
+
 export interface Mindmap {
   id: number
   title: string
   nodes: MMNode[]
+  edges: MMEdge[]
   created_at: string
   updated_at: string
 }
@@ -88,18 +95,18 @@ export function useNotes() {
 export function useMindmap() {
   const { data, mutate } = useSWR<Mindmap | null>('/api/notebook/mindmaps', fetcher)
 
-  async function saveMindmap(title: string, nodes: MMNode[]) {
+  async function saveMindmap(title: string, nodes: MMNode[], edges: MMEdge[] = []) {
     if (data?.id) {
       await fetch(`/api/notebook/mindmaps/${data.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, nodes }),
+        body: JSON.stringify({ title, nodes, edges }),
       })
     } else {
       await fetch('/api/notebook/mindmaps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, nodes }),
+        body: JSON.stringify({ title, nodes, edges }),
       })
     }
     await mutate()

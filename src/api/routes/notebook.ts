@@ -54,20 +54,20 @@ export function notebookRouter(pool: Pool): Router {
 
   router.post('/mindmaps', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { title = 'My Mindmap', nodes = [] } = req.body as { title?: string; nodes?: unknown[] }
+    const { title = 'My Mindmap', nodes = [], edges = [] } = req.body as { title?: string; nodes?: unknown[]; edges?: unknown[] }
     const { rows } = await pool.query(
-      'INSERT INTO mindmaps (title, nodes, user_id) VALUES ($1, $2, $3) RETURNING *',
-      [title, JSON.stringify(nodes), uid]
+      'INSERT INTO mindmaps (title, nodes, edges, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      [title, JSON.stringify(nodes), JSON.stringify(edges), uid]
     )
     res.json(rows[0])
   })
 
   router.put('/mindmaps/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { title, nodes } = req.body as { title: string; nodes: unknown[] }
+    const { title, nodes, edges = [] } = req.body as { title: string; nodes: unknown[]; edges?: unknown[] }
     const { rows } = await pool.query(
-      'UPDATE mindmaps SET title=$1, nodes=$2, updated_at=now() WHERE id=$3 AND user_id=$4 RETURNING *',
-      [title, JSON.stringify(nodes), req.params.id, uid]
+      'UPDATE mindmaps SET title=$1, nodes=$2, edges=$3, updated_at=now() WHERE id=$4 AND user_id=$5 RETURNING *',
+      [title, JSON.stringify(nodes), JSON.stringify(edges), req.params.id, uid]
     )
     res.json(rows[0] ?? null)
   })

@@ -104,6 +104,7 @@ ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES u
 ALTER TABLE vocabulary     ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
 ALTER TABLE transactions   ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
 ALTER TABLE etf_watchlist  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS edges JSONB NOT NULL DEFAULT '[]';
 `
 
 export async function migrate() {

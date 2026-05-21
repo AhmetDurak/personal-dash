@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useNotes, useMindmap, useVocabulary, useAllReminders } from '../hooks/useNotebook'
-import type { MMNode, VocabCard } from '../hooks/useNotebook'
+import type { MMNode, MMEdge, VocabCard } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 
 // ─── Mindmap helpers ──────────────────────────────────────────────────────────
@@ -230,6 +230,7 @@ function MindmapView() {
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; label: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [edges, setEdges] = useState<MMEdge[]>([])
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
   const initialized = useRef(false)
@@ -237,6 +238,7 @@ function MindmapView() {
   const dragRef = useRef<DragState | null>(null)
   const connectRef = useRef<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
   const nodesRef = useRef<MMNode[]>([])
+  const edgesRef = useRef<MMEdge[]>([])
   const titleRef = useRef(mmTitle)
 
   function findNodeAt(svgX: number, svgY: number, excludeId?: string): MMNode | null {
@@ -247,28 +249,27 @@ function MindmapView() {
     ) ?? null
   }
 
-  function isAncestor(nodeId: string, potentialAncId: string): boolean {
-    const node = nodesRef.current.find(n => n.id === nodeId)
-    if (!node || node.parentId === null) return false
-    if (node.parentId === potentialAncId) return true
-    return isAncestor(node.parentId, potentialAncId)
-  }
-
-  useEffect(() => { nodesRef.current = nodes }, [nodes])
+useEffect(() => { nodesRef.current = nodes }, [nodes])
+  useEffect(() => { edgesRef.current = edges }, [edges])
   useEffect(() => { titleRef.current = mmTitle }, [mmTitle])
 
   useEffect(() => {
     if (initialized.current || mindmap === undefined) return
     const raw = mindmap ? mindmap.nodes : [{ id: 'root', label: 'Finance Concepts', parentId: null }]
     setNodes(initPositions(raw))
-    if (mindmap) setMmTitle(mindmap.title)
+    if (mindmap) {
+      setMmTitle(mindmap.title)
+      setEdges(mindmap.edges ?? [])
+    }
     initialized.current = true
   }, [mindmap])
 
-  function persist(newNodes: MMNode[]) {
+  function persist(newNodes: MMNode[], newEdges = edgesRef.current) {
     setNodes(newNodes)
     nodesRef.current = newNodes
-    saveMindmap(titleRef.current, newNodes)
+    setEdges(newEdges)
+    edgesRef.current = newEdges
+    saveMindmap(titleRef.current, newNodes, newEdges)
   }
 
   function clientToSvg(clientX: number, clientY: number) {
@@ -316,8 +317,15 @@ function MindmapView() {
       connectRef.current = null
       setConnectLine(null)
       setHoveredId(null)
-      if (c.targetId && !isAncestor(c.sourceId, c.targetId)) {
-        persist(nodesRef.current.map(n => n.id === c.targetId ? { ...n, parentId: c.sourceId } : n))
+      if (c.targetId && c.targetId !== c.sourceId) {
+        const already = edgesRef.current.some(e =>
+          (e.from === c.sourceId && e.to === c.targetId) ||
+          (e.from === c.targetId && e.to === c.sourceId)
+        )
+        if (!already) {
+          const newEdge: MMEdge = { id: `e${Date.now()}`, from: c.sourceId, to: c.targetId }
+          persist(nodesRef.current, [...edgesRef.current, newEdge])
+        }
       }
     }
   }
@@ -353,7 +361,9 @@ function MindmapView() {
 
   function handleDelete(id: string) {
     const toRemove = new Set(getDescendantIds(nodesRef.current, id))
-    persist(nodesRef.current.filter(n => !toRemove.has(n.id)))
+    const newNodes = nodesRef.current.filter(n => !toRemove.has(n.id))
+    const newEdges = edgesRef.current.filter(e => !toRemove.has(e.from) && !toRemove.has(e.to))
+    persist(newNodes, newEdges)
     setConfirmDelete(null)
     setCtxMenu(null)
   }
@@ -377,6 +387,7 @@ function MindmapView() {
           height={CANVAS_H}
           className="block select-none"
           style={{ touchAction: dragRef.current ? 'none' : 'auto' }}
+          onContextMenu={e => e.preventDefault()}
         >
           {/* Dot grid */}
           <defs>
@@ -401,6 +412,30 @@ function MindmapView() {
                 d={`M ${x1} ${y1} C ${x1 + t} ${y1} ${x2 - t} ${y2} ${x2} ${y2}`}
                 fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.35} strokeLinecap="round"
               />
+            )
+          })}
+
+          {/* Extra edges (multi-connections via pin drag) — click to remove */}
+          {edges.map(e => {
+            const from = nodes.find(n => n.id === e.from)
+            const to   = nodes.find(n => n.id === e.to)
+            if (!from || !to) return null
+            const fromIsLeft = (from.x ?? 0) <= (to.x ?? 0)
+            const x1 = fromIsLeft ? (from.x ?? 0) + NODE_W : (from.x ?? 0)
+            const y1 = (from.y ?? 0) + NODE_H / 2
+            const x2 = fromIsLeft ? (to.x ?? 0) : (to.x ?? 0) + NODE_W
+            const y2 = (to.y ?? 0) + NODE_H / 2
+            const t  = Math.max(60, Math.abs(x2 - x1) * 0.45)
+            const color = nodeColor(nodes, e.from)
+            const d = `M ${x1} ${y1} C ${x1 + (fromIsLeft ? t : -t)} ${y1} ${x2 + (fromIsLeft ? -t : t)} ${y2} ${x2} ${y2}`
+            return (
+              <g key={e.id}>
+                <path d={d} fill="none" stroke="transparent" strokeWidth={12}
+                  style={{ cursor: 'pointer' }}
+                  onClick={ev => { ev.stopPropagation(); persist(nodesRef.current, edgesRef.current.filter(ex => ex.id !== e.id)) }}
+                />
+                <path d={d} fill="none" stroke={color} strokeWidth={1.5} strokeDasharray="5 3" strokeOpacity={0.55} strokeLinecap="round" style={{ pointerEvents: 'none' }} />
+              </g>
             )
           })}
 
