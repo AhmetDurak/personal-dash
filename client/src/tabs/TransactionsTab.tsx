@@ -179,57 +179,59 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
   return (
     <div className="p-4 md:p-8 space-y-4">
       {/* Top bar */}
-      <div className="flex items-center justify-between">
+      <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleImportPdf} />
+      <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImportCsv} />
+      {/* Row 1: month + primary action */}
+      <div className="flex items-center justify-between gap-2">
         <MonthSelector month={month} onChange={onMonthChange} />
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-gray-400">{txs ? `${txs.length} entries` : ''}</p>
-          {importResult && (
-            <span className={`text-xs font-medium px-2 py-1 rounded-full ${importResult.overridden === -1 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
-              {importResult.overridden === -1
-                ? 'Import failed'
-                : `✓ ${importResult.imported} imported${importResult.overridden > 0 ? `, ${importResult.overridden} overridden` : ''}${importResult.skipped ? `, ${importResult.skipped} skipped` : ''}`}
-            </span>
-          )}
-          <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleImportPdf} />
-          <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImportCsv} />
-          <div className="relative" ref={importMenuRef}>
-            <button
-              onClick={() => setShowImportMenu(v => !v)}
-              disabled={importing}
-              className="text-sm border border-xero-border text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
-            >
-              {importing ? 'Importing…' : '↑ Import'}
-              <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showImportMenu && (
-              <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-xero-border rounded-xl shadow-lg z-20 overflow-hidden">
-                <button
-                  onClick={() => { setShowImportMenu(false); fileInputRef.current?.click() }}
-                  className="w-full text-left text-sm text-gray-600 px-4 py-2.5 hover:bg-gray-50 transition-colors"
-                >
-                  📄 PDF
-                </button>
-                <button
-                  onClick={() => { setShowImportMenu(false); csvInputRef.current?.click() }}
-                  className="w-full text-left text-sm text-gray-600 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-xero-border"
-                >
-                  📊 CSV
-                </button>
-              </div>
-            )}
-          </div>
-          <a
-            href={`/api/entries/export?month=${month}`}
-            download
-            className="text-sm border border-xero-border text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-          >↓ Export CSV</a>
+        <button
+          onClick={() => setAddModal(true)}
+          className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg hover:bg-xero-green-dark font-medium transition-colors flex-shrink-0"
+        >+ Add Entry</button>
+      </div>
+      {/* Row 2: secondary actions */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="text-sm text-gray-400 mr-auto">{txs ? `${txs.length} entries` : ''}</p>
+        {importResult && (
+          <span className={`text-xs font-medium px-2 py-1 rounded-full ${importResult.overridden === -1 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+            {importResult.overridden === -1
+              ? 'Import failed'
+              : `✓ ${importResult.imported} imported${importResult.overridden > 0 ? `, ${importResult.overridden} overridden` : ''}${importResult.skipped ? `, ${importResult.skipped} skipped` : ''}`}
+          </span>
+        )}
+        <div className="relative" ref={importMenuRef}>
           <button
-            onClick={() => setAddModal(true)}
-            className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg hover:bg-xero-green-dark font-medium transition-colors"
-          >+ Add Entry</button>
+            onClick={() => setShowImportMenu(v => !v)}
+            disabled={importing}
+            className="text-sm border border-xero-border text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {importing ? 'Importing…' : '↑ Import'}
+            <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showImportMenu && (
+            <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-xero-border rounded-xl shadow-lg z-20 overflow-hidden">
+              <button
+                onClick={() => { setShowImportMenu(false); fileInputRef.current?.click() }}
+                className="w-full text-left text-sm text-gray-600 px-4 py-2.5 hover:bg-gray-50 transition-colors"
+              >
+                📄 PDF
+              </button>
+              <button
+                onClick={() => { setShowImportMenu(false); csvInputRef.current?.click() }}
+                className="w-full text-left text-sm text-gray-600 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-xero-border"
+              >
+                📊 CSV
+              </button>
+            </div>
+          )}
         </div>
+        <a
+          href={`/api/entries/export?month=${month}`}
+          download
+          className="text-sm border border-xero-border text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+        >↓ Export</a>
       </div>
 
       {/* Monthly summary */}
