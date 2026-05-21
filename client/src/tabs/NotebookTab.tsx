@@ -420,7 +420,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             }}
           />
 
-          {/* Connections */}
+          {/* Parent-child connections — click to disconnect */}
           {nodes.map(n => {
             if (!n.parentId) return null
             const p = nodes.find(p => p.id === n.parentId)
@@ -429,12 +429,15 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             const x2 = n.x ?? 0,            y2 = (n.y ?? 0) + NODE_H / 2
             const t = Math.max(60, Math.abs(x2 - x1) * 0.45)
             const color = nodeColor(nodes, n.id)
+            const d = `M ${x1} ${y1} C ${x1 + t} ${y1} ${x2 - t} ${y2} ${x2} ${y2}`
             return (
-              <path
-                key={`e-${n.id}`}
-                d={`M ${x1} ${y1} C ${x1 + t} ${y1} ${x2 - t} ${y2} ${x2} ${y2}`}
-                fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.35} strokeLinecap="round"
-              />
+              <g key={`e-${n.id}`}>
+                <path d={d} fill="none" stroke="transparent" strokeWidth={12}
+                  style={{ cursor: 'pointer' }}
+                  onClick={ev => { ev.stopPropagation(); persist(nodesRef.current.map(nd => nd.id === n.id ? { ...nd, parentId: null } : nd)) }}
+                />
+                <path d={d} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.35} strokeLinecap="round" style={{ pointerEvents: 'none' }} />
+              </g>
             )
           })}
 
@@ -518,7 +521,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
                         if (e.key === 'Escape') setRenaming(null)
                       }}
                       onBlur={handleRenameConfirm}
-                      style={{ width: '100%', fontSize: 11, border: 'none', outline: 'none', background: 'transparent', fontWeight: isRoot ? 600 : 400 }}
+                      style={{ width: '100%', fontSize: 11, border: 'none', outline: 'none', background: 'transparent', fontWeight: isRoot ? 600 : 400, color: '#1E293B' }}
                     />
                   </foreignObject>
                 ) : (
@@ -590,6 +593,33 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
           >
             <span className="text-base">➕</span> Add child
+          </button>
+          <button
+            onClick={() => {
+              const id = ctxMenu?.nodeId
+              const node = nodesRef.current.find(n => n.id === id)
+              if (!id || !node) return
+              setCtxMenu(null)
+              connectRef.current = { sourceId: id, x: (node.x ?? 0) + NODE_W, y: (node.y ?? 0) + NODE_H / 2, targetId: null }
+              setConnectLine(connectRef.current)
+            }}
+            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
+          >
+            <span className="text-base">🔗</span> Connect
+          </button>
+          <button
+            onClick={() => {
+              const id = ctxMenu?.nodeId
+              if (!id) return
+              setCtxMenu(null)
+              persist(
+                nodesRef.current.map(n => n.id === id ? { ...n, parentId: null } : n),
+                edgesRef.current.filter(e => e.from !== id && e.to !== id)
+              )
+            }}
+            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
+          >
+            <span className="text-base">✂️</span> Clear connections
           </button>
           {ctxNode.parentId !== null && (
             <button
