@@ -230,11 +230,29 @@ function MindmapView() {
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; label: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
   const initialized = useRef(false)
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragState | null>(null)
+  const connectRef = useRef<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
   const nodesRef = useRef<MMNode[]>([])
   const titleRef = useRef(mmTitle)
+
+  function findNodeAt(svgX: number, svgY: number, excludeId?: string): MMNode | null {
+    return nodesRef.current.find(n =>
+      n.id !== excludeId &&
+      svgX >= (n.x ?? 0) && svgX <= (n.x ?? 0) + NODE_W &&
+      svgY >= (n.y ?? 0) && svgY <= (n.y ?? 0) + NODE_H
+    ) ?? null
+  }
+
+  function isAncestor(nodeId: string, potentialAncId: string): boolean {
+    const node = nodesRef.current.find(n => n.id === nodeId)
+    if (!node || node.parentId === null) return false
+    if (node.parentId === potentialAncId) return true
+    return isAncestor(node.parentId, potentialAncId)
+  }
 
   useEffect(() => { nodesRef.current = nodes }, [nodes])
   useEffect(() => { titleRef.current = mmTitle }, [mmTitle])
@@ -269,22 +287,47 @@ function MindmapView() {
   }
 
   function handleSvgPointerMove(e: React.PointerEvent) {
-    const d = dragRef.current
-    if (!d) return
     const { x, y } = clientToSvg(e.clientX, e.clientY)
-    if (!d.moved && Math.hypot(x - d.startSvgX, y - d.startSvgY) > 4) dragRef.current = { ...d, moved: true }
-    setNodes(prev => prev.map(n => n.id === d.id ? { ...n, x: Math.max(0, x - d.offsetX), y: Math.max(0, y - d.offsetY) } : n))
+    const d = dragRef.current
+    if (d) {
+      if (!d.moved && Math.hypot(x - d.startSvgX, y - d.startSvgY) > 4) dragRef.current = { ...d, moved: true }
+      setNodes(prev => prev.map(n => n.id === d.id ? { ...n, x: Math.max(0, x - d.offsetX), y: Math.max(0, y - d.offsetY) } : n))
+      return
+    }
+    const c = connectRef.current
+    if (c) {
+      const target = findNodeAt(x, y, c.sourceId)
+      const updated = { ...c, x, y, targetId: target?.id ?? null }
+      connectRef.current = updated
+      setConnectLine(updated)
+    }
   }
 
   function handleSvgPointerUp(e: React.PointerEvent) {
     const d = dragRef.current
-    if (!d) return
-    dragRef.current = null
-    if (!d.moved) {
-      setCtxMenu({ nodeId: d.id, screenX: e.clientX, screenY: e.clientY })
-    } else {
-      saveMindmap(titleRef.current, nodesRef.current)
+    if (d) {
+      dragRef.current = null
+      if (!d.moved) setCtxMenu({ nodeId: d.id, screenX: e.clientX, screenY: e.clientY })
+      else saveMindmap(titleRef.current, nodesRef.current)
+      return
     }
+    const c = connectRef.current
+    if (c) {
+      connectRef.current = null
+      setConnectLine(null)
+      setHoveredId(null)
+      if (c.targetId && !isAncestor(c.sourceId, c.targetId)) {
+        persist(nodesRef.current.map(n => n.id === c.targetId ? { ...n, parentId: c.sourceId } : n))
+      }
+    }
+  }
+
+  function handlePinPointerDown(e: React.PointerEvent, sourceId: string) {
+    e.stopPropagation()
+    const { x, y } = clientToSvg(e.clientX, e.clientY)
+    connectRef.current = { sourceId, x, y, targetId: null }
+    setConnectLine(connectRef.current)
+    setCtxMenu(null)
   }
 
   function handleAddChild() {
@@ -360,6 +403,22 @@ function MindmapView() {
             )
           })}
 
+          {/* Temp connection wire while dragging a pin */}
+          {connectLine && (() => {
+            const src = nodes.find(n => n.id === connectLine.sourceId)
+            if (!src) return null
+            const x1 = (src.x ?? 0) + NODE_W, y1 = (src.y ?? 0) + NODE_H / 2
+            const t = Math.max(60, Math.abs(connectLine.x - x1) * 0.45)
+            const color = nodeColor(nodes, connectLine.sourceId)
+            return (
+              <path
+                d={`M ${x1} ${y1} C ${x1+t} ${y1} ${connectLine.x-t} ${connectLine.y} ${connectLine.x} ${connectLine.y}`}
+                fill="none" stroke={color} strokeWidth={2} strokeDasharray="6 4" strokeOpacity={0.8}
+                style={{ pointerEvents: 'none' }}
+              />
+            )
+          })()}
+
           {/* Nodes */}
           {nodes.map(n => {
             const x = n.x ?? 0, y = n.y ?? 0
@@ -367,15 +426,21 @@ function MindmapView() {
             const isRoot = n.parentId === null
             const isDragging = dragRef.current?.id === n.id
             const isRenaming = renaming?.id === n.id
+            const isTarget = connectLine?.targetId === n.id
+            const showPin = hoveredId === n.id || connectLine?.sourceId === n.id
             const label = n.label.length > 18 ? n.label.slice(0, 17) + '…' : n.label
             return (
               <g
                 key={n.id}
                 onPointerDown={e => handleNodePointerDown(e, n.id)}
+                onPointerEnter={() => { if (!dragRef.current && !connectRef.current) setHoveredId(n.id) }}
+                onPointerLeave={() => setHoveredId(null)}
                 style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
               >
                 {/* Shadow */}
                 <rect x={x+2} y={y+2} width={NODE_W} height={NODE_H} rx={10} fill="rgba(0,0,0,0.06)" />
+                {/* Target highlight ring */}
+                {isTarget && <rect x={x-3} y={y-3} width={NODE_W+6} height={NODE_H+6} rx={13} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.6} strokeDasharray="4 3" />}
                 {/* Card */}
                 <rect x={x} y={y} width={NODE_W} height={NODE_H} rx={10} fill="white" stroke={color} strokeWidth={isRoot ? 2 : 1.5} />
                 {/* Color accent bar */}
@@ -408,6 +473,16 @@ function MindmapView() {
                   >
                     {label}
                   </text>
+                )}
+
+                {/* Right-side connection pin */}
+                {showPin && (
+                  <circle
+                    cx={x + NODE_W} cy={y + NODE_H / 2} r={5}
+                    fill={color} stroke="white" strokeWidth={2}
+                    style={{ cursor: 'crosshair' }}
+                    onPointerDown={e => handlePinPointerDown(e, n.id)}
+                  />
                 )}
               </g>
             )
