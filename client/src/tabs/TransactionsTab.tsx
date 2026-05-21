@@ -207,13 +207,13 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
               <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-xero-border rounded-xl shadow-lg z-20 overflow-hidden">
                 <button
                   onClick={() => { setShowImportMenu(false); fileInputRef.current?.click() }}
-                  className="w-full text-left text-sm px-4 py-2.5 hover:bg-gray-50 transition-colors"
+                  className="w-full text-left text-sm text-gray-600 px-4 py-2.5 hover:bg-gray-50 transition-colors"
                 >
                   📄 PDF
                 </button>
                 <button
                   onClick={() => { setShowImportMenu(false); csvInputRef.current?.click() }}
-                  className="w-full text-left text-sm px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
+                  className="w-full text-left text-sm text-gray-600 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-xero-border"
                 >
                   📊 CSV
                 </button>
