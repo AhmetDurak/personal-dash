@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useJournalEntry, useRecentJournal } from '../hooks/useJournal'
+import { useLanguage } from '../hooks/useLanguage'
 
 type View = 'today' | 'calendar' | 'history'
 

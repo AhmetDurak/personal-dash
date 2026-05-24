@@ -668,7 +668,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             }}
             className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
           >
-            <span className="text-base">🔗</span> Connect
+            <span className="text-base">🔗</span> {t.connect}
           </button>
           <button
             onClick={() => {
@@ -682,7 +682,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             }}
             className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
           >
-            <span className="text-base">✂️</span> Clear connections
+            <span className="text-base">✂️</span> {t.clearConnections}
           </button>
           {ctxNode.parentId !== null && (
             <button
@@ -720,6 +720,7 @@ type NewWord = { word: string; translation: string; language: string; example: s
 type EditCard = { id: number; word: string; translation: string; language: string; example: string; image_url: string }
 
 function VocabView() {
+  const { t } = useLanguage()
   const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord } = useVocabulary()
   const [confirmDeleteVocabId, setConfirmDeleteVocabId] = useState<number | null>(null)
   const [langFilter, setLangFilter] = useState<string | null>(null)
@@ -811,7 +812,7 @@ function VocabView() {
             onClick={() => { setReviewMode(false); setReviewIdx(0); setFlipped(false) }}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
-            ← Exit Review
+            {t.exitReview}
           </button>
           <span className="text-sm text-gray-400">{Math.min(reviewIdx, dueCards.length)}/{dueCards.length} reviewed</span>
         </div>
@@ -819,13 +820,13 @@ function VocabView() {
         {reviewIdx >= dueCards.length ? (
           <div className="text-center">
             <p className="text-5xl mb-4">🎉</p>
-            <p className="text-xl font-semibold text-gray-800">All caught up!</p>
-            <p className="text-sm text-gray-400 mt-2">{dueCards.length} card{dueCards.length !== 1 ? 's' : ''} reviewed.</p>
+            <p className="text-xl font-semibold text-gray-800">{t.allCaughtUp}</p>
+            <p className="text-sm text-gray-400 mt-2">{t.reviewed(dueCards.length)}</p>
             <button
               onClick={() => { setReviewMode(false); setReviewIdx(0) }}
               className="mt-4 text-sm bg-xero-green text-white px-5 py-2 rounded-lg font-medium"
             >
-              Done
+              {t.done}
             </button>
           </div>
         ) : reviewCard && (
@@ -849,10 +850,10 @@ function VocabView() {
             {flipped && (
               <div className="grid grid-cols-4 gap-2 mt-4">
                 {[
-                  { q: 0, label: 'Again', cls: 'bg-red-100 text-red-700 hover:bg-red-200' },
-                  { q: 2, label: 'Hard',  cls: 'bg-amber-100 text-amber-700 hover:bg-amber-200' },
-                  { q: 4, label: 'Good',  cls: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
-                  { q: 5, label: 'Easy',  cls: 'bg-sky-100 text-sky-700 hover:bg-sky-200' },
+                  { q: 0, label: t.again, cls: 'bg-red-100 text-red-700 hover:bg-red-200' },
+                  { q: 2, label: t.hard,  cls: 'bg-amber-100 text-amber-700 hover:bg-amber-200' },
+                  { q: 4, label: t.good,  cls: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
+                  { q: 5, label: t.easy,  cls: 'bg-sky-100 text-sky-700 hover:bg-sky-200' },
                 ].map(({ q, label, cls }) => (
                   <button
                     key={q}
@@ -883,7 +884,7 @@ function VocabView() {
               onClick={() => setReviewMode(true)}
               className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
             >
-              Review Now
+              {t.reviewNow}
             </button>
           )}
         </div>
@@ -907,14 +908,14 @@ function VocabView() {
             onClick={() => setShowAdd(v => !v)}
             className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors ml-1"
           >
-            + Add Word
+            + {t.addWord}
           </button>
           <button
             onClick={() => csvInputRef.current?.click()}
             className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition-colors"
             title="Import CSV: word,translation,language,example"
           >
-            Import CSV
+            {t.importCsv}
           </button>
           <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvImport} />
           {importMsg && (
@@ -995,12 +996,12 @@ function VocabView() {
                   {card.image_url && (
                     <img src={card.image_url} alt="" className="mt-1.5 rounded-lg w-full object-cover max-h-24" />
                   )}
-                  <p className="text-[9px] text-indigo-300 mt-auto pt-1">tap to flip back · double-tap to edit</p>
+                  <p className="text-[9px] text-indigo-300 mt-auto pt-1">{t.tapFlipBack}</p>
                 </div>
               ) : (
                 <div className="min-h-[64px] flex flex-col gap-1">
                   <p className="text-base font-bold text-gray-900">{card.word}</p>
-                  <p className="text-[9px] text-gray-300 mt-auto pt-1">tap to reveal · double-tap to edit</p>
+                  <p className="text-[9px] text-gray-300 mt-auto pt-1">{t.tapReveal}</p>
                 </div>
               )}
             </div>
@@ -1026,7 +1027,7 @@ function VocabView() {
             className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm space-y-3"
             onClick={e => e.stopPropagation()}
           >
-            <p className="text-sm font-semibold text-gray-800">Edit word</p>
+            <p className="text-sm font-semibold text-gray-800">{t.editWord}</p>
             <input
               value={editCard.word}
               onChange={e => setEditCard(p => p && ({ ...p, word: e.target.value }))}
@@ -1062,8 +1063,8 @@ function VocabView() {
               {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
             </select>
             <div className="flex gap-2 pt-1">
-              <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">Save</button>
-              <button type="button" onClick={() => setEditCard(null)} className="flex-1 text-sm bg-gray-100 text-gray-600 py-2 rounded-lg font-medium">Cancel</button>
+              <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">{t.save}</button>
+              <button type="button" onClick={() => setEditCard(null)} className="flex-1 text-sm bg-gray-100 text-gray-600 py-2 rounded-lg font-medium">{t.cancel}</button>
             </div>
           </form>
         </div>
@@ -1078,6 +1079,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINS  = ['00', '15', '30', '45']
 
 function RemindersView() {
+  const { t } = useLanguage()
   const { reminders, isLoading, toggle, remove, add } = useAllReminders()
   const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -1233,14 +1235,14 @@ function RemindersView() {
                   onClick={resetForm}
                   className="text-sm text-gray-400 hover:text-gray-600 px-3 py-2 transition-colors"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={!newTitle.trim()}
                   className="text-sm bg-xero-green text-white px-5 py-2 rounded-lg font-medium disabled:opacity-40 hover:bg-xero-green-dark transition-colors"
                 >
-                  Add Reminder
+                  {t.addReminder}
                 </button>
               </div>
             </form>
@@ -1250,14 +1252,14 @@ function RemindersView() {
         {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
 
         {/* Grouped sections */}
-        {renderGroup('Overdue', overdue,  'overdue',  'text-red-500',      'bg-red-100 text-red-600')}
-        {renderGroup('Today',   todayGrp, 'today',    'text-xero-green',   'bg-xero-green/10 text-xero-green')}
-        {renderGroup('Upcoming',upcoming, 'upcoming', 'text-blue-500',     'bg-blue-50 text-blue-600')}
+        {renderGroup(t.overdue,  overdue,  'overdue',  'text-red-500',      'bg-red-100 text-red-600')}
+        {renderGroup(t.today,    todayGrp, 'today',    'text-xero-green',   'bg-xero-green/10 text-xero-green')}
+        {renderGroup(t.upcoming, upcoming, 'upcoming', 'text-blue-500',     'bg-blue-50 text-blue-600')}
 
         {/* No date */}
         {noDate.length > 0 && (
           <div className="mb-5">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2.5">No Date</p>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2.5">{t.noDate}</p>
             <div className="space-y-2">
               {noDate.map(r => (
                 <div key={r.id} className="flex items-start gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 group hover:shadow-sm transition-shadow">
@@ -1285,7 +1287,7 @@ function RemindersView() {
         {done.length > 0 && (
           <div className="mt-2 border-t border-gray-100 pt-4">
             <p className="text-[11px] font-bold text-gray-300 uppercase tracking-wide mb-2.5">
-              Completed ({done.length})
+              {t.completed} ({done.length})
             </p>
             <div className="space-y-1.5">
               {done.map(r => (
@@ -1307,7 +1309,7 @@ function RemindersView() {
         {pending.length === 0 && done.length === 0 && !isLoading && (
           <div className="text-center py-16">
             <p className="text-4xl mb-3">📝</p>
-            <p className="text-sm font-medium text-gray-600 mb-1">No reminders yet</p>
+            <p className="text-sm font-medium text-gray-600 mb-1">{t.noReminders}</p>
             <p className="text-xs text-gray-400">Click "+ New Reminder" to get started</p>
           </div>
         )}
