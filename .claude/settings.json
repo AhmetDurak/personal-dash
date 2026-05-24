@@ -23,6 +23,28 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /home/ahmetdrk/MEGA/Coding/ClaudeCode/FinanceDash && git rev-parse HEAD > /tmp/fd_session_start_sha 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/ahmetdrk/MEGA/Coding/ClaudeCode/FinanceDash/hooks/log-session.sh",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   }
 }

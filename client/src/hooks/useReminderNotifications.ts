@@ -65,5 +65,7 @@ export function useReminderNotifications() {
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (!('Notification' in window)) return 'denied'
   if (Notification.permission !== 'default') return Notification.permission
-  return Notification.requestPermission()
+  const perm = await Notification.requestPermission()
+  if (perm === 'granted') fireNotifications(await fetchDueReminders())
+  return perm
 }
