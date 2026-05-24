@@ -2,13 +2,15 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useDarkMode } from '../../hooks/useDarkMode'
 import { useAuth } from '../../hooks/useAuth'
+import { useLanguage } from '../../hooks/useLanguage'
+import type { Lang } from '../../hooks/useLanguage'
 import { NotificationsPanel } from './NotificationsPanel'
 import { ConfirmDialog } from './ConfirmDialog'
 
-const APPS = [
-  { to: () => '/finance/overview',                                                    label: 'Finance', isActive: (p: string) => p.startsWith('/finance') },
-  { to: () => localStorage.getItem('notebook:lastPath') ?? '/notebook/notes',         label: 'Notebook', isActive: (p: string) => p.startsWith('/notebook') },
-  { to: () => '/news',                                                                label: 'News',     isActive: (p: string) => p.startsWith('/news') },
+const LANG_OPTIONS: { value: Lang; label: string }[] = [
+  { value: 'en', label: 'EN' },
+  { value: 'de', label: 'DE' },
+  { value: 'tr', label: 'TR' },
 ]
 
 function Logo() {
@@ -26,8 +28,18 @@ export function TopBar() {
   const { pathname } = useLocation()
   const { dark, toggle } = useDarkMode()
   const { user, logout } = useAuth()
+  const { lang, t, setLang } = useLanguage()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
+
+  const APPS = [
+    { to: () => '/finance/overview',                                                    label: t.finance,  isActive: (p: string) => p.startsWith('/finance') },
+    { to: () => localStorage.getItem('notebook:lastPath') ?? '/notebook/notes',         label: t.notebook, isActive: (p: string) => p.startsWith('/notebook') },
+    { to: () => '/log',                                                                 label: t.log,      isActive: (p: string) => p.startsWith('/log') },
+    { to: () => '/meal',                                                                label: t.meal,     isActive: (p: string) => p.startsWith('/meal') },
+    { to: () => '/sport',                                                               label: t.sport,    isActive: (p: string) => p.startsWith('/sport') },
+    { to: () => '/news',                                                                label: t.news,     isActive: (p: string) => p.startsWith('/news') },
+  ]
 
   async function copyMobileToken() {
     const res = await fetch('/auth/me/token')
@@ -53,7 +65,7 @@ export function TopBar() {
         const href   = app.to()
         return (
           <Link
-            key={app.label}
+            key={href}
             to={href}
             className={`px-2.5 md:px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
               active
@@ -68,13 +80,28 @@ export function TopBar() {
 
       {/* Right side */}
       <div className="ml-auto flex items-center gap-1">
+        {/* Language switcher */}
+        <div className="hidden sm:flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/5">
+          {LANG_OPTIONS.map(o => (
+            <button
+              key={o.value}
+              onClick={() => setLang(o.value)}
+              className={`text-[11px] font-semibold px-1.5 py-0.5 rounded transition-colors ${
+                lang === o.value ? 'bg-white/20 text-white' : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+
         <NotificationsPanel />
         <button
           onClick={toggle}
           className="flex items-center gap-1 px-2 md:px-3 py-1 rounded text-sm text-gray-500 hover:text-gray-200 hover:bg-white/5 transition-colors"
         >
           <span>{dark ? '☀️' : '🌙'}</span>
-          <span className="hidden md:inline font-medium">{dark ? 'Light' : 'Dark'}</span>
+          <span className="hidden md:inline font-medium">{dark ? t.light : t.dark}</span>
         </button>
         {user && (
           <div className="flex items-center gap-1.5 md:gap-2 pl-2 ml-1 border-l border-gray-800">
@@ -94,7 +121,7 @@ export function TopBar() {
               onClick={() => setShowLogoutConfirm(true)}
               className="text-xs text-gray-500 hover:text-gray-300 transition-colors px-1"
             >
-              <span className="hidden sm:inline">Sign out</span>
+              <span className="hidden sm:inline">{t.signOut}</span>
               <span className="sm:hidden">↪</span>
             </button>
           </div>
@@ -104,7 +131,7 @@ export function TopBar() {
     {showLogoutConfirm && (
       <ConfirmDialog
         message="You will be signed out of your account."
-        confirmLabel="Sign out"
+        confirmLabel={t.signOut}
         onConfirm={logout}
         onCancel={() => setShowLogoutConfirm(false)}
       />

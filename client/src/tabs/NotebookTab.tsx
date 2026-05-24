@@ -3,6 +3,7 @@ import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useNotes, useMindmap, useVocabulary, useAllReminders } from '../hooks/useNotebook'
 import type { MMNode, MMEdge, VocabCard } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
+import { useLanguage } from '../hooks/useLanguage'
 
 // ─── Mindmap helpers ──────────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ function fmtDueLabel(due: string, group: 'overdue' | 'today' | 'upcoming'): stri
 // ─── NotesView ────────────────────────────────────────────────────────────────
 
 function NotesView() {
+  const { t } = useLanguage()
   const { notes, isLoading, createNote, saveNote, deleteNote } = useNotes()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [localTitle, setLocalTitle] = useState('')
@@ -106,7 +108,7 @@ function NotesView() {
             onClick={handleNew}
             className="w-full text-sm bg-xero-green text-white rounded-lg py-2 font-medium hover:bg-xero-green-dark transition-colors"
           >
-            + New Note
+            + {t.newNote}
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -119,7 +121,7 @@ function NotesView() {
                 selectedId === n.id ? 'bg-white border-l-2 border-l-xero-green' : ''
               }`}
             >
-              <p className="text-sm font-medium text-gray-800 truncate">{n.title || 'Untitled'}</p>
+              <p className="text-sm font-medium text-gray-800 truncate">{n.title || t.untitled}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">
                 {new Date(n.updated_at).toLocaleDateString('de-DE')}
               </p>
@@ -220,6 +222,7 @@ function initPositions(raw: MMNode[]): MMNode[] {
 }
 
 function MindmapView() {
+  const { t } = useLanguage()
   const { mindmap, saveMindmap } = useMindmap()
   const [nodes, setNodes] = useState<MMNode[]>([])
   const [mmTitle, setMmTitle] = useState('My Mindmap')
@@ -229,6 +232,8 @@ function MindmapView() {
   const [edges, setEdges] = useState<MMEdge[]>([])
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
+  const [flippedNodes, setFlippedNodes] = useState<Set<string>>(new Set())
+  const [editingBack, setEditingBack] = useState(false)
   const initialized = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -311,13 +316,23 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     }
   }
 
-  function handleSvgPointerUp(e: React.PointerEvent) {
+  function handleSvgPointerUp(_e: React.PointerEvent) {
     if (panRef.current) { panRef.current = null; return }
     const d = dragRef.current
     if (d) {
       dragRef.current = null
-      if (!d.moved) setCtxMenu({ nodeId: d.id, screenX: e.clientX, screenY: e.clientY })
-      else saveMindmap(titleRef.current, nodesRef.current)
+      if (!d.moved) {
+        // single click → flip face
+        setFlippedNodes(prev => {
+          const next = new Set(prev)
+          if (next.has(d.id)) next.delete(d.id)
+          else next.add(d.id)
+          return next
+        })
+        setCtxMenu(null)
+      } else {
+        saveMindmap(titleRef.current, nodesRef.current)
+      }
       return
     }
     const c = connectRef.current
@@ -363,8 +378,13 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
 
   function handleRenameConfirm() {
     if (!renaming) return
-    persist(nodesRef.current.map(n => n.id === renaming.id ? { ...n, label: renaming.label } : n))
+    if (editingBack) {
+      persist(nodesRef.current.map(n => n.id === renaming.id ? { ...n, back: renaming.label } : n))
+    } else {
+      persist(nodesRef.current.map(n => n.id === renaming.id ? { ...n, label: renaming.label } : n))
+    }
     setRenaming(null)
+    setEditingBack(false)
   }
 
   function handleDelete(id: string) {
@@ -399,11 +419,17 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
           style={{ touchAction: dragRef.current ? 'none' : 'auto' }}
           onContextMenu={e => e.preventDefault()}
         >
-          {/* Dot grid */}
+          {/* Dot grid + arrow markers */}
           <defs>
             <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
               <circle cx="14" cy="14" r="1" fill="#CBD5E1" />
             </pattern>
+            <marker id="arrowEnd" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+              <polygon points="0 0, 7 3.5, 0 7" fill="#94A3B8" />
+            </marker>
+            <marker id="arrowStart" markerWidth="7" markerHeight="7" refX="1" refY="3.5" orient="auto-start-reverse">
+              <polygon points="0 0, 7 3.5, 0 7" fill="#94A3B8" />
+            </marker>
           </defs>
           <rect
             width={CANVAS_W} height={CANVAS_H} fill="url(#dots)"
@@ -437,7 +463,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             )
           })}
 
-          {/* Extra edges (multi-connections via pin drag) — click to remove */}
+          {/* Extra edges (multi-connections via pin drag) — click to remove, right-click to toggle bidirectional */}
           {edges.map(e => {
             const from = nodes.find(n => n.id === e.from)
             const to   = nodes.find(n => n.id === e.to)
@@ -449,14 +475,20 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             const y2 = (to.y ?? 0) + NODE_H / 2
             const t  = Math.max(60, Math.abs(x2 - x1) * 0.45)
             const color = nodeColor(e.from)
-            const d = `M ${x1} ${y1} C ${x1 + (fromIsLeft ? t : -t)} ${y1} ${x2 + (fromIsLeft ? -t : t)} ${y2} ${x2} ${y2}`
+            const dPath = `M ${x1} ${y1} C ${x1 + (fromIsLeft ? t : -t)} ${y1} ${x2 + (fromIsLeft ? -t : t)} ${y2} ${x2} ${y2}`
             return (
               <g key={e.id}>
-                <path d={d} fill="none" stroke="transparent" strokeWidth={12}
+                <path d={dPath} fill="none" stroke="transparent" strokeWidth={12}
                   style={{ cursor: 'pointer' }}
                   onClick={ev => { ev.stopPropagation(); persist(nodesRef.current, edgesRef.current.filter(ex => ex.id !== e.id)) }}
+                  onContextMenu={ev => { ev.preventDefault(); ev.stopPropagation(); persist(nodesRef.current, edgesRef.current.map(ex => ex.id === e.id ? { ...ex, bidirectional: !ex.bidirectional } : ex)) }}
                 />
-                <path d={d} fill="none" stroke={color} strokeWidth={1.5} strokeDasharray="5 3" strokeOpacity={0.55} strokeLinecap="round" style={{ pointerEvents: 'none' }} />
+                <path
+                  d={dPath} fill="none" stroke={color} strokeWidth={1.5} strokeDasharray="5 3" strokeOpacity={0.6} strokeLinecap="round"
+                  markerEnd="url(#arrowEnd)"
+                  markerStart={e.bidirectional ? 'url(#arrowStart)' : undefined}
+                  style={{ pointerEvents: 'none' }}
+                />
               </g>
             )
           })}
@@ -486,24 +518,41 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             const isRenaming = renaming?.id === n.id
             const isTarget = connectLine?.targetId === n.id
             const showPin = hoveredId === n.id || connectLine?.sourceId === n.id
-            const label = n.label.length > 18 ? n.label.slice(0, 17) + '…' : n.label
+            const isFlipped = flippedNodes.has(n.id)
+            const displayText = isFlipped ? (n.back || '+ add notes') : n.label
+            const truncated = displayText.length > 18 ? displayText.slice(0, 17) + '…' : displayText
             return (
               <g
                 key={n.id}
                 onPointerDown={e => handleNodePointerDown(e, n.id)}
                 onPointerEnter={() => { if (!dragRef.current && !connectRef.current) setHoveredId(n.id) }}
                 onPointerLeave={() => setHoveredId(null)}
+                onDoubleClick={e => {
+                  e.stopPropagation()
+                  const editLabel = isFlipped ? (n.back ?? '') : n.label
+                  setEditingBack(isFlipped)
+                  setRenaming({ id: n.id, label: editLabel })
+                  setCtxMenu(null)
+                }}
+                onContextMenu={e => {
+                  e.preventDefault(); e.stopPropagation()
+                  setCtxMenu({ nodeId: n.id, screenX: e.clientX, screenY: e.clientY })
+                }}
                 style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
               >
                 {/* Shadow */}
                 <rect x={x+2} y={y+2} width={NODE_W} height={NODE_H} rx={10} fill="rgba(0,0,0,0.06)" />
                 {/* Target highlight ring */}
                 {isTarget && <rect x={x-3} y={y-3} width={NODE_W+6} height={NODE_H+6} rx={13} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.6} strokeDasharray="4 3" />}
-                {/* Card */}
-                <rect x={x} y={y} width={NODE_W} height={NODE_H} rx={10} fill="white" stroke={color} strokeWidth={isRoot ? 2 : 1.5} />
+                {/* Card — slate tint on back face */}
+                <rect x={x} y={y} width={NODE_W} height={NODE_H} rx={10} fill={isFlipped ? '#F1F5F9' : 'white'} stroke={color} strokeWidth={isRoot ? 2 : 1.5} />
                 {/* Color accent bar */}
                 <rect x={x} y={y} width={5} height={NODE_H} rx={3} fill={color} />
                 <rect x={x+2} y={y} width={3} height={NODE_H} fill={color} />
+                {/* Flip indicator on back face */}
+                {isFlipped && (
+                  <text x={x + NODE_W - 8} y={y + 9} fontSize={8} fill={color} opacity={0.6} style={{ pointerEvents: 'none', userSelect: 'none' }}>↩</text>
+                )}
 
                 {isRenaming ? (
                   <foreignObject x={x + 12} y={y + 6} width={NODE_W - 20} height={NODE_H - 12}>
@@ -514,10 +563,10 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
                       onKeyDown={e => {
                         e.stopPropagation()
                         if (e.key === 'Enter') handleRenameConfirm()
-                        if (e.key === 'Escape') setRenaming(null)
+                        if (e.key === 'Escape') { setRenaming(null); setEditingBack(false) }
                       }}
                       onBlur={handleRenameConfirm}
-                      style={{ width: '100%', fontSize: 11, border: 'none', outline: 'none', background: 'transparent', fontWeight: isRoot ? 600 : 400, color: '#1E293B' }}
+                      style={{ width: '100%', fontSize: 11, border: 'none', outline: 'none', background: 'transparent', fontWeight: isRoot && !editingBack ? 600 : 400, color: '#1E293B', fontStyle: editingBack ? 'italic' : 'normal' }}
                     />
                   </foreignObject>
                 ) : (
@@ -525,11 +574,12 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
                     x={x + 14} y={y + NODE_H / 2}
                     dominantBaseline="middle"
                     fontSize={11}
-                    fontWeight={isRoot ? 700 : 400}
-                    fill="#1E293B"
+                    fontWeight={isRoot && !isFlipped ? 700 : 400}
+                    fontStyle={isFlipped ? 'italic' : 'normal'}
+                    fill={isFlipped && !n.back ? '#94A3B8' : '#1E293B'}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
                   >
-                    {label}
+                    {truncated}
                   </text>
                 )}
 
@@ -569,26 +619,43 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       </div>
 
       {/* Context menu */}
-      {ctxMenu && ctxNode && (
+      {ctxMenu && ctxNode && (() => {
+        const ctxIsFlipped = flippedNodes.has(ctxNode.id)
+        return (
         <div
           className="fixed z-40 bg-white border border-xero-border rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
           style={{ left: ctxMenu.screenX, top: ctxMenu.screenY, transform: 'translate(-50%, calc(-100% - 8px))' }}
           onClick={e => e.stopPropagation()}
         >
           <div className="px-4 py-2 border-b border-gray-50">
-            <p className="text-xs font-semibold text-gray-500 truncate max-w-[120px]">{ctxNode.label}</p>
+            <p className="text-xs font-semibold text-gray-500 truncate max-w-[120px]">{ctxIsFlipped ? (ctxNode.back ?? '(back)') : ctxNode.label}</p>
+            <p className="text-[10px] text-gray-400">{ctxIsFlipped ? t.backFace : t.frontFace}</p>
           </div>
           <button
-            onClick={() => { setRenaming({ id: ctxNode.id, label: ctxNode.label }); setCtxMenu(null) }}
+            onClick={() => {
+              setEditingBack(false)
+              setRenaming({ id: ctxNode.id, label: ctxNode.label })
+              setCtxMenu(null)
+            }}
             className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors"
           >
-            <span className="text-base">✏️</span> Rename
+            <span className="text-base">✏️</span> {t.editFront}
+          </button>
+          <button
+            onClick={() => {
+              setEditingBack(true)
+              setRenaming({ id: ctxNode.id, label: ctxNode.back ?? '' })
+              setCtxMenu(null)
+            }}
+            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
+          >
+            <span className="text-base">↩</span> {t.editBack}
           </button>
           <button
             onClick={handleAddChild}
             className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
           >
-            <span className="text-base">➕</span> Add child
+            <span className="text-base">➕</span> {t.addChild}
           </button>
           <button
             onClick={() => {
@@ -626,7 +693,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             </button>
           )}
         </div>
-      )}
+        )
+      })()}
 
       {confirmDelete && (
         <ConfirmDialog
@@ -649,8 +717,10 @@ const LANG_LABELS: Record<string, string> = {
 
 type NewWord = { word: string; translation: string; language: string; example: string }
 
+type EditCard = { id: number; word: string; translation: string; language: string; example: string; image_url: string }
+
 function VocabView() {
-  const { vocab, isLoading, addWord, deleteWord, review } = useVocabulary()
+  const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord } = useVocabulary()
   const [confirmDeleteVocabId, setConfirmDeleteVocabId] = useState<number | null>(null)
   const [langFilter, setLangFilter] = useState<string | null>(null)
   const [reviewMode, setReviewMode] = useState(false)
@@ -658,6 +728,28 @@ function VocabView() {
   const [reviewIdx, setReviewIdx] = useState(0)
   const [showAdd, setShowAdd] = useState(false)
   const [newWord, setNewWord] = useState<NewWord>({ word: '', translation: '', language: 'de', example: '' })
+  const [importMsg, setImportMsg] = useState<string | null>(null)
+  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set())
+  const [editCard, setEditCard] = useState<EditCard | null>(null)
+  const csvInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    const lines = text.trim().split('\n').filter(Boolean)
+    const isHeader = /word|translation/i.test(lines[0] ?? '')
+    const rows = isHeader ? lines.slice(1) : lines
+    const items = rows.map(row => {
+      const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      return { word: cols[0] ?? '', translation: cols[1] ?? '', language: cols[2] || 'de', example: cols[3] || undefined }
+    }).filter(i => i.word && i.translation)
+    if (!items.length) { setImportMsg('No valid rows found.'); return }
+    const n = await bulkImport(items)
+    setImportMsg(`Imported ${n} word${n !== 1 ? 's' : ''}.`)
+    setTimeout(() => setImportMsg(null), 4000)
+    e.target.value = ''
+  }
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const dueCards = vocab.filter(v => new Date(v.due_at) <= today)
@@ -677,6 +769,38 @@ function VocabView() {
     await addWord({ ...newWord, example: newWord.example.trim() || undefined })
     setNewWord({ word: '', translation: '', language: newWord.language, example: '' })
     setShowAdd(false)
+  }
+
+  async function handleEditSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editCard) return
+    await updateWord(editCard.id, {
+      word: editCard.word,
+      translation: editCard.translation,
+      language: editCard.language,
+      example: editCard.example || undefined,
+      image_url: editCard.image_url || undefined,
+    })
+    setEditCard(null)
+  }
+
+  function openEdit(card: VocabCard) {
+    setEditCard({
+      id: card.id,
+      word: card.word,
+      translation: card.translation,
+      language: card.language,
+      example: card.example ?? '',
+      image_url: card.image_url ?? '',
+    })
+  }
+
+  function toggleFlip(id: number) {
+    setFlippedCards(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
   if (reviewMode) {
@@ -785,6 +909,17 @@ function VocabView() {
           >
             + Add Word
           </button>
+          <button
+            onClick={() => csvInputRef.current?.click()}
+            className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            title="Import CSV: word,translation,language,example"
+          >
+            Import CSV
+          </button>
+          <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvImport} />
+          {importMsg && (
+            <span className="text-xs text-xero-green font-medium">{importMsg}</span>
+          )}
         </div>
       </div>
 
@@ -845,12 +980,31 @@ function VocabView() {
                 />
               )}
             </div>
-            <p className="text-base font-bold text-gray-900 mt-1">{card.word}</p>
-            <p className="text-sm text-gray-500">{card.translation}</p>
-            {card.example && (
-              <p className="text-[10px] text-gray-400 mt-1.5 italic">"{card.example}"</p>
-            )}
-            <div className="flex items-center justify-between mt-2.5">
+            {/* Front / Back faces */}
+            <div
+              className="mt-1 cursor-pointer select-none"
+              onClick={() => toggleFlip(card.id)}
+              onDoubleClick={e => { e.stopPropagation(); openEdit(card) }}
+            >
+              {flippedCards.has(card.id) ? (
+                <div className="min-h-[64px] flex flex-col gap-1">
+                  <p className="text-sm font-semibold text-indigo-700">{card.translation}</p>
+                  {card.example && (
+                    <p className="text-[10px] text-gray-400 italic">"{card.example}"</p>
+                  )}
+                  {card.image_url && (
+                    <img src={card.image_url} alt="" className="mt-1.5 rounded-lg w-full object-cover max-h-24" />
+                  )}
+                  <p className="text-[9px] text-indigo-300 mt-auto pt-1">tap to flip back · double-tap to edit</p>
+                </div>
+              ) : (
+                <div className="min-h-[64px] flex flex-col gap-1">
+                  <p className="text-base font-bold text-gray-900">{card.word}</p>
+                  <p className="text-[9px] text-gray-300 mt-auto pt-1">tap to reveal · double-tap to edit</p>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between mt-2">
               <span className={`text-[9px] ${new Date(card.due_at) <= today ? 'text-red-400' : 'text-gray-300'}`}>
                 Due {new Date(card.due_at).toLocaleDateString('de-DE')}
               </span>
@@ -862,6 +1016,57 @@ function VocabView() {
 
       {filtered.length === 0 && !isLoading && (
         <p className="text-sm text-gray-400 text-center py-12">No words yet. Add your first word!</p>
+      )}
+
+      {/* Edit modal */}
+      {editCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditCard(null)}>
+          <form
+            onSubmit={handleEditSave}
+            className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm space-y-3"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-gray-800">Edit word</p>
+            <input
+              value={editCard.word}
+              onChange={e => setEditCard(p => p && ({ ...p, word: e.target.value }))}
+              placeholder="Word"
+              className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
+            />
+            <input
+              value={editCard.translation}
+              onChange={e => setEditCard(p => p && ({ ...p, translation: e.target.value }))}
+              placeholder="Translation"
+              className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
+            />
+            <input
+              value={editCard.example}
+              onChange={e => setEditCard(p => p && ({ ...p, example: e.target.value }))}
+              placeholder="Example / emoji hint (optional)"
+              className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
+            />
+            <input
+              value={editCard.image_url}
+              onChange={e => setEditCard(p => p && ({ ...p, image_url: e.target.value }))}
+              placeholder="Image / GIF URL (optional)"
+              className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
+            />
+            {editCard.image_url && (
+              <img src={editCard.image_url} alt="preview" className="w-full rounded-lg max-h-32 object-cover" />
+            )}
+            <select
+              value={editCard.language}
+              onChange={e => setEditCard(p => p && ({ ...p, language: e.target.value }))}
+              className="text-sm border border-gray-200 rounded-lg px-2 py-2 w-full focus:outline-none"
+            >
+              {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+            </select>
+            <div className="flex gap-2 pt-1">
+              <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">Save</button>
+              <button type="button" onClick={() => setEditCard(null)} className="flex-1 text-sm bg-gray-100 text-gray-600 py-2 rounded-lg font-medium">Cancel</button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   )
@@ -1121,21 +1326,22 @@ function RemindersView() {
 
 // ─── NotebookTab ──────────────────────────────────────────────────────────────
 
-const VIEWS = [
-  { path: '/notebook/notes',     label: 'Notes',      icon: '📓' },
-  { path: '/notebook/mindmap',   label: 'Mindmap',    icon: '🧠' },
-  { path: '/notebook/vocab',     label: 'Wortschatz', icon: '📚' },
-  { path: '/notebook/reminders', label: 'Reminders',  icon: '📝' },
-]
-
 export function NotebookTab() {
   const { pathname } = useLocation()
+  const { t } = useLanguage()
+
+  const VIEWS = [
+    { path: '/notebook/notes',     label: t.notes,     icon: '📓' },
+    { path: '/notebook/mindmap',   label: t.mindmap,   icon: '🧠' },
+    { path: '/notebook/vocab',     label: t.vocab,     icon: '📚' },
+    { path: '/notebook/reminders', label: t.reminders, icon: '📝' },
+  ]
 
   useEffect(() => {
     localStorage.setItem('notebook:lastPath', pathname)
   }, [pathname])
 
-  const currentLabel = VIEWS.find(v => pathname === v.path)?.label ?? 'Notebook'
+  const currentLabel = VIEWS.find(v => pathname === v.path)?.label ?? t.notebook
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -1178,7 +1384,7 @@ export function NotebookTab() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
           <aside className="relative w-[220px] h-full bg-xero-navy flex flex-col shadow-2xl">
             <div className="px-6 py-5 border-b border-xero-navy-light">
-              <p className="text-white font-bold text-lg tracking-tight">Notebook</p>
+              <p className="text-white font-bold text-lg tracking-tight">{t.notebook}</p>
             </div>
             <NavItems />
           </aside>

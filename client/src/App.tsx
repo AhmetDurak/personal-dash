@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { useReminderNotifications } from './hooks/useReminderNotifications'
+import { LanguageContext, useLanguageState } from './hooks/useLanguage'
 import { LoginPage } from './pages/LoginPage'
 import { TopBar } from './components/web/TopBar'
 import { Sidebar } from './components/web/Sidebar'
@@ -27,6 +28,7 @@ function NewsPage() {
   )
 }
 import { NotebookTab } from './tabs/NotebookTab'
+import { LogTab } from './tabs/LogTab'
 import { currentMonth } from './utils/format'
 import type { Span } from './components/web/BalanceChart'
 
@@ -66,22 +68,26 @@ function FinanceDashboard() {
 
 export function App() {
   const { user, isLoading } = useAuth()
+  const langCtx = useLanguageState()
   useReminderNotifications()
 
   if (isLoading) return <div className="h-screen bg-gray-950" />
   if (!user)     return <LoginPage />
 
   return (
-    <div className="flex flex-col h-dvh overflow-hidden">
-      <TopBar />
-      <div className="flex-1 overflow-hidden">
-        <Routes>
-          <Route path="/notebook/*" element={<NotebookTab />} />
-          <Route path="/news"       element={<NewsPage />} />
-          <Route path="/finance/*"  element={<FinanceDashboard />} />
-          <Route path="*"           element={<Navigate to="/finance/overview" replace />} />
-        </Routes>
+    <LanguageContext.Provider value={langCtx}>
+      <div className="flex flex-col h-dvh overflow-hidden">
+        <TopBar />
+        <div className="flex-1 overflow-hidden">
+          <Routes>
+            <Route path="/notebook/*" element={<NotebookTab />} />
+            <Route path="/log/*"      element={<LogTab />} />
+            <Route path="/news"       element={<NewsPage />} />
+            <Route path="/finance/*"  element={<FinanceDashboard />} />
+            <Route path="*"           element={<Navigate to="/finance/overview" replace />} />
+          </Routes>
+        </div>
       </div>
-    </div>
+    </LanguageContext.Provider>
   )
 }

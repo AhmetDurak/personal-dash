@@ -105,6 +105,78 @@ ALTER TABLE vocabulary     ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES u
 ALTER TABLE transactions   ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
 ALTER TABLE etf_watchlist  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
 ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS edges JSONB NOT NULL DEFAULT '[]';
+
+CREATE TABLE IF NOT EXISTS journal_entries (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER REFERENCES users(id),
+  date       DATE NOT NULL,
+  content    TEXT NOT NULL DEFAULT '',
+  went_well  TEXT[] NOT NULL DEFAULT '{}',
+  went_bad   TEXT[] NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS foods (
+  id                SERIAL PRIMARY KEY,
+  user_id           INTEGER REFERENCES users(id),
+  name              TEXT NOT NULL,
+  category          TEXT NOT NULL DEFAULT 'other',
+  calories_per_100g INTEGER NOT NULL DEFAULT 0,
+  emoji             TEXT,
+  created_at        TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS meal_logs (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER REFERENCES users(id),
+  date       DATE NOT NULL,
+  meal_type  TEXT NOT NULL CHECK (meal_type IN ('breakfast','lunch','dinner','snack')),
+  items      JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, date, meal_type)
+);
+
+CREATE TABLE IF NOT EXISTS exercises (
+  id             SERIAL PRIMARY KEY,
+  user_id        INTEGER REFERENCES users(id),
+  name           TEXT NOT NULL,
+  type           TEXT NOT NULL CHECK (type IN ('calisthenics','weights','cardio','flexibility')),
+  muscle_groups  TEXT[] NOT NULL DEFAULT '{}',
+  description    TEXT,
+  created_at     TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS workout_templates (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER REFERENCES users(id),
+  name       TEXT NOT NULL,
+  exercises  JSONB NOT NULL DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS workout_logs (
+  id           SERIAL PRIMARY KEY,
+  user_id      INTEGER REFERENCES users(id),
+  template_id  INTEGER REFERENCES workout_templates(id),
+  date         DATE NOT NULL,
+  sets         JSONB NOT NULL DEFAULT '[]',
+  notes        TEXT,
+  duration_min INTEGER,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS fitness_targets (
+  id            SERIAL PRIMARY KEY,
+  user_id       INTEGER REFERENCES users(id),
+  name          TEXT NOT NULL,
+  unit          TEXT NOT NULL DEFAULT 'reps',
+  target_value  NUMERIC NOT NULL,
+  current_value NUMERIC NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
 `
 
 export async function migrate() {

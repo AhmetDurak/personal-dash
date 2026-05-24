@@ -13,6 +13,7 @@ export interface Note {
 export interface MMNode {
   id: string
   label: string
+  back?: string
   parentId: string | null
   x?: number
   y?: number
@@ -22,6 +23,7 @@ export interface MMEdge {
   id: string
   from: string
   to: string
+  bidirectional?: boolean
 }
 
 export interface Mindmap {
@@ -134,6 +136,17 @@ export function useVocabulary() {
     await mutate()
   }
 
+  async function bulkImport(items: { word: string; translation: string; language?: string; example?: string }[]): Promise<number> {
+    const res = await fetch('/api/notebook/vocabulary/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    })
+    const { inserted } = await res.json() as { inserted: number }
+    await mutate()
+    return inserted
+  }
+
   async function review(id: number, quality: number) {
     await fetch(`/api/notebook/vocabulary/${id}/review`, {
       method: 'POST',
@@ -143,7 +156,16 @@ export function useVocabulary() {
     await mutate()
   }
 
-  return { vocab: data ?? [], isLoading, addWord, deleteWord, review }
+  async function updateWord(id: number, payload: { word: string; translation: string; language: string; example?: string; image_url?: string }) {
+    await fetch(`/api/notebook/vocabulary/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    await mutate()
+  }
+
+  return { vocab: data ?? [], isLoading, addWord, deleteWord, review, bulkImport, updateWord }
 }
 
 // ─── All Reminders (notebook view — includes done) ────────────────────────────

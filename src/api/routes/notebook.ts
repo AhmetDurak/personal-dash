@@ -98,6 +98,22 @@ export function notebookRouter(pool: Pool): Router {
     res.json(rows[0])
   })
 
+  router.post('/vocabulary/bulk', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const items = (req.body as { items: { word: string; translation: string; language?: string; example?: string }[] }).items ?? []
+    const valid = items.filter(i => i.word?.trim() && i.translation?.trim())
+    if (!valid.length) { res.json({ inserted: 0 }); return }
+    const values = valid.map((_, i) => `($${i * 5 + 1},$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5})`).join(',')
+    const params: (string | null)[] = valid.flatMap(i => [
+      i.word.trim(), i.translation.trim(), i.language ?? 'de', i.example?.trim() ?? null, String(uid),
+    ])
+    await pool.query(
+      `INSERT INTO vocabulary (word, translation, language, example, user_id) VALUES ${values}`,
+      params
+    )
+    res.json({ inserted: valid.length })
+  })
+
   router.put('/vocabulary/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { word, translation, language, image_url, example } = req.body as {
