@@ -4,6 +4,7 @@ import { useNotes, useMindmap, useVocabulary, useAllReminders } from '../hooks/u
 import type { MMNode, MMEdge, VocabCard } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
+import { useDarkMode } from '../hooks/useDarkMode'
 
 // ─── Mindmap helpers ──────────────────────────────────────────────────────────
 
@@ -223,6 +224,7 @@ function initPositions(raw: MMNode[]): MMNode[] {
 
 function MindmapView() {
   const { t } = useLanguage()
+  const { dark } = useDarkMode()
   const { mindmap, saveMindmap } = useMindmap()
   const [nodes, setNodes] = useState<MMNode[]>([])
   const [mmTitle, setMmTitle] = useState('My Mindmap')
@@ -403,7 +405,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       {/* Canvas */}
       <div
         ref={containerRef}
-        className="h-full overflow-auto bg-[#F8FAFC]"
+        className={`h-full overflow-auto ${dark ? 'bg-[#0F172A]' : 'bg-[#F8FAFC]'}`}
         style={{ cursor: panRef.current ? 'grabbing' : 'default' }}
         onPointerMove={handleSvgPointerMove}
         onPointerUp={handleSvgPointerUp}
@@ -545,7 +547,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
                 {/* Target highlight ring */}
                 {isTarget && <rect x={x-3} y={y-3} width={NODE_W+6} height={NODE_H+6} rx={13} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.6} strokeDasharray="4 3" />}
                 {/* Card — slate tint on back face */}
-                <rect x={x} y={y} width={NODE_W} height={NODE_H} rx={10} fill={isFlipped ? '#F1F5F9' : 'white'} stroke={color} strokeWidth={isRoot ? 2 : 1.5} />
+                <rect x={x} y={y} width={NODE_W} height={NODE_H} rx={10} fill={isFlipped ? (dark ? '#162032' : '#F1F5F9') : (dark ? '#1E293B' : 'white')} stroke={color} strokeWidth={isRoot ? 2 : 1.5} />
                 {/* Color accent bar */}
                 <rect x={x} y={y} width={5} height={NODE_H} rx={3} fill={color} />
                 <rect x={x+2} y={y} width={3} height={NODE_H} fill={color} />
@@ -566,7 +568,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
                         if (e.key === 'Escape') { setRenaming(null); setEditingBack(false) }
                       }}
                       onBlur={handleRenameConfirm}
-                      style={{ width: '100%', fontSize: 11, border: 'none', outline: 'none', background: 'transparent', fontWeight: isRoot && !editingBack ? 600 : 400, color: '#1E293B', fontStyle: editingBack ? 'italic' : 'normal' }}
+                      style={{ width: '100%', fontSize: 11, border: 'none', outline: 'none', background: 'transparent', fontWeight: isRoot && !editingBack ? 600 : 400, color: dark ? '#E2E8F0' : '#1E293B', fontStyle: editingBack ? 'italic' : 'normal' }}
                     />
                   </foreignObject>
                 ) : (
@@ -576,7 +578,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
                     fontSize={11}
                     fontWeight={isRoot && !isFlipped ? 700 : 400}
                     fontStyle={isFlipped ? 'italic' : 'normal'}
-                    fill={isFlipped && !n.back ? '#94A3B8' : '#1E293B'}
+                    fill={isFlipped && !n.back ? (dark ? '#475569' : '#94A3B8') : (dark ? '#E2E8F0' : '#1E293B')}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
                   >
                     {truncated}

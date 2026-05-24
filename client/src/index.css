@@ -91,6 +91,10 @@ html, body { overflow-x: hidden; }
 /* DashboardHeader specifically */
 .dark header.border-b { background-color: #1E293B; }
 
+/* Divide utilities (Tailwind divide-* sets border-color on children) */
+.dark .divide-gray-50 > * + * { border-color: #1E293B; }
+.dark .divide-gray-100 > * + * { border-color: #273348; }
+
 /* Scrollbar in dark mode */
 .dark ::-webkit-scrollbar { width: 6px; height: 6px; }
 .dark ::-webkit-scrollbar-track { background: #0F172A; }

@@ -101,3 +101,15 @@ Each entry lists git commits made during that session.
 - `SportTab.tsx`, `useSport.ts`, `sport.ts` routes
 - Views: Dashboard, Exercises (filterable), Log Workout, Targets
 
+
+## Session — 2026-05-24 23:28
+
+### Commits
+- 4f889b6 chore: auto-commit session changes — 2026-05-24 23:28
+
+
+## Session — 2026-05-24 23:35
+
+### Commits
+- 4f889b6 chore: auto-commit session changes — 2026-05-24 23:28
+
