@@ -66,3 +66,38 @@ Each entry lists git commits made during that session.
 ### Commits
 - 6f131e4 chore: auto-commit session changes — 2026-05-24 23:10
 - ec40c6f chore: auto-commit session changes — 2026-05-24 23:06
+
+
+## Plan Tasks Completed — 2026-05-24
+
+### TASK-A — Bell Notification Fix
+- Badge now counts only due reminders (`due_at <= now()`)
+- "Enable notifications" button added to NotificationsPanel when permission not granted
+
+### TASK-B — Vocabulary CSV Import
+- File input in NotebookTab vocab section; bulk POST to `/api/notebook/vocabulary/bulk`
+
+### TASK-C — Daily Log / Journal Tab
+- New `journal_entries` table, `LogTab.tsx`, `useJournal.ts`; views: Today / Calendar / History
+
+### TASK-D — Mindmap Two-Face Nodes + Bidirectional Edges
+- Single-click flips node to back face (slate bg, italic); double-click edits current face
+- Ctx menu "Edit front" / "Edit back"; bidirectional edges render arrowheads at both ends
+
+### TASK-E — Vocabulary Card Flip + Inline Edit + Emoji/GIF
+- `flippedCards: Set<number>` grid flip; double-click opens edit modal with image_url field
+- CSV import supports `emoji` column
+
+### TASK-F — Language Support (en / de / tr)
+- `client/src/i18n/translations.ts` + `useLanguage.ts` + `LanguageContext`
+- EN / DE / TR switcher in TopBar; all nav labels and action strings translated
+
+### TASK-G — Meal Tracker
+- New `foods`, `meal_logs`, `shopping_list` tables; `MealTab.tsx`, `useMeal.ts`, `meal.ts` routes
+- Views: Today (4 meal cards + calorie tracker), Food Library, Shopping List
+
+### TASK-H — Sport Tracker
+- New `exercises`, `workout_templates`, `workout_logs`, `fitness_targets` tables
+- `SportTab.tsx`, `useSport.ts`, `sport.ts` routes
+- Views: Dashboard, Exercises (filterable), Log Workout, Targets
+
