@@ -40,6 +40,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash /home/ahmetdrk/MEGA/Coding/ClaudeCode/FinanceDash/hooks/auto-commit.sh",
+            "timeout": 30
+          },
+          {
+            "type": "command",
             "command": "bash /home/ahmetdrk/MEGA/Coding/ClaudeCode/FinanceDash/hooks/log-session.sh",
             "timeout": 15
           }
