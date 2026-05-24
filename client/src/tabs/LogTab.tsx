@@ -76,6 +76,7 @@ function PillList({ items, onChange, max, color, placeholder }: PillListProps) {
 // ─── Today view ───────────────────────────────────────────────────────────────
 
 function TodayView() {
+  const { t } = useLanguage()
   const date = todayStr()
   const { entry, save } = useJournalEntry(date)
   const [content, setContent] = useState('')
@@ -123,27 +124,27 @@ function TodayView() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">{fmt(date)}</h2>
-          <p className="text-xs text-gray-400">Today's log</p>
+          <p className="text-xs text-gray-400">{t.todayLog}</p>
         </div>
-        {saving && <span className="text-xs text-gray-400">Saving…</span>}
+        {saving && <span className="text-xs text-gray-400">{t.saving}</span>}
       </div>
 
       <textarea
         value={content}
         onChange={e => handleContent(e.target.value)}
-        placeholder="Write about your day…"
+        placeholder={t.writeAboutDay}
         rows={8}
         className="w-full text-sm border border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-xero-green resize-none text-gray-800 placeholder-gray-300"
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div>
-          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">What went well (up to 3)</p>
-          <PillList items={wentWell} onChange={handleWell} max={3} color="green" placeholder="Add highlight…" />
+          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">{t.wentWell}</p>
+          <PillList items={wentWell} onChange={handleWell} max={3} color="green" placeholder={t.addHighlight} />
         </div>
         <div>
-          <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">What was hard (up to 3)</p>
-          <PillList items={wentBad} onChange={handleBad} max={3} color="red" placeholder="Add challenge…" />
+          <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">{t.wasHard}</p>
+          <PillList items={wentBad} onChange={handleBad} max={3} color="red" placeholder={t.addChallenge} />
         </div>
       </div>
     </div>
@@ -217,10 +218,11 @@ function CalendarView({ onSelectDate }: { onSelectDate: (d: string) => void }) {
 // ─── History view ─────────────────────────────────────────────────────────────
 
 function HistoryView({ onSelectDate }: { onSelectDate: (d: string) => void }) {
+  const { t } = useLanguage()
   const { data: entries, isLoading } = useRecentJournal(30)
 
   if (isLoading) return <p className="text-sm text-gray-400 p-6">Loading…</p>
-  if (!entries?.length) return <p className="text-sm text-gray-400 p-6 text-center">No entries yet. Write your first log!</p>
+  if (!entries?.length) return <p className="text-sm text-gray-400 p-6 text-center">{t.noEntriesYet}</p>
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-3">
@@ -253,6 +255,7 @@ function HistoryView({ onSelectDate }: { onSelectDate: (d: string) => void }) {
 // ─── Entry view (past date) ───────────────────────────────────────────────────
 
 function EntryView({ date, onBack }: { date: string; onBack: () => void }) {
+  const { t } = useLanguage()
   const { entry, save } = useJournalEntry(date)
   const [content, setContent] = useState('')
   const [wentWell, setWentWell] = useState<string[]>([])
@@ -281,23 +284,23 @@ function EntryView({ date, onBack }: { date: string; onBack: () => void }) {
       <div className="flex items-center gap-3">
         <button onClick={onBack} className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
         <h2 className="text-lg font-semibold text-gray-900">{fmt(date)}</h2>
-        {saving && <span className="text-xs text-gray-400 ml-auto">Saving…</span>}
+        {saving && <span className="text-xs text-gray-400 ml-auto">{t.saving}</span>}
       </div>
       <textarea
         value={content}
         onChange={e => { setContent(e.target.value); scheduleSave(e.target.value, wentWell, wentBad) }}
-        placeholder="Write about this day…"
+        placeholder={t.writeAboutDay}
         rows={8}
         className="w-full text-sm border border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-xero-green resize-none"
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div>
-          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">What went well</p>
-          <PillList items={wentWell} onChange={ww => { setWentWell(ww); scheduleSave(content, ww, wentBad) }} max={3} color="green" placeholder="Add highlight…" />
+          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">{t.wentWell}</p>
+          <PillList items={wentWell} onChange={ww => { setWentWell(ww); scheduleSave(content, ww, wentBad) }} max={3} color="green" placeholder={t.addHighlight} />
         </div>
         <div>
-          <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">What was hard</p>
-          <PillList items={wentBad} onChange={wb => { setWentBad(wb); scheduleSave(content, wentWell, wb) }} max={3} color="red" placeholder="Add challenge…" />
+          <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">{t.wasHard}</p>
+          <PillList items={wentBad} onChange={wb => { setWentBad(wb); scheduleSave(content, wentWell, wb) }} max={3} color="red" placeholder={t.addChallenge} />
         </div>
       </div>
     </div>
@@ -307,6 +310,7 @@ function EntryView({ date, onBack }: { date: string; onBack: () => void }) {
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
 export function LogTab() {
+  const { t } = useLanguage()
   const [view, setView] = useState<View>('today')
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
@@ -319,15 +323,15 @@ export function LogTab() {
   }
 
   const VIEWS: { id: View; label: string }[] = [
-    { id: 'today',    label: 'Today' },
-    { id: 'calendar', label: 'Calendar' },
-    { id: 'history',  label: 'History' },
+    { id: 'today',    label: t.todayLabel },
+    { id: 'calendar', label: t.calendar },
+    { id: 'history',  label: t.history },
   ]
 
   return (
     <div className="flex flex-col h-full bg-xero-bg overflow-hidden">
       <header className="flex items-center gap-1 px-4 py-2.5 bg-white border-b border-xero-border flex-shrink-0">
-        <span className="text-base font-semibold text-gray-800 mr-3">Daily Log</span>
+        <span className="text-base font-semibold text-gray-800 mr-3">{t.dailyLog}</span>
         {VIEWS.map(v => (
           <button
             key={v.id}

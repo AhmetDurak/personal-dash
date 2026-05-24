@@ -23,6 +23,8 @@ import { budgetsRouter } from './routes/budgets'
 import { templatesRouter } from './routes/templates'
 import { authRouter } from './routes/auth'
 import { journalRouter } from './routes/journal'
+import { mealRouter } from './routes/meal'
+import { sportRouter } from './routes/sport'
 
 const PgSession = connectPgSimple(session)
 
@@ -85,6 +87,8 @@ app.use('/api/notebook',      notebookRouter(pool))
 app.use('/api/budgets',       budgetsRouter(pool))
 app.use('/api/templates',     templatesRouter(pool))
 app.use('/api/journal',       journalRouter(pool))
+app.use('/api/meal',          mealRouter(pool))
+app.use('/api/sport',         sportRouter(pool))
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
 

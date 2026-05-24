@@ -29,6 +29,8 @@ function NewsPage() {
 }
 import { NotebookTab } from './tabs/NotebookTab'
 import { LogTab } from './tabs/LogTab'
+import { MealTab } from './tabs/MealTab'
+import { SportTab } from './tabs/SportTab'
 import { currentMonth } from './utils/format'
 import type { Span } from './components/web/BalanceChart'
 
@@ -82,6 +84,8 @@ export function App() {
           <Routes>
             <Route path="/notebook/*" element={<NotebookTab />} />
             <Route path="/log/*"      element={<LogTab />} />
+          <Route path="/meal/*"     element={<MealTab />} />
+          <Route path="/sport/*"    element={<SportTab />} />
             <Route path="/news"       element={<NewsPage />} />
             <Route path="/finance/*"  element={<FinanceDashboard />} />
             <Route path="*"           element={<Navigate to="/finance/overview" replace />} />

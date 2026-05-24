@@ -139,6 +139,13 @@ CREATE TABLE IF NOT EXISTS meal_logs (
   UNIQUE(user_id, date, meal_type)
 );
 
+CREATE TABLE IF NOT EXISTS shopping_list (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER REFERENCES users(id) UNIQUE,
+  items      JSONB NOT NULL DEFAULT '[]',
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS exercises (
   id             SERIAL PRIMARY KEY,
   user_id        INTEGER REFERENCES users(id),
