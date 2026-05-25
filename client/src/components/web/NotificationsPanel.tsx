@@ -84,7 +84,7 @@ export function NotificationsPanel() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-11 w-96 max-w-[calc(100vw-1rem)] bg-white border border-xero-border rounded-2xl shadow-xl z-50 overflow-hidden">
+        <div className="fixed right-2 top-10 w-96 max-w-[calc(100vw-0.5rem)] bg-white border border-xero-border rounded-2xl shadow-xl z-50 overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-900">Notifications</p>
             <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
@@ -191,26 +191,28 @@ export function NotificationsPanel() {
               </div>
 
               {/* Add reminder form */}
-              <form onSubmit={handleAdd} className="flex gap-2 mt-2">
+              <form onSubmit={handleAdd} className="flex flex-col gap-2 mt-2">
                 <input
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
                   placeholder="New reminder…"
-                  className="flex-1 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green focus:border-xero-green"
+                  className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green focus:border-xero-green"
                 />
-                <input
-                  type="date"
-                  value={newDue}
-                  onChange={e => setNewDue(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green w-[110px]"
-                />
-                <button
-                  type="submit"
-                  disabled={!newTitle.trim()}
-                  className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-40 hover:bg-xero-green-dark transition-colors flex-shrink-0"
-                >
-                  Add
-                </button>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={newDue}
+                    onChange={e => setNewDue(e.target.value)}
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green min-w-0"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newTitle.trim()}
+                    className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-40 hover:bg-xero-green-dark transition-colors flex-shrink-0"
+                  >
+                    Add
+                  </button>
+                </div>
               </form>
             </section>
 

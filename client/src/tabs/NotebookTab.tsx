@@ -1052,7 +1052,18 @@ function VocabView() {
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set())
   const [editCard, setEditCard] = useState<EditCard | null>(null)
+  const [csvTooltipOpen, setCsvTooltipOpen] = useState(false)
   const csvInputRef = useRef<HTMLInputElement>(null)
+  const csvTooltipRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!csvTooltipOpen) return
+    function handleClick(e: MouseEvent) {
+      if (!csvTooltipRef.current?.contains(e.target as Node)) setCsvTooltipOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [csvTooltipOpen])
 
   async function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -1230,27 +1241,37 @@ function VocabView() {
           >
             + {t.addWord}
           </button>
-          <div className="relative group">
-            <button
-              onClick={() => csvInputRef.current?.click()}
-              className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-            >
-              {t.importCsv}
-            </button>
-            {/* CSV format tooltip */}
-            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-50 w-72 pointer-events-none">
-              <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
-                <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`word,translation,language,example\nApfel,Apple,de,Der Apfel ist rot 🍎\nWasser,Water,de,`}</code>
-                <div className="mt-2 space-y-0.5">
-                  <p className="text-[10px] text-gray-300"><span className="text-white font-medium">word</span> &amp; <span className="text-white font-medium">translation</span> — required</p>
-                  <p className="text-[10px] text-gray-300"><span className="text-white font-medium">language</span> — <code className="text-green-300">en</code> / <code className="text-green-300">de</code> / <code className="text-green-300">tr</code> (optional)</p>
-                  <p className="text-[10px] text-gray-300"><span className="text-white font-medium">example</span> — text or emoji hint (optional)</p>
-                </div>
-                {/* Arrow */}
-                <div className="absolute top-full left-4 border-4 border-transparent border-t-gray-900" />
-              </div>
+          <div className="relative" ref={csvTooltipRef}>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => csvInputRef.current?.click()}
+                className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+              >
+                {t.importCsv}
+              </button>
+              <button
+                onClick={() => setCsvTooltipOpen(v => !v)}
+                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
+                aria-label="CSV format info"
+              >
+                ?
+              </button>
             </div>
+            {/* CSV format tooltip — click/tap toggled */}
+            {csvTooltipOpen && (
+              <div className="absolute bottom-full left-0 mb-2 z-50 w-72 max-w-[calc(100vw-2rem)]">
+                <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
+                  <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`word,translation,language,example\nApfel,Apple,de,Der Apfel ist rot 🍎\nWasser,Water,de,`}</code>
+                  <div className="mt-2 space-y-0.5">
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">word</span> &amp; <span className="text-white font-medium">translation</span> — required</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">language</span> — <code className="text-green-300">en</code> / <code className="text-green-300">de</code> / <code className="text-green-300">tr</code> (optional)</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">example</span> — text or emoji hint (optional)</p>
+                  </div>
+                  <div className="absolute top-full left-4 border-4 border-transparent border-t-gray-900" />
+                </div>
+              </div>
+            )}
           </div>
           <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvImport} />
           {importMsg && (
