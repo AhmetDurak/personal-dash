@@ -57,6 +57,16 @@ function fmtDueLabel(due: string, group: 'overdue' | 'today' | 'upcoming'): stri
 
 // ─── NotesView ────────────────────────────────────────────────────────────────
 
+const URL_RE = /(https?:\/\/[^\s<>"']+)/g
+
+function renderWithLinks(text: string) {
+  return text.split(URL_RE).map((part, i) =>
+    i % 2 === 1
+      ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{part}</a>
+      : <span key={i}>{part}</span>
+  )
+}
+
 function NotesView() {
   const { t } = useLanguage()
   const { notes, isLoading, createNote, saveNote, deleteNote } = useNotes()
@@ -64,6 +74,7 @@ function NotesView() {
   const [localTitle, setLocalTitle] = useState('')
   const [localContent, setLocalContent] = useState('')
   const [saving, setSaving] = useState(false)
+  const [preview, setPreview] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -160,29 +171,46 @@ function NotesView() {
                 className="text-lg font-semibold text-gray-900 bg-transparent flex-1 outline-none placeholder-gray-300 min-w-0"
               />
               <div className="flex items-center gap-3">
-                {saving && <span className="text-xs text-gray-400">Saving…</span>}
+                {saving && <span className="text-xs text-gray-400">{t.saving}</span>}
+                <button
+                  onClick={() => setPreview(p => !p)}
+                  className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${preview ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
+                >
+                  {preview ? t.editMode : t.preview}
+                </button>
                 <button
                   onClick={() => setConfirmDeleteId(selectedId)}
                   className="text-xs text-red-400 hover:text-red-600 transition-colors"
                 >
-                  Delete
+                  {t.delete}
                 </button>
                 {confirmDeleteId !== null && (
                   <ConfirmDialog
                     message="This note will be permanently deleted."
-                    confirmLabel="Delete"
+                    confirmLabel={t.delete}
                     onConfirm={() => { handleDelete(confirmDeleteId); setConfirmDeleteId(null) }}
                     onCancel={() => setConfirmDeleteId(null)}
                   />
                 )}
               </div>
             </div>
-            <textarea
-              value={localContent}
-              onChange={e => { setLocalContent(e.target.value); scheduleSave(localTitle, e.target.value) }}
-              placeholder="Write your note here…"
-              className="flex-1 p-6 text-sm text-gray-700 bg-white resize-none outline-none placeholder-gray-300 overflow-y-auto"
-            />
+            {preview ? (
+              <div className="flex-1 p-6 text-sm text-gray-700 bg-white overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                {localContent
+                  ? localContent.split('\n').map((line, i) => (
+                      <p key={i} className="min-h-[1.4em]">{renderWithLinks(line)}</p>
+                    ))
+                  : <span className="text-gray-300">Write your note here…</span>
+                }
+              </div>
+            ) : (
+              <textarea
+                value={localContent}
+                onChange={e => { setLocalContent(e.target.value); scheduleSave(localTitle, e.target.value) }}
+                placeholder="Write your note here…"
+                className="flex-1 p-6 text-sm text-gray-700 bg-white resize-none outline-none placeholder-gray-300 overflow-y-auto"
+              />
+            )}
           </>
         )}
       </div>
@@ -1425,24 +1453,24 @@ function RemindersView() {
 
 // ─── WorkspaceTab ─────────────────────────────────────────────────────────────
 
-const KNOWLEDGE_VIEWS = [
-  { path: '/workspace/notes',     label: 'Notes',     icon: '📓' },
-  { path: '/workspace/mindmap',   label: 'Mindmap',   icon: '🧠' },
-  { path: '/workspace/vocab',     label: 'Vocabulary', icon: '📚' },
-  { path: '/workspace/reminders', label: 'Reminders', icon: '📝' },
-]
-
 const TRACKER_PATHS = ['/workspace/log', '/workspace/meal', '/workspace/sport']
-const TRACKER_VIEWS = [
-  { path: '/workspace/log',   label: 'Log',   icon: '📔' },
-  { path: '/workspace/meal',  label: 'Meal',  icon: '🍽️' },
-  { path: '/workspace/sport', label: 'Sport', icon: '💪' },
-]
 
 export function WorkspaceTab() {
   const { pathname } = useLocation()
   const { t } = useLanguage()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const KNOWLEDGE_VIEWS = [
+    { path: '/workspace/notes',     label: t.notes,     icon: '📓' },
+    { path: '/workspace/mindmap',   label: t.mindmap,   icon: '🧠' },
+    { path: '/workspace/vocab',     label: t.vocab,     icon: '📚' },
+    { path: '/workspace/reminders', label: t.reminders, icon: '📝' },
+  ]
+  const TRACKER_VIEWS = [
+    { path: '/workspace/log',   label: t.log,   icon: '📔' },
+    { path: '/workspace/meal',  label: t.meal,  icon: '🍽️' },
+    { path: '/workspace/sport', label: t.sport, icon: '💪' },
+  ]
 
   const isTracker = TRACKER_PATHS.some(p => pathname.startsWith(p))
   const currentLabel = KNOWLEDGE_VIEWS.find(v => pathname === v.path)?.label ?? t.workspace
@@ -1500,7 +1528,7 @@ export function WorkspaceTab() {
       {/* Sidebar — desktop permanent, mobile overlay */}
       <aside className="hidden md:flex w-[220px] h-full bg-xero-navy flex-col flex-shrink-0">
         <div className="px-6 py-5 border-b border-xero-navy-light">
-          <p className="text-white font-bold text-lg tracking-tight">Workspace</p>
+          <p className="text-white font-bold text-lg tracking-tight">{t.workspace}</p>
         </div>
         <NavItems />
       </aside>
@@ -1510,7 +1538,7 @@ export function WorkspaceTab() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
           <aside className="relative w-[220px] h-full bg-xero-navy flex flex-col shadow-2xl">
             <div className="px-6 py-5 border-b border-xero-navy-light">
-              <p className="text-white font-bold text-lg tracking-tight">Workspace</p>
+              <p className="text-white font-bold text-lg tracking-tight">{t.workspace}</p>
             </div>
             <NavItems />
           </aside>

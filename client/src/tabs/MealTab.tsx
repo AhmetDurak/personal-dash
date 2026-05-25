@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useFoods, useMealLogs, useShoppingList } from '../hooks/useMeal'
 import type { Food, MealItem, MealType } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
+import { useLanguage } from '../hooks/useLanguage'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -9,18 +10,18 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const MEAL_TYPES: { id: MealType; label: string; icon: string }[] = [
-  { id: 'breakfast', label: 'Breakfast', icon: '🌅' },
-  { id: 'lunch',     label: 'Lunch',     icon: '☀️' },
-  { id: 'dinner',    label: 'Dinner',    icon: '🌙' },
-  { id: 'snack',     label: 'Snack',     icon: '🍎' },
-]
-
 const CATEGORIES = ['protein', 'carbs', 'fat', 'vegetable', 'fruit', 'dairy', 'other']
 
 // ─── Today view ───────────────────────────────────────────────────────────────
 
 function TodayView() {
+  const { t } = useLanguage()
+  const MEAL_TYPES: { id: MealType; label: string; icon: string }[] = [
+    { id: 'breakfast', label: t.breakfast, icon: '🌅' },
+    { id: 'lunch',     label: t.lunch,     icon: '☀️' },
+    { id: 'dinner',    label: t.dinner,    icon: '🌙' },
+    { id: 'snack',     label: t.snack,     icon: '🍎' },
+  ]
   const date = todayStr()
   const { logs, saveMeal } = useMealLogs(date)
   const { foods } = useFoods()
@@ -376,14 +377,14 @@ function ShoppingListView() {
 
 type View = 'today' | 'library' | 'shopping'
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: 'today',    label: 'Today' },
-  { id: 'library',  label: 'Food Library' },
-  { id: 'shopping', label: 'Shopping List' },
-]
-
 export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
+  const { t } = useLanguage()
   const [view, setView] = useState<View>('today')
+  const VIEWS: { id: View; label: string }[] = [
+    { id: 'today',    label: t.today },
+    { id: 'library',  label: t.foodLibrary },
+    { id: 'shopping', label: t.shoppingList },
+  ]
 
   return (
     <div className="flex flex-col h-full bg-xero-bg overflow-hidden">
@@ -393,7 +394,7 @@ export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
         )}
-        <span className="text-base font-semibold text-gray-800 mr-3">Meal Tracker</span>
+        <span className="text-base font-semibold text-gray-800 mr-3">{t.mealTracker}</span>
         {VIEWS.map(v => (
           <button
             key={v.id}

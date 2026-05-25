@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useExercises, useTemplates, useWorkoutLogs, useFitnessTargets } from '../hooks/useSport'
 import type { ExerciseType, MuscleGroup, WorkoutSetGroup, SetEntry } from '../hooks/useSport'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
+import { useLanguage } from '../hooks/useLanguage'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -518,15 +519,15 @@ function TargetsView() {
 
 type View = 'dashboard' | 'exercises' | 'log' | 'targets'
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: 'dashboard',  label: 'Dashboard' },
-  { id: 'exercises',  label: 'Exercises' },
-  { id: 'log',        label: 'Log Workout' },
-  { id: 'targets',    label: 'Targets' },
-]
-
 export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
+  const { t } = useLanguage()
   const [view, setView] = useState<View>('dashboard')
+  const VIEWS: { id: View; label: string }[] = [
+    { id: 'dashboard',  label: t.sportDashboard },
+    { id: 'exercises',  label: t.exercises },
+    { id: 'log',        label: t.logWorkout },
+    { id: 'targets',    label: t.targets },
+  ]
 
   return (
     <div className="flex flex-col h-full bg-xero-bg overflow-hidden">
@@ -536,7 +537,7 @@ export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
         )}
-        <span className="text-base font-semibold text-gray-800 mr-3">Sport</span>
+        <span className="text-base font-semibold text-gray-800 mr-3">{t.sport}</span>
         {VIEWS.map(v => (
           <button
             key={v.id}
