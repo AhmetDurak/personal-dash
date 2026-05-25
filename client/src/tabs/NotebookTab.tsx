@@ -299,13 +299,31 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   useEffect(() => {
     if (initialized.current || mindmap === undefined) return
     const raw = mindmap ? mindmap.nodes : [{ id: 'root', label: 'Finance Concepts', parentId: null }]
-    setNodes(initPositions(raw))
+    const placed = initPositions(raw)
+    setNodes(placed)
     if (mindmap) {
       setMmTitle(mindmap.title)
       setEdges(mindmap.edges ?? [])
     }
     initialized.current = true
-  }, [mindmap])
+
+    // Auto-center if no cached pan for this map
+    const hasCached = !!localStorage.getItem(`mindmap:pan:${mapId}`)
+    if (!hasCached && placed.length > 0) {
+      const xs = placed.map(n => n.x ?? 0)
+      const ys = placed.map(n => n.y ?? 0)
+      const minX = Math.min(...xs), maxX = Math.max(...xs) + NODE_W
+      const minY = Math.min(...ys), maxY = Math.max(...ys) + NODE_H
+      const cx = (minX + maxX) / 2
+      const cy = (minY + maxY) / 2
+      const rect = containerRef.current?.getBoundingClientRect()
+      const vw = rect?.width  ?? 800
+      const vh = rect?.height ?? 600
+      const centered = { x: vw / 2 - cx, y: vh / 2 - cy }
+      setPan(centered)
+      panStateRef.current = centered
+    }
+  }, [mindmap, mapId])
 
   function persist(newNodes: MMNode[], newEdges = edgesRef.current) {
     setNodes(newNodes)
@@ -775,6 +793,7 @@ function MindmapView() {
     return s ? Number(s) : null
   })
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
     if (mindmaps.length === 0) return
@@ -798,10 +817,9 @@ function MindmapView() {
     if (selectedId === id) setSelectedId(mindmaps.find(m => m.id !== id)?.id ?? null)
   }
 
-  return (
-    <div className="flex h-full overflow-hidden">
-      {/* Map list panel */}
-      <div className="w-44 flex-shrink-0 flex flex-col bg-xero-navy border-r border-xero-navy-light">
+  function MapList({ onSelect }: { onSelect: () => void }) {
+    return (
+      <>
         <div className="px-3 py-3 border-b border-xero-navy-light flex items-center justify-between">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Maps</span>
           <button
@@ -815,7 +833,7 @@ function MindmapView() {
           {mindmaps.map(m => (
             <div
               key={m.id}
-              onClick={() => setSelectedId(m.id)}
+              onClick={() => { setSelectedId(m.id); onSelect() }}
               className={`group flex items-center justify-between px-3 py-2 cursor-pointer rounded mx-1 my-0.5 transition-colors ${
                 selectedId === m.id
                   ? 'bg-xero-green/20 text-xero-green'
@@ -833,16 +851,52 @@ function MindmapView() {
             <p className="text-xs text-gray-500 px-3 py-3">No maps yet.</p>
           )}
         </div>
+      </>
+    )
+  }
+
+  const selectedTitle = mindmaps.find(m => m.id === selectedId)?.title ?? 'Mindmap'
+
+  return (
+    <div className="flex h-full overflow-hidden relative">
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex w-44 flex-shrink-0 flex-col bg-xero-navy border-r border-xero-navy-light">
+        <MapList onSelect={() => {}} />
       </div>
 
-      {/* Canvas */}
-      {selectedId !== null ? (
-        <MindmapCanvas key={selectedId} mapId={selectedId} />
-      ) : (
-        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-          {isLoading ? 'Loading…' : 'Create a map to get started'}
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
+          <div className="relative w-52 h-full bg-xero-navy flex flex-col shadow-2xl">
+            <MapList onSelect={() => setMobileOpen(false)} />
+          </div>
         </div>
       )}
+
+      {/* Canvas + mobile header */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center gap-2 px-3 py-2 bg-xero-navy border-b border-xero-navy-light flex-shrink-0">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="text-gray-400 hover:text-white transition-colors p-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <span className="text-sm text-gray-300 font-medium truncate">{selectedTitle}</span>
+        </div>
+
+        {selectedId !== null ? (
+          <MindmapCanvas key={selectedId} mapId={selectedId} />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+            {isLoading ? 'Loading…' : 'Create a map to get started'}
+          </div>
+        )}
+      </div>
 
       {confirmDeleteId !== null && (
         <ConfirmDialog
