@@ -265,7 +265,13 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null; fromLeft?: boolean } | null>(null)
   const [flippedNodes, setFlippedNodes] = useState<Set<string>>(new Set())
   const [editingBack, setEditingBack] = useState(false)
-  const [pan, setPan] = useState({ x: 300, y: 300 })
+  const [pan, setPan] = useState<{ x: number; y: number }>(() => {
+    try {
+      const raw = localStorage.getItem(`mindmap:pan:${mapId}`)
+      if (raw) { const p = JSON.parse(raw); if (typeof p?.x === 'number') return p }
+    } catch { /* ignore */ }
+    return { x: 300, y: 300 }
+  })
   const [isPanning, setIsPanning] = useState(false)
   const initialized = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -273,7 +279,7 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   const dragRef = useRef<DragState | null>(null)
   const connectRef = useRef<{ sourceId: string; x: number; y: number; targetId: string | null; fromLeft?: boolean } | null>(null)
   const panRef = useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(null)
-  const panStateRef = useRef({ x: 300, y: 300 })
+  const panStateRef = useRef({ x: pan.x, y: pan.y })
   const nodesRef = useRef<MMNode[]>([])
   const edgesRef = useRef<MMEdge[]>([])
   const titleRef = useRef(mmTitle)
@@ -352,7 +358,12 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   }
 
   function handleSvgPointerUp(_e: React.PointerEvent) {
-    if (panRef.current) { panRef.current = null; setIsPanning(false); return }
+    if (panRef.current) {
+      panRef.current = null
+      setIsPanning(false)
+      localStorage.setItem(`mindmap:pan:${mapId}`, JSON.stringify(panStateRef.current))
+      return
+    }
     const d = dragRef.current
     if (d) {
       dragRef.current = null
