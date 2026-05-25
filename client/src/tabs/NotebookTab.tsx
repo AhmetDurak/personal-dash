@@ -262,9 +262,11 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [edges, setEdges] = useState<MMEdge[]>([])
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [selectedForConnect, setSelectedForConnect] = useState<string | null>(null)
   const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null; fromLeft?: boolean } | null>(null)
   const [flippedNodes, setFlippedNodes] = useState<Set<string>>(new Set())
   const [editingBack, setEditingBack] = useState(false)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [pan, setPan] = useState<{ x: number; y: number }>(() => {
     try {
       const raw = localStorage.getItem(`mindmap:pan:${mapId}`)
@@ -347,9 +349,18 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     const { x, y } = clientToSvg(e.clientX, e.clientY)
     dragRef.current = { id, offsetX: x - (node.x ?? 0), offsetY: y - (node.y ?? 0), startSvgX: x, startSvgY: y, moved: false }
     setCtxMenu(null)
+    // Long-press → context menu (mobile substitute for right-click)
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    longPressTimer.current = setTimeout(() => {
+      if (dragRef.current && !dragRef.current.moved) {
+        dragRef.current = null
+        setCtxMenu({ nodeId: id, screenX: e.clientX, screenY: e.clientY })
+      }
+    }, 600)
   }
 
   function handleSvgPointerMove(e: React.PointerEvent) {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
     const p = panRef.current
     if (p) {
       const nx = p.tx + (e.clientX - p.startX)
@@ -384,17 +395,27 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     }
     const d = dragRef.current
     if (d) {
+      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
       dragRef.current = null
       if (!d.moved) {
-        // single click → flip face
-        setFlippedNodes(prev => {
-          const next = new Set(prev)
-          if (next.has(d.id)) next.delete(d.id)
-          else next.add(d.id)
-          return next
-        })
+        const isHovered = hoveredId === d.id          // desktop: mouse was already over node
+        const isSelected = selectedForConnect === d.id // mobile: node was tapped once before
+        if (isHovered || isSelected) {
+          // Second interaction → flip face and deselect
+          setFlippedNodes(prev => {
+            const next = new Set(prev)
+            if (next.has(d.id)) next.delete(d.id)
+            else next.add(d.id)
+            return next
+          })
+          setSelectedForConnect(null)
+        } else {
+          // First tap on mobile (no hover) → select to reveal pins
+          setSelectedForConnect(d.id)
+        }
         setCtxMenu(null)
       } else {
+        setSelectedForConnect(null)
         saveMindmap(titleRef.current, nodesRef.current)
       }
       return
@@ -404,6 +425,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       connectRef.current = null
       setConnectLine(null)
       setHoveredId(null)
+      setSelectedForConnect(null)
       if (c.targetId && c.targetId !== c.sourceId) {
         const already = edgesRef.current.some(e =>
           (e.from === c.sourceId && e.to === c.targetId) ||
@@ -414,11 +436,17 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
           persist(nodesRef.current, [...edgesRef.current, newEdge])
         }
       }
+      return
     }
+    // Tapped SVG background with nothing active → deselect
+    setSelectedForConnect(null)
+    setCtxMenu(null)
   }
 
   function handlePinPointerDown(e: React.PointerEvent, sourceId: string, fromLeft = false) {
     e.stopPropagation()
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+    dragRef.current = null
     const { x, y } = clientToSvg(e.clientX, e.clientY)
     connectRef.current = { sourceId, x, y, targetId: null, fromLeft }
     setConnectLine(connectRef.current)
@@ -583,7 +611,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             const isDragging = dragRef.current?.id === n.id
             const isRenaming = renaming?.id === n.id
             const isTarget = connectLine?.targetId === n.id
-            const showPin = hoveredId === n.id || connectLine?.sourceId === n.id
+            const showPin = hoveredId === n.id || connectLine?.sourceId === n.id || selectedForConnect === n.id
             const isFlipped = flippedNodes.has(n.id)
             const displayText = isFlipped ? (n.back || '+ add notes') : n.label
             const truncated = displayText.length > 18 ? displayText.slice(0, 17) + '…' : displayText
