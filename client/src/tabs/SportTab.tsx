@@ -77,7 +77,7 @@ function Dashboard() {
               <div key={log.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-gray-800">
-                    {new Date(log.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                    {new Date(log.date.slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                   </p>
                   {log.duration_min && <span className="text-xs text-gray-400">{log.duration_min} min</span>}
                 </div>
@@ -500,7 +500,7 @@ function LogWorkout() {
               <div key={log.id} className={`bg-white rounded-xl border px-4 py-3 group relative ${editingLogId === log.id ? 'border-xero-green/50 ring-1 ring-xero-green/30' : 'border-gray-100'}`}>
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-sm font-semibold text-gray-800">
-                    {new Date(log.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
+                    {new Date(log.date.slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
                     {editingLogId === log.id && <span className="ml-2 text-[10px] text-xero-green font-medium">editing</span>}
                   </p>
                   <div className="flex items-center gap-2">
