@@ -119,3 +119,26 @@ Each entry lists git commits made during that session.
 ### Commits
 - d737c27 chore: auto-commit session changes — 2026-05-25 09:31
 
+
+## Completed from Backlog — 2026-05-25
+
+---
+
+## TASK-002 — Three New Charts (Savings Rate, Category Trends, Top Payees)
+
+**Difficulty:** 4/10
+**Priority:** Medium
+
+- Savings Rate trend line (% per month) — no backend needed
+- Category trend lines (one line per expense category over time) — no backend needed
+- Top Payees horizontal bar (top 10 spenders for selected month) — needs new `/api/charts/top-payees` route
+
+A full plan exists at: `.claude/plans/dreamy-foraging-puppy.md`
+
+
+## Session — 2026-05-25 09:35
+
+### Commits
+- 9abb49b chore: auto-commit session changes — 2026-05-25 09:33
+- d737c27 chore: auto-commit session changes — 2026-05-25 09:31
+

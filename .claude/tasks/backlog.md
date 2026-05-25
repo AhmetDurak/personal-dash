@@ -5,19 +5,6 @@ Priority: High / Medium / Low
 
 ---
 
-## TASK-002 — Three New Charts (Savings Rate, Category Trends, Top Payees) [DONE]
-
-**Difficulty:** 4/10
-**Priority:** Medium
-
-- Savings Rate trend line (% per month) — no backend needed
-- Category trend lines (one line per expense category over time) — no backend needed
-- Top Payees horizontal bar (top 10 spenders for selected month) — needs new `/api/charts/top-payees` route
-
-A full plan exists at: `.claude/plans/dreamy-foraging-puppy.md`
-
----
-
 ## TASK-003 — Budget Tracking UI
 
 **Difficulty:** 5/10
@@ -74,7 +61,7 @@ A full plan exists at: `.claude/plans/dreamy-foraging-puppy.md`
 
 ---
 
-## TASK-008 — Dark Mode
+## TASK-008 — Dark Mode [DONE]
 
 **Difficulty:** 5/10
 **Priority:** Low
