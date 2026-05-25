@@ -1243,12 +1243,16 @@ function VocabView() {
           </button>
           <div className="relative" ref={csvTooltipRef}>
             <div className="flex items-center gap-1">
+              {/* Hover (desktop) shows tooltip; click opens file picker */}
               <button
                 onClick={() => csvInputRef.current?.click()}
+                onMouseEnter={() => setCsvTooltipOpen(true)}
+                onMouseLeave={() => setCsvTooltipOpen(false)}
                 className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition-colors"
               >
                 {t.importCsv}
               </button>
+              {/* Tap (mobile) toggles tooltip */}
               <button
                 onClick={() => setCsvTooltipOpen(v => !v)}
                 className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
@@ -1257,9 +1261,8 @@ function VocabView() {
                 ?
               </button>
             </div>
-            {/* CSV format tooltip — click/tap toggled */}
             {csvTooltipOpen && (
-              <div className="absolute bottom-full left-0 mb-2 z-50 w-72 max-w-[calc(100vw-2rem)]">
+              <div className="absolute bottom-full left-0 mb-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
                 <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
                   <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`word,translation,language,example\nApfel,Apple,de,Der Apfel ist rot 🍎\nWasser,Water,de,`}</code>
