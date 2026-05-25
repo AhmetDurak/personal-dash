@@ -8,6 +8,7 @@ import type { MMNode, MMEdge, VocabCard } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
 import { useDarkMode } from '../hooks/useDarkMode'
+import { AreaChart, Area, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContainer } from 'recharts'
 
 // ─── Mindmap helpers ──────────────────────────────────────────────────────────
 
@@ -844,6 +845,23 @@ type NewWord = { word: string; translation: string; language: string; example: s
 
 type EditCard = { id: number; word: string; translation: string; language: string; example: string; image_url: string }
 
+// SM-2 targets 90% retention at due_at. Solve: 0.9 = e^(-1/k) → k = -1/ln(0.9) ≈ 9.49
+const LN09K = -1 / Math.log(0.9)
+
+function retentionPct(card: VocabCard): number {
+  const lastReview = new Date(card.due_at)
+  lastReview.setDate(lastReview.getDate() - card.interval)
+  const daysSince = (Date.now() - lastReview.getTime()) / 86_400_000
+  return Math.max(0, Math.round(Math.exp(-daysSince / (card.interval * LN09K)) * 100))
+}
+
+function forgettingCurveData(card: VocabCard): { day: string; pct: number }[] {
+  return Array.from({ length: 31 }, (_, i) => ({
+    day: i === 0 ? '0' : `+${i}d`,
+    pct: Math.max(0, Math.round(Math.exp(-i / (card.interval * LN09K)) * 100)),
+  }))
+}
+
 function VocabView() {
   const { t } = useLanguage()
   const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord } = useVocabulary()
@@ -1130,12 +1148,25 @@ function VocabView() {
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between mt-2">
-              <span className={`text-[9px] ${new Date(card.due_at) <= today ? 'text-red-400' : 'text-gray-300'}`}>
-                Due {new Date(card.due_at).toLocaleDateString('de-DE')}
-              </span>
-              <span className="text-[9px] text-gray-300">×{card.repetitions}</span>
-            </div>
+            {/* Retention decay bar */}
+            {(() => {
+              const pct = retentionPct(card)
+              const color = pct >= 90 ? '#10B981' : pct >= 70 ? '#F59E0B' : '#EF4444'
+              return (
+                <div className="mt-2 pt-1.5 border-t border-gray-50">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] text-gray-300">×{card.repetitions}</span>
+                    <span className="text-[10px] font-bold" style={{ color }}>{pct}%</span>
+                  </div>
+                  <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                  </div>
+                  <span className={`text-[9px] mt-0.5 block ${new Date(card.due_at) <= today ? 'text-red-400' : 'text-gray-300'}`}>
+                    Due {new Date(card.due_at).toLocaleDateString('de-DE')}
+                  </span>
+                </div>
+              )
+            })()}
           </div>
         ))}
       </div>
@@ -1180,6 +1211,32 @@ function VocabView() {
             {editCard.image_url && (
               <img src={editCard.image_url} alt="preview" className="w-full rounded-lg max-h-32 object-cover" />
             )}
+            {/* Forgetting curve chart */}
+            {(() => {
+              const vocabCard = vocab.find(c => c.id === editCard.id)
+              if (!vocabCard) return null
+              return (
+                <div className="pt-3 border-t border-gray-100">
+                  <p className="text-xs text-gray-400 mb-1.5">{t.forgettingCurve}</p>
+                  <ResponsiveContainer width="100%" height={80}>
+                    <AreaChart data={forgettingCurveData(vocabCard)} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                      <defs>
+                        <linearGradient id="retGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <Area type="monotone" dataKey="pct" stroke="#10B981" strokeWidth={1.5} fill="url(#retGrad)" dot={false} />
+                      <XAxis dataKey="day" fontSize={8} tickLine={false} axisLine={false} interval={4} />
+                      <YAxis domain={[0, 100]} fontSize={8} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}%`} />
+                      <ReferenceLine y={90} stroke="#F59E0B" strokeDasharray="3 3" />
+                      <Tooltip formatter={(v: number) => [`${v}%`, t.retentionLabel]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                  <p className="text-[10px] text-amber-500 mt-0.5">─ ─ {t.reviewThreshold} (90%)</p>
+                </div>
+              )
+            })()}
             <select
               value={editCard.language}
               onChange={e => setEditCard(p => p && ({ ...p, language: e.target.value }))}

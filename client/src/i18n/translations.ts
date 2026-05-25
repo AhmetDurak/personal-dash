@@ -102,6 +102,9 @@ export const TRANSLATIONS = {
     language: 'Language',
     preview: 'Preview',
     editMode: 'Edit',
+    retentionLabel: 'Retention',
+    forgettingCurve: 'Forgetting curve',
+    reviewThreshold: 'review threshold',
   },
   de: {
     finance: 'Finanzen',
@@ -192,6 +195,9 @@ export const TRANSLATIONS = {
     language: 'Sprache',
     preview: 'Vorschau',
     editMode: 'Bearbeiten',
+    retentionLabel: 'Behaltensrate',
+    forgettingCurve: 'Vergessenskurve',
+    reviewThreshold: 'Wiederholungsschwelle',
   },
   tr: {
     finance: 'Finans',
@@ -282,6 +288,9 @@ export const TRANSLATIONS = {
     language: 'Dil',
     preview: 'Önizleme',
     editMode: 'Düzenle',
+    retentionLabel: 'Hafıza Gücü',
+    forgettingCurve: 'Unutma Eğrisi',
+    reviewThreshold: 'tekrar eşiği',
   },
 }
 

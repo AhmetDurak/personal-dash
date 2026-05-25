@@ -48,11 +48,34 @@ function fireNotifications(reminders: Reminder[]) {
   }
 }
 
+const VOCAB_DAY_KEY = () => `vocab:${new Date().toISOString().slice(0, 10)}`
+
+async function checkVocabNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  const key = VOCAB_DAY_KEY()
+  if (getFired().has(key)) return
+  try {
+    const res = await fetch('/api/notebook/vocabulary')
+    if (!res.ok) return
+    const cards = await res.json() as { due_at: string }[]
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const n = cards.filter(c => new Date(c.due_at) <= today).length
+    if (n === 0) return
+    new Notification('Vocabulary Review', {
+      body: `You have ${n} card${n !== 1 ? 's' : ''} to review today.`,
+      icon: '/favicon.ico',
+      tag: 'vocab-due',
+    })
+    addFired(key)
+  } catch { /* ignore */ }
+}
+
 export function useReminderNotifications() {
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   async function check() {
     fireNotifications(await fetchDueReminders())
+    await checkVocabNotifications()
   }
 
   useEffect(() => {
