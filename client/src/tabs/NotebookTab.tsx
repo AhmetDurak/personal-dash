@@ -405,7 +405,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   const ctxNode = ctxMenu ? nodes.find(n => n.id === ctxMenu.nodeId) ?? null : null
 
   return (
-    <div className="h-full relative overflow-hidden">
+    <div className="flex-1 min-w-0 h-full relative overflow-hidden">
       {/* Canvas */}
       <div
         ref={containerRef}
