@@ -228,6 +228,7 @@ interface DragState {
   startSvgX: number
   startSvgY: number
   moved: boolean
+  pointerType: string
 }
 
 interface CtxMenu { nodeId: string; screenX: number; screenY: number }
@@ -347,7 +348,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     const node = nodesRef.current.find(n => n.id === id)
     if (!node) return
     const { x, y } = clientToSvg(e.clientX, e.clientY)
-    dragRef.current = { id, offsetX: x - (node.x ?? 0), offsetY: y - (node.y ?? 0), startSvgX: x, startSvgY: y, moved: false }
+    dragRef.current = { id, offsetX: x - (node.x ?? 0), offsetY: y - (node.y ?? 0), startSvgX: x, startSvgY: y, moved: false, pointerType: e.pointerType }
     setCtxMenu(null)
     // Long-press → context menu (mobile substitute for right-click)
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
@@ -398,9 +399,9 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
       dragRef.current = null
       if (!d.moved) {
-        const isHovered = hoveredId === d.id          // desktop: mouse was already over node
-        const isSelected = selectedForConnect === d.id // mobile: node was tapped once before
-        if (isHovered || isSelected) {
+        const isMouseClick = d.pointerType === 'mouse'  // desktop: always flip on click
+        const isSelected = selectedForConnect === d.id   // mobile: already tapped once
+        if (isMouseClick || isSelected) {
           // Second interaction → flip face and deselect
           setFlippedNodes(prev => {
             const next = new Set(prev)
