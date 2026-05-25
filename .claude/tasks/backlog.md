@@ -5,7 +5,7 @@ Priority: High / Medium / Low
 
 ---
 
-## TASK-002 — Three New Charts (Savings Rate, Category Trends, Top Payees)
+## TASK-002 — Three New Charts (Savings Rate, Category Trends, Top Payees) [DONE]
 
 **Difficulty:** 4/10
 **Priority:** Medium
