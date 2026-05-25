@@ -1013,9 +1013,9 @@ function MindmapView() {
 
 // ─── VocabView ────────────────────────────────────────────────────────────────
 
-const LANGS = ['de', 'en', 'tr', 'fr', 'es']
+const LANGS = ['de', 'en', 'tr', 'fr', 'es', 'ja']
 const LANG_LABELS: Record<string, string> = {
-  de: '🇩🇪 DE', en: '🇬🇧 EN', tr: '🇹🇷 TR', fr: '🇫🇷 FR', es: '🇪🇸 ES',
+  de: '🇩🇪 DE', en: '🇬🇧 EN', tr: '🇹🇷 TR', fr: '🇫🇷 FR', es: '🇪🇸 ES', ja: '🇯🇵 JA',
 }
 
 type NewWord = { word: string; translation: string; language: string; example: string }
