@@ -262,7 +262,7 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [edges, setEdges] = useState<MMEdge[]>([])
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
+  const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null; fromLeft?: boolean } | null>(null)
   const [flippedNodes, setFlippedNodes] = useState<Set<string>>(new Set())
   const [editingBack, setEditingBack] = useState(false)
   const [pan, setPan] = useState({ x: 300, y: 300 })
@@ -271,7 +271,7 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragState | null>(null)
-  const connectRef = useRef<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
+  const connectRef = useRef<{ sourceId: string; x: number; y: number; targetId: string | null; fromLeft?: boolean } | null>(null)
   const panRef = useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(null)
   const panStateRef = useRef({ x: 300, y: 300 })
   const nodesRef = useRef<MMNode[]>([])
@@ -381,17 +381,17 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
           (e.from === c.targetId && e.to === c.sourceId)
         )
         if (!already) {
-          const newEdge: MMEdge = { id: `e${Date.now()}`, from: c.sourceId, to: c.targetId }
+          const newEdge: MMEdge = { id: `e${Date.now()}`, from: c.sourceId, to: c.targetId, bidirectional: true }
           persist(nodesRef.current, [...edgesRef.current, newEdge])
         }
       }
     }
   }
 
-  function handlePinPointerDown(e: React.PointerEvent, sourceId: string) {
+  function handlePinPointerDown(e: React.PointerEvent, sourceId: string, fromLeft = false) {
     e.stopPropagation()
     const { x, y } = clientToSvg(e.clientX, e.clientY)
-    connectRef.current = { sourceId, x, y, targetId: null }
+    connectRef.current = { sourceId, x, y, targetId: null, fromLeft }
     setConnectLine(connectRef.current)
     setCtxMenu(null)
   }
@@ -532,12 +532,14 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
           {connectLine && (() => {
             const src = nodes.find(n => n.id === connectLine.sourceId)
             if (!src) return null
-            const x1 = (src.x ?? 0) + NODE_W, y1 = (src.y ?? 0) + NODE_H / 2
+            const x1 = connectLine.fromLeft ? (src.x ?? 0) : (src.x ?? 0) + NODE_W
+            const y1 = (src.y ?? 0) + NODE_H / 2
+            const sign = connectLine.fromLeft ? -1 : 1
             const t = Math.max(60, Math.abs(connectLine.x - x1) * 0.45)
             const color = nodeColor(connectLine.sourceId)
             return (
               <path
-                d={`M ${x1} ${y1} C ${x1+t} ${y1} ${connectLine.x-t} ${connectLine.y} ${connectLine.x} ${connectLine.y}`}
+                d={`M ${x1} ${y1} C ${x1 + sign * t} ${y1} ${connectLine.x - sign * t} ${connectLine.y} ${connectLine.x} ${connectLine.y}`}
                 fill="none" stroke={color} strokeWidth={2} strokeDasharray="6 4" strokeOpacity={0.8}
                 style={{ pointerEvents: 'none' }}
               />
@@ -618,13 +620,22 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
                   </text>
                 )}
 
+                {/* Left-side connection pin */}
+                {showPin && (
+                  <circle
+                    cx={x} cy={y + NODE_H / 2} r={5}
+                    fill={color} stroke="white" strokeWidth={2}
+                    style={{ cursor: 'crosshair' }}
+                    onPointerDown={e => handlePinPointerDown(e, n.id, true)}
+                  />
+                )}
                 {/* Right-side connection pin */}
                 {showPin && (
                   <circle
                     cx={x + NODE_W} cy={y + NODE_H / 2} r={5}
                     fill={color} stroke="white" strokeWidth={2}
                     style={{ cursor: 'crosshair' }}
-                    onPointerDown={e => handlePinPointerDown(e, n.id)}
+                    onPointerDown={e => handlePinPointerDown(e, n.id, false)}
                   />
                 )}
               </g>
