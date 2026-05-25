@@ -164,3 +164,17 @@ A full plan exists at: `.claude/plans/dreamy-foraging-puppy.md`
 - 9abb49b chore: auto-commit session changes — 2026-05-25 09:33
 - d737c27 chore: auto-commit session changes — 2026-05-25 09:31
 
+
+## Completed from Backlog — 2026-05-25
+
+---
+
+## TASK-007 — Mindmap Multi-Workspace
+
+**Difficulty:** 6/10
+**Priority:** Low
+
+- Allow multiple saved mindmaps (currently only one per user)
+- Sidebar to switch between maps
+- Each map has its own title and canvas state
+

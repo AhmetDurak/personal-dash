@@ -192,9 +192,6 @@ function NotesView() {
 
 // ─── MindmapView ──────────────────────────────────────────────────────────────
 
-const CANVAS_W = 2400
-const CANVAS_H = 1600
-
 interface DragState {
   id: string
   offsetX: number
@@ -215,7 +212,7 @@ function initPositions(raw: MMNode[]): MMNode[] {
   function leafCount(id: string): number { const ch = childrenOf.get(id) ?? []; return ch.length === 0 ? 1 : ch.reduce((s, c) => s + leafCount(c.id), 0) }
   const posMap = new Map<string, { x: number; y: number }>()
   const totalLeaves = leafCount(root.id)
-  const startY = Math.max(80, (CANVAS_H - totalLeaves * 80) / 2)
+  const startY = -(totalLeaves * 40)
   function place(id: string, depth: number, yFrom: number, yTo: number) {
     posMap.set(id, { x: 80 + depth * 220, y: (yFrom + yTo) / 2 - NODE_H / 2 })
     const ch = childrenOf.get(id) ?? []; const total = leafCount(id); let cursor = yFrom
@@ -239,12 +236,15 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
   const [flippedNodes, setFlippedNodes] = useState<Set<string>>(new Set())
   const [editingBack, setEditingBack] = useState(false)
+  const [pan, setPan] = useState({ x: 300, y: 300 })
+  const [isPanning, setIsPanning] = useState(false)
   const initialized = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const dragRef = useRef<DragState | null>(null)
   const connectRef = useRef<{ sourceId: string; x: number; y: number; targetId: string | null } | null>(null)
-  const panRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null)
+  const panRef = useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(null)
+  const panStateRef = useRef({ x: 300, y: 300 })
   const nodesRef = useRef<MMNode[]>([])
   const edgesRef = useRef<MMEdge[]>([])
   const titleRef = useRef(mmTitle)
@@ -283,7 +283,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   function clientToSvg(clientX: number, clientY: number) {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return { x: clientX, y: clientY }
-    return { x: clientX - rect.left, y: clientY - rect.top }
+    const p = panStateRef.current
+    return { x: clientX - rect.left - p.x, y: clientY - rect.top - p.y }
   }
 
   function handleNodePointerDown(e: React.PointerEvent, id: string) {
@@ -298,18 +299,18 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   function handleSvgPointerMove(e: React.PointerEvent) {
     const p = panRef.current
     if (p) {
-      const el = containerRef.current
-      if (el) {
-        el.scrollLeft = p.scrollLeft - (e.clientX - p.startX)
-        el.scrollTop  = p.scrollTop  - (e.clientY - p.startY)
-      }
+      const nx = p.tx + (e.clientX - p.startX)
+      const ny = p.ty + (e.clientY - p.startY)
+      panStateRef.current = { x: nx, y: ny }
+      setPan({ x: nx, y: ny })
+      setIsPanning(true)
       return
     }
     const { x, y } = clientToSvg(e.clientX, e.clientY)
     const d = dragRef.current
     if (d) {
       if (!d.moved && Math.hypot(x - d.startSvgX, y - d.startSvgY) > 4) dragRef.current = { ...d, moved: true }
-      setNodes(prev => prev.map(n => n.id === d.id ? { ...n, x: Math.max(0, x - d.offsetX), y: Math.max(0, y - d.offsetY) } : n))
+      setNodes(prev => prev.map(n => n.id === d.id ? { ...n, x: x - d.offsetX, y: y - d.offsetY } : n))
       return
     }
     const c = connectRef.current
@@ -322,7 +323,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   }
 
   function handleSvgPointerUp(_e: React.PointerEvent) {
-    if (panRef.current) { panRef.current = null; return }
+    if (panRef.current) { panRef.current = null; setIsPanning(false); return }
     const d = dragRef.current
     if (d) {
       dragRef.current = null
@@ -408,8 +409,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       {/* Canvas */}
       <div
         ref={containerRef}
-        className={`h-full overflow-auto ${dark ? 'bg-[#0F172A]' : 'bg-[#F8FAFC]'}`}
-        style={{ cursor: panRef.current ? 'grabbing' : 'default' }}
+        className={`h-full overflow-hidden ${dark ? 'bg-[#0F172A]' : 'bg-[#F8FAFC]'}`}
+        style={{ cursor: isPanning ? 'grabbing' : 'default' }}
         onPointerMove={handleSvgPointerMove}
         onPointerUp={handleSvgPointerUp}
         onPointerLeave={handleSvgPointerUp}
@@ -418,16 +419,15 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       >
         <svg
           ref={svgRef}
-          width={CANVAS_W}
-          height={CANVAS_H}
+          width="100%" height="100%"
           className="block select-none"
-          style={{ touchAction: dragRef.current ? 'none' : 'auto' }}
+          style={{ touchAction: 'none' }}
           onContextMenu={e => e.preventDefault()}
         >
           {/* Dot grid + arrow markers */}
           <defs>
-            <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
-              <circle cx="14" cy="14" r="1" fill="#CBD5E1" />
+            <pattern id="dots" x={pan.x % 28} y={pan.y % 28} width="28" height="28" patternUnits="userSpaceOnUse">
+              <circle cx="14" cy="14" r="1" fill={dark ? '#334155' : '#CBD5E1'} />
             </pattern>
             <marker id="arrowEnd" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
               <polygon points="0 0, 7 3.5, 0 7" fill="#94A3B8" />
@@ -436,16 +436,17 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
               <polygon points="0 0, 7 3.5, 0 7" fill="#94A3B8" />
             </marker>
           </defs>
+          {/* Background — full viewport, infinite feel */}
           <rect
-            width={CANVAS_W} height={CANVAS_H} fill="url(#dots)"
+            x="-10000" y="-10000" width="20000" height="20000" fill="url(#dots)"
             style={{ cursor: 'grab' }}
             onPointerDown={e => {
               if (dragRef.current || connectRef.current) return
-              const el = containerRef.current
-              if (!el) return
-              panRef.current = { startX: e.clientX, startY: e.clientY, scrollLeft: el.scrollLeft, scrollTop: el.scrollTop }
+              panRef.current = { startX: e.clientX, startY: e.clientY, tx: panStateRef.current.x, ty: panStateRef.current.y }
             }}
           />
+          {/* World transform — all content pans together */}
+          <g transform={`translate(${pan.x},${pan.y})`}>
 
           {/* Parent-child connections — click to disconnect */}
           {nodes.map(n => {
@@ -603,13 +604,14 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
 
           {/* Empty state */}
           {nodes.length === 0 && (
-            <text x={CANVAS_W / 2} y={CANVAS_H / 2} textAnchor="middle" dominantBaseline="middle" fontSize={14} fill="#94A3B8"
+            <text x={0} y={0} textAnchor="middle" dominantBaseline="middle" fontSize={14} fill="#94A3B8"
               style={{ cursor: 'pointer' }}
-              onClick={e => { e.stopPropagation(); persist([{ id: 'root', label: 'Finance Concepts', parentId: null, x: CANVAS_W/2 - NODE_W/2, y: CANVAS_H/2 - NODE_H/2 }]) }}
+              onClick={e => { e.stopPropagation(); persist([{ id: 'root', label: 'Finance Concepts', parentId: null, x: -NODE_W/2, y: -NODE_H/2 }]) }}
             >
               Click to create your first node
             </text>
           )}
+          </g>
         </svg>
       </div>
 

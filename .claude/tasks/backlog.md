@@ -50,17 +50,6 @@ Priority: High / Medium / Low
 
 ---
 
-## TASK-007 — Mindmap Multi-Workspace [DONE]
-
-**Difficulty:** 6/10
-**Priority:** Low
-
-- Allow multiple saved mindmaps (currently only one per user)
-- Sidebar to switch between maps
-- Each map has its own title and canvas state
-
----
-
 ## TASK-009 — React Native / Expo Mobile App
 
 **Difficulty:** 8/10
