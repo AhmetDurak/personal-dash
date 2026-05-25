@@ -60,7 +60,7 @@ export function TopBar() {
 
   return (
     <>
-    <div className="h-10 bg-gray-950 flex items-center px-3 md:px-4 gap-1 flex-shrink-0 border-b border-gray-800 w-full overflow-hidden">
+    <div className="h-10 bg-gray-950 flex items-center px-3 md:px-4 gap-1 flex-shrink-0 border-b border-gray-800 w-full">
       {/* Brand */}
       <div className="flex items-center gap-2 pr-3 md:pr-4 mr-1 md:mr-2 border-r border-gray-800 flex-shrink-0">
         <Logo />
