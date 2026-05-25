@@ -14,6 +14,9 @@ import { TransactionsTab } from './tabs/TransactionsTab'
 import { ETFTab } from './tabs/ETFTab'
 import { NewsTab } from './tabs/NewsTab'
 import { LearnTab } from './tabs/LearnTab'
+import { WorkspaceTab } from './tabs/NotebookTab'
+import { currentMonth } from './utils/format'
+import type { Span } from './components/web/BalanceChart'
 
 function NewsPage() {
   return (
@@ -27,12 +30,6 @@ function NewsPage() {
     </div>
   )
 }
-import { NotebookTab } from './tabs/NotebookTab'
-import { LogTab } from './tabs/LogTab'
-import { MealTab } from './tabs/MealTab'
-import { SportTab } from './tabs/SportTab'
-import { currentMonth } from './utils/format'
-import type { Span } from './components/web/BalanceChart'
 
 function useLocalState<T>(key: string, fallback: T) {
   const [value, setValue] = useState<T>(() => {
@@ -82,13 +79,14 @@ export function App() {
         <TopBar />
         <div className="flex-1 overflow-hidden">
           <Routes>
-            <Route path="/notebook/*" element={<NotebookTab />} />
-            <Route path="/log/*"      element={<LogTab />} />
-          <Route path="/meal/*"     element={<MealTab />} />
-          <Route path="/sport/*"    element={<SportTab />} />
-            <Route path="/news"       element={<NewsPage />} />
-            <Route path="/finance/*"  element={<FinanceDashboard />} />
-            <Route path="*"           element={<Navigate to="/finance/overview" replace />} />
+            <Route path="/workspace/*" element={<WorkspaceTab />} />
+            <Route path="/notebook/*"  element={<Navigate to="/workspace/notes" replace />} />
+            <Route path="/log/*"       element={<Navigate to="/workspace/log" replace />} />
+            <Route path="/meal/*"      element={<Navigate to="/workspace/meal" replace />} />
+            <Route path="/sport/*"     element={<Navigate to="/workspace/sport" replace />} />
+            <Route path="/news"        element={<NewsPage />} />
+            <Route path="/finance/*"   element={<FinanceDashboard />} />
+            <Route path="*"            element={<Navigate to="/finance/overview" replace />} />
           </Routes>
         </div>
       </div>

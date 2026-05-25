@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useNotes, useMindmap, useVocabulary, useAllReminders } from '../hooks/useNotebook'
+import { LogTab } from './LogTab'
+import { MealTab } from './MealTab'
+import { SportTab } from './SportTab'
 import type { MMNode, MMEdge, VocabCard } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
@@ -1328,31 +1331,58 @@ function RemindersView() {
   )
 }
 
-// ─── NotebookTab ──────────────────────────────────────────────────────────────
+// ─── WorkspaceTab ─────────────────────────────────────────────────────────────
 
-export function NotebookTab() {
+const KNOWLEDGE_VIEWS = [
+  { path: '/workspace/notes',     label: 'Notes',     icon: '📓' },
+  { path: '/workspace/mindmap',   label: 'Mindmap',   icon: '🧠' },
+  { path: '/workspace/vocab',     label: 'Vocabulary', icon: '📚' },
+  { path: '/workspace/reminders', label: 'Reminders', icon: '📝' },
+]
+
+const TRACKER_PATHS = ['/workspace/log', '/workspace/meal', '/workspace/sport']
+const TRACKER_VIEWS = [
+  { path: '/workspace/log',   label: 'Log',   icon: '📔' },
+  { path: '/workspace/meal',  label: 'Meal',  icon: '🍽️' },
+  { path: '/workspace/sport', label: 'Sport', icon: '💪' },
+]
+
+export function WorkspaceTab() {
   const { pathname } = useLocation()
   const { t } = useLanguage()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const VIEWS = [
-    { path: '/notebook/notes',     label: t.notes,     icon: '📓' },
-    { path: '/notebook/mindmap',   label: t.mindmap,   icon: '🧠' },
-    { path: '/notebook/vocab',     label: t.vocab,     icon: '📚' },
-    { path: '/notebook/reminders', label: t.reminders, icon: '📝' },
-  ]
+  const isTracker = TRACKER_PATHS.some(p => pathname.startsWith(p))
+  const currentLabel = KNOWLEDGE_VIEWS.find(v => pathname === v.path)?.label ?? t.workspace
 
   useEffect(() => {
-    localStorage.setItem('notebook:lastPath', pathname)
+    localStorage.setItem('workspace:lastPath', pathname)
   }, [pathname])
-
-  const currentLabel = VIEWS.find(v => pathname === v.path)?.label ?? t.notebook
-
-  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   function NavItems() {
     return (
       <nav className="flex-1 py-4 overflow-y-auto">
-        {VIEWS.map(v => (
+        {KNOWLEDGE_VIEWS.map(v => (
+          <NavLink
+            key={v.path}
+            to={v.path}
+            onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) =>
+              `w-full flex items-center gap-3 px-6 py-3 text-sm transition-colors text-left border-l-[3px] ${
+                isActive
+                  ? 'border-xero-green text-xero-green bg-xero-navy-light'
+                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'
+              }`
+            }
+          >
+            <span className="text-base w-5 text-center">{v.icon}</span>
+            <span className="font-medium">{v.label}</span>
+          </NavLink>
+        ))}
+
+        <div className="mx-6 my-2 border-t border-xero-navy-light" />
+
+        {TRACKER_VIEWS.map(v => (
           <NavLink
             key={v.path}
             to={v.path}
@@ -1378,7 +1408,7 @@ export function NotebookTab() {
       {/* Sidebar — desktop permanent, mobile overlay */}
       <aside className="hidden md:flex w-[220px] h-full bg-xero-navy flex-col flex-shrink-0">
         <div className="px-6 py-5 border-b border-xero-navy-light">
-          <p className="text-white font-bold text-lg tracking-tight">Notebook</p>
+          <p className="text-white font-bold text-lg tracking-tight">Workspace</p>
         </div>
         <NavItems />
       </aside>
@@ -1388,7 +1418,7 @@ export function NotebookTab() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
           <aside className="relative w-[220px] h-full bg-xero-navy flex flex-col shadow-2xl">
             <div className="px-6 py-5 border-b border-xero-navy-light">
-              <p className="text-white font-bold text-lg tracking-tight">{t.notebook}</p>
+              <p className="text-white font-bold text-lg tracking-tight">Workspace</p>
             </div>
             <NavItems />
           </aside>
@@ -1397,27 +1427,35 @@ export function NotebookTab() {
 
       {/* Content area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-xero-bg">
-        <header className="flex items-center gap-3 px-4 md:px-8 py-4 bg-white border-b border-xero-border flex-shrink-0">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <h1 className="text-xl font-semibold text-gray-900">{currentLabel}</h1>
-        </header>
+        {/* Inner header — only for knowledge views (trackers have their own) */}
+        {!isTracker && (
+          <header className="flex items-center gap-3 px-4 md:px-8 py-4 bg-white border-b border-xero-border flex-shrink-0">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 className="text-xl font-semibold text-gray-900">{currentLabel}</h1>
+          </header>
+        )}
         <div className="flex-1 overflow-hidden">
           <Routes>
             <Route path="notes"     element={<NotesView />} />
             <Route path="mindmap"   element={<MindmapView />} />
             <Route path="vocab"     element={<VocabView />} />
             <Route path="reminders" element={<RemindersView />} />
-            <Route path="*"         element={<Navigate to="/notebook/notes" replace />} />
+            <Route path="log/*"     element={<LogTab  onMenuClick={() => setSidebarOpen(true)} />} />
+            <Route path="meal/*"    element={<MealTab onMenuClick={() => setSidebarOpen(true)} />} />
+            <Route path="sport/*"   element={<SportTab onMenuClick={() => setSidebarOpen(true)} />} />
+            <Route path="*"         element={<Navigate to="/workspace/notes" replace />} />
           </Routes>
         </div>
       </div>
     </div>
   )
 }
+
+export { WorkspaceTab as NotebookTab }

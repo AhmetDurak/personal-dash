@@ -33,12 +33,9 @@ export function TopBar() {
   const [tokenCopied, setTokenCopied] = useState(false)
 
   const APPS = [
-    { to: () => '/finance/overview',                                                    label: t.finance,  isActive: (p: string) => p.startsWith('/finance') },
-    { to: () => localStorage.getItem('notebook:lastPath') ?? '/notebook/notes',         label: t.notebook, isActive: (p: string) => p.startsWith('/notebook') },
-    { to: () => '/log',                                                                 label: t.log,      isActive: (p: string) => p.startsWith('/log') },
-    { to: () => '/meal',                                                                label: t.meal,     isActive: (p: string) => p.startsWith('/meal') },
-    { to: () => '/sport',                                                               label: t.sport,    isActive: (p: string) => p.startsWith('/sport') },
-    { to: () => '/news',                                                                label: t.news,     isActive: (p: string) => p.startsWith('/news') },
+    { to: () => '/finance/overview',                                                      label: t.finance,   isActive: (p: string) => p.startsWith('/finance') },
+    { to: () => localStorage.getItem('workspace:lastPath') ?? '/workspace/notes',         label: t.workspace, isActive: (p: string) => p.startsWith('/workspace') },
+    { to: () => '/news',                                                                  label: t.news,      isActive: (p: string) => p.startsWith('/news') },
   ]
 
   async function copyMobileToken() {

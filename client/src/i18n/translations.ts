@@ -4,7 +4,7 @@ export const TRANSLATIONS = {
   en: {
     // nav
     finance: 'Finance',
-    notebook: 'Notebook',
+    workspace: 'Workspace',
     log: 'Log',
     meal: 'Meal',
     sport: 'Sport',
@@ -89,7 +89,7 @@ export const TRANSLATIONS = {
   },
   de: {
     finance: 'Finanzen',
-    notebook: 'Notizbuch',
+    workspace: 'Arbeitsbereich',
     log: 'Tagebuch',
     meal: 'Mahlzeit',
     sport: 'Sport',
@@ -165,7 +165,7 @@ export const TRANSLATIONS = {
   },
   tr: {
     finance: 'Finans',
-    notebook: 'Defter',
+    workspace: 'Alan',
     log: 'Günlük',
     meal: 'Yemek',
     sport: 'Spor',
