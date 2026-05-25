@@ -1262,7 +1262,7 @@ function VocabView() {
               </button>
             </div>
             {csvTooltipOpen && (
-              <div className="absolute top-full left-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
+              <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
                 <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
                   <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`word,translation,language,example\nApfel,Apple,de,Der Apfel ist rot 🍎\nWasser,Water,de,`}</code>
@@ -1271,7 +1271,7 @@ function VocabView() {
                     <p className="text-[10px] text-gray-300"><span className="text-white font-medium">language</span> — <code className="text-green-300">en</code> / <code className="text-green-300">de</code> / <code className="text-green-300">tr</code> (optional)</p>
                     <p className="text-[10px] text-gray-300"><span className="text-white font-medium">example</span> — text or emoji hint (optional)</p>
                   </div>
-                  <div className="absolute bottom-full left-4 border-4 border-transparent border-b-gray-900" />
+                  <div className="absolute bottom-full right-4 border-4 border-transparent border-b-gray-900" />
                 </div>
               </div>
             )}
