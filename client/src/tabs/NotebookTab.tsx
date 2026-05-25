@@ -275,6 +275,7 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
     } catch { /* ignore */ }
     return { x: 300, y: 300 }
   })
+  const [scale, setScale] = useState(1)
   const [isPanning, setIsPanning] = useState(false)
   const initialized = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -283,6 +284,7 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   const connectRef = useRef<{ sourceId: string; x: number; y: number; targetId: string | null; fromLeft?: boolean } | null>(null)
   const panRef = useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(null)
   const panStateRef = useRef({ x: pan.x, y: pan.y })
+  const scaleRef = useRef(1)
   const nodesRef = useRef<MMNode[]>([])
   const edgesRef = useRef<MMEdge[]>([])
   const titleRef = useRef(mmTitle)
@@ -298,6 +300,79 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
 useEffect(() => { nodesRef.current = nodes }, [nodes])
   useEffect(() => { edgesRef.current = edges }, [edges])
   useEffect(() => { titleRef.current = mmTitle }, [mmTitle])
+  useEffect(() => { scaleRef.current = scale }, [scale])
+
+  // Wheel zoom (desktop + trackpad) and two-finger pinch zoom (mobile)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    function handleWheel(e: WheelEvent) {
+      e.preventDefault()
+      // ctrlKey = trackpad pinch; otherwise mouse wheel
+      const delta = e.ctrlKey ? -e.deltaY * 0.01 : -e.deltaY * 0.002
+      const factor = Math.exp(delta)
+      const s = scaleRef.current
+      const newScale = Math.max(0.15, Math.min(5, s * factor))
+      const rect = svgRef.current!.getBoundingClientRect()
+      const cx = e.clientX - rect.left
+      const cy = e.clientY - rect.top
+      const newPan = {
+        x: panStateRef.current.x + (cx - panStateRef.current.x) * (1 - newScale / s),
+        y: panStateRef.current.y + (cy - panStateRef.current.y) * (1 - newScale / s),
+      }
+      scaleRef.current = newScale
+      setScale(newScale)
+      panStateRef.current = newPan
+      setPan(newPan)
+    }
+
+    let pinchInitDist = 0
+    let pinchInitScale = 1
+    let pinchInitPan = { x: 0, y: 0 }
+    let pinchMidX = 0
+    let pinchMidY = 0
+
+    function handleTouchStart(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        const [a, b] = [e.touches[0], e.touches[1]]
+        pinchInitDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY)
+        pinchInitScale = scaleRef.current
+        pinchInitPan = { ...panStateRef.current }
+        const rect = svgRef.current!.getBoundingClientRect()
+        pinchMidX = (a.clientX + b.clientX) / 2 - rect.left
+        pinchMidY = (a.clientY + b.clientY) / 2 - rect.top
+        panRef.current = null // cancel single-finger pan
+      }
+    }
+
+    function handleTouchMove(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        e.preventDefault()
+        const [a, b] = [e.touches[0], e.touches[1]]
+        const newDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY)
+        const newScale = Math.max(0.15, Math.min(5, pinchInitScale * (newDist / pinchInitDist)))
+        const ratio = newScale / pinchInitScale
+        const newPan = {
+          x: pinchInitPan.x + pinchMidX * (1 - ratio),
+          y: pinchInitPan.y + pinchMidY * (1 - ratio),
+        }
+        scaleRef.current = newScale
+        setScale(newScale)
+        panStateRef.current = newPan
+        setPan(newPan)
+      }
+    }
+
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    el.addEventListener('touchstart', handleTouchStart, { passive: true })
+    el.addEventListener('touchmove', handleTouchMove, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', handleWheel)
+      el.removeEventListener('touchstart', handleTouchStart)
+      el.removeEventListener('touchmove', handleTouchMove)
+    }
+  }, [])
 
   useEffect(() => {
     if (initialized.current || mindmap === undefined) return
@@ -340,7 +415,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return { x: clientX, y: clientY }
     const p = panStateRef.current
-    return { x: clientX - rect.left - p.x, y: clientY - rect.top - p.y }
+    const s = scaleRef.current
+    return { x: (clientX - rect.left - p.x) / s, y: (clientY - rect.top - p.y) / s }
   }
 
   function handleNodePointerDown(e: React.PointerEvent, id: string) {
@@ -513,8 +589,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
         >
           {/* Dot grid + arrow markers */}
           <defs>
-            <pattern id="dots" x={pan.x % 28} y={pan.y % 28} width="28" height="28" patternUnits="userSpaceOnUse">
-              <circle cx="14" cy="14" r="1" fill={dark ? '#334155' : '#CBD5E1'} />
+            <pattern id="dots" x={pan.x % (28 * scale)} y={pan.y % (28 * scale)} width={28 * scale} height={28 * scale} patternUnits="userSpaceOnUse">
+              <circle cx={14 * scale} cy={14 * scale} r={Math.max(0.5, scale)} fill={dark ? '#334155' : '#CBD5E1'} />
             </pattern>
             <marker id="arrowEnd" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
               <polygon points="0 0, 7 3.5, 0 7" fill="#94A3B8" />
@@ -532,8 +608,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
               panRef.current = { startX: e.clientX, startY: e.clientY, tx: panStateRef.current.x, ty: panStateRef.current.y }
             }}
           />
-          {/* World transform — all content pans together */}
-          <g transform={`translate(${pan.x},${pan.y})`}>
+          {/* World transform — all content pans + zooms together */}
+          <g transform={`translate(${pan.x},${pan.y}) scale(${scale})`}>
 
           {/* Parent-child connections — click to disconnect */}
           {nodes.map(n => {
@@ -678,23 +754,19 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
                   </text>
                 )}
 
-                {/* Left-side connection pin */}
+                {/* Left-side connection pin — large invisible hit area for touch */}
                 {showPin && (
-                  <circle
-                    cx={x} cy={y + NODE_H / 2} r={5}
-                    fill={color} stroke="white" strokeWidth={2}
-                    style={{ cursor: 'crosshair' }}
-                    onPointerDown={e => handlePinPointerDown(e, n.id, true)}
-                  />
+                  <g onPointerDown={e => handlePinPointerDown(e, n.id, true)} style={{ cursor: 'crosshair' }}>
+                    <circle cx={x} cy={y + NODE_H / 2} r={14} fill="transparent" />
+                    <circle cx={x} cy={y + NODE_H / 2} r={5} fill={color} stroke="white" strokeWidth={2} style={{ pointerEvents: 'none' }} />
+                  </g>
                 )}
-                {/* Right-side connection pin */}
+                {/* Right-side connection pin — large invisible hit area for touch */}
                 {showPin && (
-                  <circle
-                    cx={x + NODE_W} cy={y + NODE_H / 2} r={5}
-                    fill={color} stroke="white" strokeWidth={2}
-                    style={{ cursor: 'crosshair' }}
-                    onPointerDown={e => handlePinPointerDown(e, n.id, false)}
-                  />
+                  <g onPointerDown={e => handlePinPointerDown(e, n.id, false)} style={{ cursor: 'crosshair' }}>
+                    <circle cx={x + NODE_W} cy={y + NODE_H / 2} r={14} fill="transparent" />
+                    <circle cx={x + NODE_W} cy={y + NODE_H / 2} r={5} fill={color} stroke="white" strokeWidth={2} style={{ pointerEvents: 'none' }} />
+                  </g>
                 )}
               </g>
             )
