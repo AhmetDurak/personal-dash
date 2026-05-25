@@ -1067,7 +1067,7 @@ function VocabView() {
           <button
             onClick={() => csvInputRef.current?.click()}
             className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-            title="Import CSV: word,translation,language,example"
+            title={`Import CSV format:\nword,translation,language,example\n\nExample rows:\nApfel,Apple,de,Der Apfel ist rot 🍎\nWasser,Water,de,\n\n• word & translation are required\n• language: en | de | tr (optional)\n• example: text or emoji hint (optional)`}
           >
             {t.importCsv}
           </button>
