@@ -50,7 +50,7 @@ Priority: High / Medium / Low
 
 ---
 
-## TASK-007 — Mindmap Multi-Workspace
+## TASK-007 — Mindmap Multi-Workspace [DONE]
 
 **Difficulty:** 6/10
 **Priority:** Low
@@ -58,17 +58,6 @@ Priority: High / Medium / Low
 - Allow multiple saved mindmaps (currently only one per user)
 - Sidebar to switch between maps
 - Each map has its own title and canvas state
-
----
-
-## TASK-008 — Dark Mode [DONE]
-
-**Difficulty:** 5/10
-**Priority:** Low
-
-- Tailwind `dark:` classes across all components
-- Theme toggle (persisted to localStorage)
-- Mindmap canvas background and SVG edges adapt to dark theme
 
 ---
 

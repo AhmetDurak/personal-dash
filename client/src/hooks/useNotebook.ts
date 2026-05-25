@@ -1,4 +1,4 @@
-import useSWR from 'swr'
+import useSWR, { mutate as globalMutate } from 'swr'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -26,13 +26,16 @@ export interface MMEdge {
   bidirectional?: boolean
 }
 
-export interface Mindmap {
+export interface MindmapMeta {
   id: number
   title: string
-  nodes: MMNode[]
-  edges: MMEdge[]
   created_at: string
   updated_at: string
+}
+
+export interface Mindmap extends MindmapMeta {
+  nodes: MMNode[]
+  edges: MMEdge[]
 }
 
 export interface VocabCard {
@@ -94,24 +97,39 @@ export function useNotes() {
 
 // ─── Mindmap ──────────────────────────────────────────────────────────────────
 
-export function useMindmap() {
-  const { data, mutate } = useSWR<Mindmap | null>('/api/notebook/mindmaps', fetcher)
+export function useMindmapList() {
+  const { data, mutate, isLoading } = useSWR<MindmapMeta[]>('/api/notebook/mindmaps', fetcher)
+
+  async function createMindmap(title = 'New Map'): Promise<Mindmap> {
+    const res = await fetch('/api/notebook/mindmaps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    })
+    const m = await res.json() as Mindmap
+    await mutate()
+    return m
+  }
+
+  async function deleteMindmap(id: number) {
+    await fetch(`/api/notebook/mindmaps/${id}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { mindmaps: data ?? [], isLoading, createMindmap, deleteMindmap }
+}
+
+export function useMindmap(id: number) {
+  const { data, mutate } = useSWR<Mindmap | null>(`/api/notebook/mindmaps/${id}`, fetcher)
 
   async function saveMindmap(title: string, nodes: MMNode[], edges: MMEdge[] = []) {
-    if (data?.id) {
-      await fetch(`/api/notebook/mindmaps/${data.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, nodes, edges }),
-      })
-    } else {
-      await fetch('/api/notebook/mindmaps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, nodes, edges }),
-      })
-    }
+    await fetch(`/api/notebook/mindmaps/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, nodes, edges }),
+    })
     await mutate()
+    await globalMutate('/api/notebook/mindmaps')
   }
 
   return { mindmap: data, saveMindmap }

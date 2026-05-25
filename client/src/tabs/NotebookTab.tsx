@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { useNotes, useMindmap, useVocabulary, useAllReminders } from '../hooks/useNotebook'
+import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
@@ -225,10 +225,10 @@ function initPositions(raw: MMNode[]): MMNode[] {
   return raw.map(n => ({ ...n, x: n.x ?? (posMap.get(n.id)?.x ?? 100), y: n.y ?? (posMap.get(n.id)?.y ?? 100) }))
 }
 
-function MindmapView() {
+function MindmapCanvas({ mapId }: { mapId: number }) {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { mindmap, saveMindmap } = useMindmap()
+  const { mindmap, saveMindmap } = useMindmap(mapId)
   const [nodes, setNodes] = useState<MMNode[]>([])
   const [mmTitle, setMmTitle] = useState('My Mindmap')
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
@@ -707,6 +707,96 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
           confirmLabel="Delete"
           onConfirm={() => handleDelete(confirmDelete)}
           onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── MindmapView (multi-map picker + canvas) ─────────────────────────────────
+
+function MindmapView() {
+  const { mindmaps, isLoading, createMindmap, deleteMindmap } = useMindmapList()
+  const [selectedId, setSelectedId] = useState<number | null>(() => {
+    const s = localStorage.getItem('mindmap:selectedId')
+    return s ? Number(s) : null
+  })
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (mindmaps.length === 0) return
+    if (selectedId === null || !mindmaps.find(m => m.id === selectedId)) {
+      setSelectedId(mindmaps[0].id)
+    }
+  }, [mindmaps, selectedId])
+
+  useEffect(() => {
+    if (selectedId !== null) localStorage.setItem('mindmap:selectedId', String(selectedId))
+  }, [selectedId])
+
+  async function handleNew() {
+    const m = await createMindmap('New Map')
+    setSelectedId(m.id)
+  }
+
+  async function handleDelete(id: number) {
+    await deleteMindmap(id)
+    setConfirmDeleteId(null)
+    if (selectedId === id) setSelectedId(mindmaps.find(m => m.id !== id)?.id ?? null)
+  }
+
+  return (
+    <div className="flex h-full overflow-hidden">
+      {/* Map list panel */}
+      <div className="w-44 flex-shrink-0 flex flex-col bg-xero-navy border-r border-xero-navy-light">
+        <div className="px-3 py-3 border-b border-xero-navy-light flex items-center justify-between">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Maps</span>
+          <button
+            onClick={handleNew}
+            className="text-gray-400 hover:text-white transition-colors text-lg leading-none"
+            title="New map"
+          >+</button>
+        </div>
+        <div className="flex-1 overflow-y-auto py-1">
+          {isLoading && <p className="text-xs text-gray-500 px-3 py-2">Loading…</p>}
+          {mindmaps.map(m => (
+            <div
+              key={m.id}
+              onClick={() => setSelectedId(m.id)}
+              className={`group flex items-center justify-between px-3 py-2 cursor-pointer rounded mx-1 my-0.5 transition-colors ${
+                selectedId === m.id
+                  ? 'bg-xero-green/20 text-xero-green'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'
+              }`}
+            >
+              <span className="text-sm truncate flex-1">{m.title}</span>
+              <button
+                onClick={e => { e.stopPropagation(); setConfirmDeleteId(m.id) }}
+                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all leading-none ml-1 flex-shrink-0"
+              >×</button>
+            </div>
+          ))}
+          {!isLoading && mindmaps.length === 0 && (
+            <p className="text-xs text-gray-500 px-3 py-3">No maps yet.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Canvas */}
+      {selectedId !== null ? (
+        <MindmapCanvas key={selectedId} mapId={selectedId} />
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+          {isLoading ? 'Loading…' : 'Create a map to get started'}
+        </div>
+      )}
+
+      {confirmDeleteId !== null && (
+        <ConfirmDialog
+          message="This mindmap and all its nodes will be deleted."
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
         />
       )}
     </div>

@@ -142,3 +142,25 @@ A full plan exists at: `.claude/plans/dreamy-foraging-puppy.md`
 - 9abb49b chore: auto-commit session changes — 2026-05-25 09:33
 - d737c27 chore: auto-commit session changes — 2026-05-25 09:31
 
+
+## Completed from Backlog — 2026-05-25
+
+---
+
+## TASK-008 — Dark Mode
+
+**Difficulty:** 5/10
+**Priority:** Low
+
+- Tailwind `dark:` classes across all components
+- Theme toggle (persisted to localStorage)
+- Mindmap canvas background and SVG edges adapt to dark theme
+
+
+## Session — 2026-05-25 09:41
+
+### Commits
+- 9623863 chore: auto-commit session changes — 2026-05-25 09:35
+- 9abb49b chore: auto-commit session changes — 2026-05-25 09:33
+- d737c27 chore: auto-commit session changes — 2026-05-25 09:31
+

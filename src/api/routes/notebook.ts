@@ -46,15 +46,24 @@ export function notebookRouter(pool: Pool): Router {
   router.get('/mindmaps', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { rows } = await pool.query(
-      'SELECT * FROM mindmaps WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 1',
+      'SELECT id, title, created_at, updated_at FROM mindmaps WHERE user_id = $1 ORDER BY updated_at DESC',
       [uid]
+    )
+    res.json(rows)
+  })
+
+  router.get('/mindmaps/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      'SELECT * FROM mindmaps WHERE id=$1 AND user_id=$2',
+      [req.params.id, uid]
     )
     res.json(rows[0] ?? null)
   })
 
   router.post('/mindmaps', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { title = 'My Mindmap', nodes = [], edges = [] } = req.body as { title?: string; nodes?: unknown[]; edges?: unknown[] }
+    const { title = 'New Map', nodes = [], edges = [] } = req.body as { title?: string; nodes?: unknown[]; edges?: unknown[] }
     const { rows } = await pool.query(
       'INSERT INTO mindmaps (title, nodes, edges, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
       [title, JSON.stringify(nodes), JSON.stringify(edges), uid]
@@ -70,6 +79,12 @@ export function notebookRouter(pool: Pool): Router {
       [title, JSON.stringify(nodes), JSON.stringify(edges), req.params.id, uid]
     )
     res.json(rows[0] ?? null)
+  })
+
+  router.delete('/mindmaps/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    await pool.query('DELETE FROM mindmaps WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
   })
 
   // ─── Vocabulary ──────────────────────────────────────────────────────────────
