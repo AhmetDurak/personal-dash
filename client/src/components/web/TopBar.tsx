@@ -44,9 +44,11 @@ export function TopBar() {
   }, [userMenuOpen])
 
   const APPS = [
-    { to: () => '/finance/overview',                                                      label: t.finance,   isActive: (p: string) => p.startsWith('/finance') },
-    { to: () => localStorage.getItem('workspace:lastPath') ?? '/workspace/notes',         label: t.workspace, isActive: (p: string) => p.startsWith('/workspace') },
-    { to: () => '/news',                                                                  label: t.news,      isActive: (p: string) => p.startsWith('/news') },
+    { to: () => '/today',                                                               label: t.todayLabel, isActive: (p: string) => p.startsWith('/today') },
+    { to: () => '/finance/overview',                                                    label: t.finance,    isActive: (p: string) => p.startsWith('/finance') },
+    { to: () => localStorage.getItem('life:lastPath') ?? '/life/log',                  label: t.life,       isActive: (p: string) => p.startsWith('/life') },
+    { to: () => localStorage.getItem('learn:lastPath') ?? '/learn/notes',              label: t.learn,      isActive: (p: string) => p.startsWith('/learn') },
+    { to: () => '/news',                                                                label: t.news,       isActive: (p: string) => p.startsWith('/news') },
   ]
 
   async function copyMobileToken() {

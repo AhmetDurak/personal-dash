@@ -14,7 +14,8 @@ import { TransactionsTab } from './tabs/TransactionsTab'
 import { ETFTab } from './tabs/ETFTab'
 import { NewsTab } from './tabs/NewsTab'
 import { LearnTab } from './tabs/LearnTab'
-import { WorkspaceTab } from './tabs/NotebookTab'
+import { LearnSectionTab, LifeTab } from './tabs/NotebookTab'
+import { TodayTab } from './tabs/TodayTab'
 import { currentMonth } from './utils/format'
 import type { Span } from './components/web/BalanceChart'
 
@@ -79,14 +80,21 @@ export function App() {
         <TopBar />
         <div className="flex-1 overflow-hidden">
           <Routes>
-            <Route path="/workspace/*" element={<WorkspaceTab />} />
-            <Route path="/notebook/*"  element={<Navigate to="/workspace/notes" replace />} />
-            <Route path="/log/*"       element={<Navigate to="/workspace/log" replace />} />
-            <Route path="/meal/*"      element={<Navigate to="/workspace/meal" replace />} />
-            <Route path="/sport/*"     element={<Navigate to="/workspace/sport" replace />} />
+            <Route path="/today"       element={<TodayTab />} />
+            <Route path="/life/*"      element={<LifeTab />} />
+            <Route path="/learn/*"     element={<LearnSectionTab />} />
             <Route path="/news"        element={<NewsPage />} />
             <Route path="/finance/*"   element={<FinanceDashboard />} />
-            <Route path="*"            element={<Navigate to="/finance/overview" replace />} />
+            {/* Legacy redirects */}
+            <Route path="/workspace/log/*"   element={<Navigate to="/life/log" replace />} />
+            <Route path="/workspace/meal/*"  element={<Navigate to="/life/meal" replace />} />
+            <Route path="/workspace/sport/*" element={<Navigate to="/life/sport" replace />} />
+            <Route path="/workspace/reminders" element={<Navigate to="/life/reminders" replace />} />
+            <Route path="/workspace/notes"   element={<Navigate to="/learn/notes" replace />} />
+            <Route path="/workspace/mindmap" element={<Navigate to="/learn/mindmap" replace />} />
+            <Route path="/workspace/vocab"   element={<Navigate to="/learn/vocab" replace />} />
+            <Route path="/workspace/*"       element={<Navigate to="/learn/notes" replace />} />
+            <Route path="*"            element={<Navigate to="/today" replace />} />
           </Routes>
         </div>
       </div>

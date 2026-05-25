@@ -5,6 +5,8 @@ export const TRANSLATIONS = {
     // nav
     finance: 'Finance',
     workspace: 'Workspace',
+    life: 'Life',
+    learn: 'Learn',
     log: 'Log',
     meal: 'Meal',
     sport: 'Sport',
@@ -116,6 +118,8 @@ export const TRANSLATIONS = {
   de: {
     finance: 'Finanzen',
     workspace: 'Arbeitsbereich',
+    life: 'Leben',
+    learn: 'Lernen',
     log: 'Tagebuch',
     meal: 'Mahlzeit',
     sport: 'Sport',
@@ -215,6 +219,8 @@ export const TRANSLATIONS = {
   tr: {
     finance: 'Finans',
     workspace: 'Alan',
+    life: 'Hayat',
+    learn: 'Öğren',
     log: 'Günlük',
     meal: 'Yemek',
     sport: 'Spor',

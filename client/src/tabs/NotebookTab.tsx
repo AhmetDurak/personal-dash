@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
@@ -1545,58 +1545,43 @@ function RemindersView() {
   )
 }
 
-// ─── WorkspaceTab ─────────────────────────────────────────────────────────────
+// ─── Shared section shell ─────────────────────────────────────────────────────
 
-const TRACKER_PATHS = ['/workspace/log', '/workspace/meal', '/workspace/sport']
+interface SectionView {
+  path: string
+  label: string
+  icon: string
+}
 
-export function WorkspaceTab() {
+function SectionShell({
+  title,
+  views,
+  trackerPaths,
+  defaultRedirect,
+  children,
+  storageKey,
+}: {
+  title: string
+  views: SectionView[]
+  trackerPaths: string[]
+  defaultRedirect: string
+  children: (openSidebar: () => void) => ReactNode
+  storageKey: string
+}) {
   const { pathname } = useLocation()
-  const { t } = useLanguage()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const KNOWLEDGE_VIEWS = [
-    { path: '/workspace/notes',     label: t.notes,     icon: '📓' },
-    { path: '/workspace/mindmap',   label: t.mindmap,   icon: '🧠' },
-    { path: '/workspace/vocab',     label: t.vocab,     icon: '📚' },
-    { path: '/workspace/reminders', label: t.reminders, icon: '📝' },
-  ]
-  const TRACKER_VIEWS = [
-    { path: '/workspace/log',   label: t.log,   icon: '📔' },
-    { path: '/workspace/meal',  label: t.meal,  icon: '🍽️' },
-    { path: '/workspace/sport', label: t.sport, icon: '💪' },
-  ]
-
-  const isTracker = TRACKER_PATHS.some(p => pathname.startsWith(p))
-  const currentLabel = KNOWLEDGE_VIEWS.find(v => pathname === v.path)?.label ?? t.workspace
+  const isTracker  = trackerPaths.some(p => pathname.startsWith(p))
+  const currentLabel = views.find(v => pathname.startsWith(v.path))?.label ?? title
 
   useEffect(() => {
-    localStorage.setItem('workspace:lastPath', pathname)
-  }, [pathname])
+    localStorage.setItem(storageKey, pathname)
+  }, [pathname, storageKey])
 
   function NavItems() {
     return (
       <nav className="flex-1 py-4 overflow-y-auto">
-        {KNOWLEDGE_VIEWS.map(v => (
-          <NavLink
-            key={v.path}
-            to={v.path}
-            onClick={() => setSidebarOpen(false)}
-            className={({ isActive }) =>
-              `w-full flex items-center gap-3 px-6 py-3 text-sm transition-colors text-left border-l-[3px] ${
-                isActive
-                  ? 'border-xero-green text-xero-green bg-xero-navy-light'
-                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'
-              }`
-            }
-          >
-            <span className="text-base w-5 text-center">{v.icon}</span>
-            <span className="font-medium">{v.label}</span>
-          </NavLink>
-        ))}
-
-        <div className="mx-6 my-2 border-t border-xero-navy-light" />
-
-        {TRACKER_VIEWS.map(v => (
+        {views.map(v => (
           <NavLink
             key={v.path}
             to={v.path}
@@ -1619,10 +1604,9 @@ export function WorkspaceTab() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Sidebar — desktop permanent, mobile overlay */}
       <aside className="hidden md:flex w-[220px] h-full bg-xero-navy flex-col flex-shrink-0">
         <div className="px-6 py-5 border-b border-xero-navy-light">
-          <p className="text-white font-bold text-lg tracking-tight">{t.workspace}</p>
+          <p className="text-white font-bold text-lg tracking-tight">{title}</p>
         </div>
         <NavItems />
       </aside>
@@ -1632,16 +1616,14 @@ export function WorkspaceTab() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
           <aside className="relative w-[220px] h-full bg-xero-navy flex flex-col shadow-2xl">
             <div className="px-6 py-5 border-b border-xero-navy-light">
-              <p className="text-white font-bold text-lg tracking-tight">{t.workspace}</p>
+              <p className="text-white font-bold text-lg tracking-tight">{title}</p>
             </div>
             <NavItems />
           </aside>
         </div>
       )}
 
-      {/* Content area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-xero-bg">
-        {/* Inner header — only for knowledge views (trackers have their own) */}
         {!isTracker && (
           <header className="flex items-center gap-3 px-4 md:px-8 py-4 bg-white border-b border-xero-border flex-shrink-0">
             <button
@@ -1657,14 +1639,8 @@ export function WorkspaceTab() {
         )}
         <div className="flex-1 overflow-hidden">
           <Routes>
-            <Route path="notes"     element={<NotesView />} />
-            <Route path="mindmap"   element={<MindmapView />} />
-            <Route path="vocab"     element={<VocabView />} />
-            <Route path="reminders" element={<RemindersView />} />
-            <Route path="log/*"     element={<LogTab  onMenuClick={() => setSidebarOpen(true)} />} />
-            <Route path="meal/*"    element={<MealTab onMenuClick={() => setSidebarOpen(true)} />} />
-            <Route path="sport/*"   element={<SportTab onMenuClick={() => setSidebarOpen(true)} />} />
-            <Route path="*"         element={<Navigate to="/workspace/notes" replace />} />
+            {children(() => setSidebarOpen(true))}
+            <Route path="*" element={<Navigate to={defaultRedirect} replace />} />
           </Routes>
         </div>
       </div>
@@ -1672,4 +1648,71 @@ export function WorkspaceTab() {
   )
 }
 
+// ─── Learn tab (Notes · Mindmap · Vocab) ──────────────────────────────────────
+
+export function LearnSectionTab() {
+  const { t } = useLanguage()
+
+  const VIEWS: SectionView[] = [
+    { path: '/learn/notes',   label: t.notes,   icon: '📓' },
+    { path: '/learn/mindmap', label: t.mindmap, icon: '🧠' },
+    { path: '/learn/vocab',   label: t.vocab,   icon: '📚' },
+  ]
+
+  return (
+    <SectionShell
+      title={t.learn}
+      views={VIEWS}
+      trackerPaths={[]}
+      defaultRedirect="/learn/notes"
+      storageKey="learn:lastPath"
+    >
+      {() => (
+        <>
+          <Route path="notes"   element={<NotesView />} />
+          <Route path="mindmap" element={<MindmapView />} />
+          <Route path="vocab"   element={<VocabView />} />
+        </>
+      )}
+    </SectionShell>
+  )
+}
+
+// ─── Life tab (Log · Meal · Sport · Reminders) ────────────────────────────────
+
+const LIFE_TRACKER_PATHS = ['/life/log', '/life/meal', '/life/sport']
+
+export function LifeTab() {
+  const { t } = useLanguage()
+
+  const VIEWS: SectionView[] = [
+    { path: '/life/log',       label: t.log,       icon: '📔' },
+    { path: '/life/meal',      label: t.meal,      icon: '🍽️' },
+    { path: '/life/sport',     label: t.sport,     icon: '💪' },
+    { path: '/life/reminders', label: t.reminders, icon: '📝' },
+  ]
+
+  return (
+    <SectionShell
+      title={t.life}
+      views={VIEWS}
+      trackerPaths={LIFE_TRACKER_PATHS}
+      defaultRedirect="/life/log"
+      storageKey="life:lastPath"
+    >
+      {(openSidebar) => (
+        <>
+          <Route path="log/*"     element={<LogTab  onMenuClick={openSidebar} />} />
+          <Route path="meal/*"    element={<MealTab onMenuClick={openSidebar} />} />
+          <Route path="sport/*"   element={<SportTab onMenuClick={openSidebar} />} />
+          <Route path="reminders" element={<RemindersView />} />
+        </>
+      )}
+    </SectionShell>
+  )
+}
+
+// ─── Legacy alias ─────────────────────────────────────────────────────────────
+
+export function WorkspaceTab() { return <LearnSectionTab /> }
 export { WorkspaceTab as NotebookTab }
