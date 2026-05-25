@@ -69,24 +69,26 @@ export function TopBar() {
         <span className="hidden sm:inline text-sm font-semibold text-white tracking-tight">Personal Dashboard</span>
       </div>
 
-      {/* App switcher */}
-      {APPS.map(app => {
-        const active = app.isActive(pathname)
-        const href   = app.to()
-        return (
-          <Link
-            key={href}
-            to={href}
-            className={`px-2.5 md:px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
-              active
-                ? 'bg-white/10 text-white'
-                : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
-            }`}
-          >
-            {app.label}
-          </Link>
-        )
-      })}
+      {/* App switcher — scrollable on mobile */}
+      <div className="flex-1 flex overflow-x-auto min-w-0" style={{ scrollbarWidth: 'none' }}>
+        {APPS.map(app => {
+          const active = app.isActive(pathname)
+          const href   = app.to()
+          return (
+            <Link
+              key={href}
+              to={href}
+              className={`flex-shrink-0 px-2.5 md:px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
+                active
+                  ? 'bg-white/10 text-white'
+                  : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
+              }`}
+            >
+              {app.label}
+            </Link>
+          )
+        })}
+      </div>
 
       {/* Right side */}
       <div className="ml-auto flex items-center gap-1">

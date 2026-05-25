@@ -342,7 +342,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
         const rect = svgRef.current!.getBoundingClientRect()
         pinchMidX = (a.clientX + b.clientX) / 2 - rect.left
         pinchMidY = (a.clientY + b.clientY) / 2 - rect.top
-        panRef.current = null // cancel single-finger pan
+        panRef.current = null   // cancel single-finger pan
+        dragRef.current = null  // cancel any active node drag
       }
     }
 
@@ -573,10 +574,16 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       <div
         ref={containerRef}
         className={`h-full overflow-hidden ${dark ? 'bg-[#0F172A]' : 'bg-[#F8FAFC]'}`}
-        style={{ cursor: isPanning ? 'grabbing' : 'default' }}
+        style={{ cursor: isPanning ? 'grabbing' : 'default', touchAction: 'none' }}
         onPointerMove={handleSvgPointerMove}
         onPointerUp={handleSvgPointerUp}
-        onPointerLeave={handleSvgPointerUp}
+        onPointerLeave={() => {
+          // Only cancel pan on leave — do NOT clear selectedForConnect.
+          // On mobile, pointerleave fires immediately after pointerup, which
+          // would wipe out the just-set selectedForConnect if we ran the full handler.
+          if (panRef.current) { panRef.current = null; setIsPanning(false) }
+          if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+        }}
         onClick={() => setCtxMenu(null)}
         onContextMenu={e => e.preventDefault()}
       >
