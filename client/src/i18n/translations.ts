@@ -105,6 +105,13 @@ export const TRANSLATIONS = {
     retentionLabel: 'Retention',
     forgettingCurve: 'Forgetting curve',
     reviewThreshold: 'review threshold',
+    // plan
+    todayPlan: "Today's Plan",
+    planLabel: 'Plan',
+    addTask: 'Add task…',
+    noTasksYet: 'No tasks yet. Add your first task!',
+    motivationalNotes: 'Motivational notes',
+    motivationalNotesPlaceholder: 'Write something to keep yourself motivated…',
   },
   de: {
     finance: 'Finanzen',
@@ -198,6 +205,12 @@ export const TRANSLATIONS = {
     retentionLabel: 'Behaltensrate',
     forgettingCurve: 'Vergessenskurve',
     reviewThreshold: 'Wiederholungsschwelle',
+    todayPlan: 'Tagesplan',
+    planLabel: 'Plan',
+    addTask: 'Aufgabe hinzufügen…',
+    noTasksYet: 'Noch keine Aufgaben. Füge deine erste Aufgabe hinzu!',
+    motivationalNotes: 'Motivationsnotizen',
+    motivationalNotesPlaceholder: 'Schreibe etwas, das dich motiviert…',
   },
   tr: {
     finance: 'Finans',
@@ -291,6 +304,12 @@ export const TRANSLATIONS = {
     retentionLabel: 'Hafıza Gücü',
     forgettingCurve: 'Unutma Eğrisi',
     reviewThreshold: 'tekrar eşiği',
+    todayPlan: 'Günün Planı',
+    planLabel: 'Plan',
+    addTask: 'Görev ekle…',
+    noTasksYet: 'Henüz görev yok. İlk görevinizi ekleyin!',
+    motivationalNotes: 'Motivasyon notları',
+    motivationalNotesPlaceholder: 'Kendinizi motive etmek için bir şeyler yazın…',
   },
 }
 

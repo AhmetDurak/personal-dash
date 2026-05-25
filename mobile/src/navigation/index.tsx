@@ -6,12 +6,13 @@ import { TransactionsScreen } from '../screens/TransactionsScreen'
 import { ChartsScreen } from '../screens/ChartsScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
 import { SportScreen } from '../screens/SportScreen'
+import { LogScreen } from '../screens/LogScreen'
 import { currentMonth, prevMonth, nextMonth, formatMonth } from '../utils/format'
 
 const Tab = createBottomTabNavigator()
 
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  const icons: Record<string, string> = { Overview: '⊡', Transactions: '≡', Charts: '∿', Sport: '💪', Profile: '◉' }
+  const icons: Record<string, string> = { Overview: '⊡', Transactions: '≡', Charts: '∿', Log: '📓', Sport: '💪', Profile: '◉' }
   return (
     <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.45 }}>
       {icons[label] ?? '●'}
@@ -83,6 +84,7 @@ export function AppNavigator() {
           </>
         )}
       </Tab.Screen>
+      <Tab.Screen name="Log" component={LogScreen} />
       <Tab.Screen name="Sport" component={SportScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

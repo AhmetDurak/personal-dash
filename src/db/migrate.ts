@@ -184,6 +184,17 @@ CREATE TABLE IF NOT EXISTS fitness_targets (
   current_value NUMERIC NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS daily_plans (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER REFERENCES users(id),
+  date       DATE NOT NULL,
+  tasks      JSONB NOT NULL DEFAULT '[]',
+  notes      TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, date)
+);
 `
 
 export async function migrate() {
