@@ -118,13 +118,17 @@ function Dashboard() {
 // ─── Exercises view ───────────────────────────────────────────────────────────
 
 function ExercisesView() {
-  const { exercises, isLoading, addExercise, deleteExercise } = useExercises()
+  const { exercises, isLoading, addExercise, updateExercise, deleteExercise } = useExercises()
   const [typeFilter, setTypeFilter] = useState<ExerciseType | null>(null)
   const [muscleFilter, setMuscleFilter] = useState<MuscleGroup | null>(null)
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [form, setForm] = useState<{ name: string; type: ExerciseType; muscle_groups: MuscleGroup[]; description: string }>({
+    name: '', type: 'calisthenics', muscle_groups: [], description: '',
+  })
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState<{ name: string; type: ExerciseType; muscle_groups: MuscleGroup[]; description: string }>({
     name: '', type: 'calisthenics', muscle_groups: [], description: '',
   })
 
@@ -142,8 +146,24 @@ function ExercisesView() {
     setShowAdd(false)
   }
 
+  async function handleEditSave(ev: React.FormEvent) {
+    ev.preventDefault()
+    if (!editForm.name.trim() || editingId === null) return
+    await updateExercise(editingId, { ...editForm, description: editForm.description || undefined })
+    setEditingId(null)
+  }
+
   function toggleMuscle(m: MuscleGroup) {
     setForm(p => ({
+      ...p,
+      muscle_groups: p.muscle_groups.includes(m)
+        ? p.muscle_groups.filter(x => x !== m)
+        : [...p.muscle_groups, m],
+    }))
+  }
+
+  function toggleEditMuscle(m: MuscleGroup) {
+    setEditForm(p => ({
       ...p,
       muscle_groups: p.muscle_groups.includes(m)
         ? p.muscle_groups.filter(x => x !== m)
@@ -216,10 +236,17 @@ function ExercisesView() {
           const typeInfo = EXERCISE_TYPES.find(t => t.id === ex.type)
           return (
             <div key={ex.id} className="bg-white rounded-xl border border-gray-100 p-4 group hover:shadow-sm transition-shadow relative">
-              <button onClick={() => setConfirmId(ex.id)}
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all leading-none text-base">
-                ×
-              </button>
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button
+                  onClick={() => { setEditingId(ex.id); setEditForm({ name: ex.name, type: ex.type, muscle_groups: [...ex.muscle_groups], description: ex.description ?? '' }) }}
+                  className="text-gray-300 hover:text-blue-400 transition-colors leading-none text-sm px-1"
+                  title="Edit"
+                >✎</button>
+                <button onClick={() => setConfirmId(ex.id)}
+                  className="text-gray-300 hover:text-red-400 transition-colors leading-none text-base">
+                  ×
+                </button>
+              </div>
               <div className="flex items-start gap-2 mb-2">
                 <span className="text-lg">{typeInfo?.icon}</span>
                 <div>
@@ -251,6 +278,44 @@ function ExercisesView() {
       {filtered.length === 0 && !isLoading && (
         <p className="text-sm text-gray-400 text-center py-12">No exercises. Add your first one!</p>
       )}
+
+      {/* Edit modal */}
+      {editingId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditingId(null)}>
+          <form onSubmit={handleEditSave} className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-3" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-gray-800">Edit Exercise</p>
+            <div className="flex flex-wrap gap-3">
+              <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="Exercise name *"
+                className="text-sm border border-gray-200 rounded-lg px-3 py-2 flex-1 min-w-[180px] focus:outline-none focus:ring-1 focus:ring-xero-green" />
+              <select value={editForm.type} onChange={e => setEditForm(p => ({ ...p, type: e.target.value as ExerciseType }))}
+                className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none">
+                {EXERCISE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wide mb-1.5">Muscle groups</p>
+              <div className="flex flex-wrap gap-1.5">
+                {MUSCLE_GROUPS.map(m => (
+                  <button key={m} type="button" onClick={() => toggleEditMuscle(m)}
+                    className={`text-xs px-2.5 py-1 rounded-full capitalize transition-colors ${
+                      editForm.muscle_groups.includes(m) ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600'
+                    }`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <input value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
+              placeholder="Description (optional)"
+              className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green" />
+            <div className="flex gap-2 pt-1">
+              <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">Save</button>
+              <button type="button" onClick={() => setEditingId(null)} className="flex-1 text-sm bg-gray-100 text-gray-600 py-2 rounded-lg font-medium">Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }
@@ -260,7 +325,7 @@ function ExercisesView() {
 function LogWorkout() {
   const month = currentMonth()
   const { templates } = useTemplates()
-  const { logs, logWorkout } = useWorkoutLogs(month)
+  const { logs, logWorkout, updateLog, deleteLog } = useWorkoutLogs(month)
   const { exercises } = useExercises()
   const [templateId, setTemplateId] = useState<number | null>(null)
   const [date, setDate] = useState(todayStr())
@@ -268,6 +333,27 @@ function LogWorkout() {
   const [notes, setNotes] = useState('')
   const [sets, setSets] = useState<WorkoutSetGroup[]>([])
   const [saved, setSaved] = useState(false)
+  const [editingLogId, setEditingLogId] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+
+  function loadLogForEdit(log: (typeof logs)[0]) {
+    setEditingLogId(log.id)
+    setDate(log.date)
+    setDurationMin(log.duration_min ? String(log.duration_min) : '')
+    setNotes(log.notes ?? '')
+    setSets(log.sets.map(g => ({ ...g, sets: g.sets.map(s => ({ ...s })) })))
+    setTemplateId(log.template_id)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelEdit() {
+    setEditingLogId(null)
+    setDate(todayStr())
+    setDurationMin('')
+    setNotes('')
+    setSets([])
+    setTemplateId(null)
+  }
 
   const template = templates.find(t => t.id === templateId)
 
@@ -299,17 +385,23 @@ function LogWorkout() {
   }
 
   async function handleSave() {
-    await logWorkout({
+    const payload = {
       template_id: templateId ?? undefined,
       date,
       sets,
       notes: notes.trim() || undefined,
       duration_min: durationMin ? Number(durationMin) : undefined,
-    })
-    setSets([])
-    setNotes('')
-    setDurationMin('')
-    setTemplateId(null)
+    }
+    if (editingLogId !== null) {
+      await updateLog(editingLogId, payload)
+      cancelEdit()
+    } else {
+      await logWorkout(payload)
+      setSets([])
+      setNotes('')
+      setDurationMin('')
+      setTemplateId(null)
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
@@ -389,8 +481,13 @@ function LogWorkout() {
       <div className="flex items-center gap-3">
         <button onClick={handleSave} disabled={sets.length === 0}
           className="text-sm bg-xero-green text-white px-6 py-2.5 rounded-xl font-medium hover:bg-xero-green-dark transition-colors disabled:opacity-40">
-          Save workout
+          {editingLogId !== null ? 'Update workout' : 'Save workout'}
         </button>
+        {editingLogId !== null && (
+          <button onClick={cancelEdit} className="text-sm text-gray-400 hover:text-gray-600 px-2">
+            Cancel edit
+          </button>
+        )}
         {saved && <span className="text-sm text-xero-green font-medium">Saved!</span>}
       </div>
 
@@ -400,14 +497,29 @@ function LogWorkout() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">This month</p>
           <div className="space-y-2">
             {logs.map(log => (
-              <div key={log.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3">
+              <div key={log.id} className={`bg-white rounded-xl border px-4 py-3 group relative ${editingLogId === log.id ? 'border-xero-green/50 ring-1 ring-xero-green/30' : 'border-gray-100'}`}>
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-sm font-semibold text-gray-800">
                     {new Date(log.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
+                    {editingLogId === log.id && <span className="ml-2 text-[10px] text-xero-green font-medium">editing</span>}
                   </p>
-                  {log.duration_min && <span className="text-xs text-gray-400">{log.duration_min} min</span>}
+                  <div className="flex items-center gap-2">
+                    {log.duration_min && <span className="text-xs text-gray-400">{log.duration_min} min</span>}
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <button onClick={() => loadLogForEdit(log)} className="text-gray-300 hover:text-blue-400 transition-colors text-sm px-1" title="Edit">✎</button>
+                      <button onClick={() => setConfirmDeleteId(log.id)} className="text-gray-300 hover:text-red-400 transition-colors leading-none text-base" title="Delete">×</button>
+                    </div>
+                  </div>
                 </div>
                 <p className="text-xs text-gray-400">{log.sets.map(g => `${g.exercise_name} ×${g.sets.length}`).join(' · ')}</p>
+                {confirmDeleteId === log.id && (
+                  <ConfirmDialog
+                    message="This workout log will be deleted."
+                    confirmLabel="Delete"
+                    onConfirm={() => { deleteLog(log.id); setConfirmDeleteId(null); if (editingLogId === log.id) cancelEdit() }}
+                    onCancel={() => setConfirmDeleteId(null)}
+                  />
+                )}
               </div>
             ))}
           </div>

@@ -25,6 +25,16 @@ export function sportRouter(pool: Pool): Router {
     res.json(rows[0])
   })
 
+  router.put('/exercises/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { name, type, muscle_groups = [], description } = req.body
+    const { rows } = await pool.query(
+      'UPDATE exercises SET name=$1, type=$2, muscle_groups=$3, description=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
+      [name, type, muscle_groups, description ?? null, req.params.id, uid]
+    )
+    res.json(rows[0] ?? {})
+  })
+
   router.delete('/exercises/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     await pool.query('DELETE FROM exercises WHERE id=$1 AND user_id=$2', [req.params.id, uid])
@@ -96,6 +106,22 @@ export function sportRouter(pool: Pool): Router {
       [uid, template_id ?? null, date, JSON.stringify(sets), notes ?? null, duration_min ?? null]
     )
     res.json(rows[0])
+  })
+
+  router.put('/logs/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { template_id, date, sets = [], notes, duration_min } = req.body
+    const { rows } = await pool.query(
+      'UPDATE workout_logs SET date=$1, sets=$2, notes=$3, duration_min=$4, template_id=$5 WHERE id=$6 AND user_id=$7 RETURNING *',
+      [date, JSON.stringify(sets), notes ?? null, duration_min ?? null, template_id ?? null, req.params.id, uid]
+    )
+    res.json(rows[0] ?? {})
+  })
+
+  router.delete('/logs/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    await pool.query('DELETE FROM workout_logs WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
   })
 
   // ─── Targets ──────────────────────────────────────────────────────────────

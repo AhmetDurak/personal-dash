@@ -72,12 +72,21 @@ export function useExercises() {
     await mutate()
   }
 
+  async function updateExercise(id: number, payload: { name: string; type: ExerciseType; muscle_groups: MuscleGroup[]; description?: string }) {
+    await fetch(`/api/sport/exercises/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    await mutate()
+  }
+
   async function deleteExercise(id: number) {
     await fetch(`/api/sport/exercises/${id}`, { method: 'DELETE' })
     await mutate()
   }
 
-  return { exercises: data ?? [], isLoading, addExercise, deleteExercise }
+  return { exercises: data ?? [], isLoading, addExercise, updateExercise, deleteExercise }
 }
 
 // ─── Templates ────────────────────────────────────────────────────────────────
@@ -125,7 +134,21 @@ export function useWorkoutLogs(month: string) {
     await mutate()
   }
 
-  return { logs: data ?? [], logWorkout }
+  async function updateLog(id: number, payload: { template_id?: number; date: string; sets: WorkoutSetGroup[]; notes?: string; duration_min?: number }) {
+    await fetch(`/api/sport/logs/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    await mutate()
+  }
+
+  async function deleteLog(id: number) {
+    await fetch(`/api/sport/logs/${id}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { logs: data ?? [], logWorkout, updateLog, deleteLog }
 }
 
 // ─── Targets ──────────────────────────────────────────────────────────────────
