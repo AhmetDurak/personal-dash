@@ -1371,8 +1371,27 @@ function VocabView() {
                 </div>
               )}
             </div>
-            {/* Retention decay bar */}
-            {(() => {
+            {/* Footer: rating buttons when flipped, retention bar when front */}
+            {flippedCards.has(card.id) ? (
+              <div className="mt-2 pt-1.5 border-t border-gray-50">
+                <p className="text-[9px] text-gray-400 mb-1.5 text-center">How well did you know it?</p>
+                <div className="flex gap-1">
+                  {([
+                    { q: 2, label: t.hard, cls: 'bg-red-50 text-red-600 hover:bg-red-100' },
+                    { q: 4, label: t.good, cls: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
+                    { q: 5, label: t.easy, cls: 'bg-sky-50 text-sky-600 hover:bg-sky-100' },
+                  ] as const).map(({ q, label, cls }) => (
+                    <button
+                      key={q}
+                      onClick={e => { e.stopPropagation(); review(card.id, q); toggleFlip(card.id) }}
+                      className={`flex-1 text-[10px] font-semibold py-1.5 rounded-lg transition-colors ${cls}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (() => {
               const pct = retentionPct(card)
               const color = pct >= 90 ? '#10B981' : pct >= 70 ? '#F59E0B' : '#EF4444'
               return (
