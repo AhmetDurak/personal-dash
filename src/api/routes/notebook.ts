@@ -100,30 +100,30 @@ export function notebookRouter(pool: Pool): Router {
 
   router.post('/vocabulary', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { word, translation, language = 'de', image_url, example } = req.body as {
-      word: string; translation: string; language?: string; image_url?: string; example?: string
+    const { word, translation, language = 'de', translation_language = 'tr', image_url, example } = req.body as {
+      word: string; translation: string; language?: string; translation_language?: string; image_url?: string; example?: string
     }
     if (!word?.trim() || !translation?.trim()) {
       res.status(400).json({ error: 'word and translation required' }); return
     }
     const { rows } = await pool.query(
-      'INSERT INTO vocabulary (word, translation, language, image_url, example, user_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-      [word.trim(), translation.trim(), language, image_url ?? null, example ?? null, uid]
+      'INSERT INTO vocabulary (word, translation, language, translation_language, image_url, example, user_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+      [word.trim(), translation.trim(), language, translation_language, image_url ?? null, example ?? null, uid]
     )
     res.json(rows[0])
   })
 
   router.post('/vocabulary/bulk', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const items = (req.body as { items: { word: string; translation: string; language?: string; example?: string }[] }).items ?? []
+    const items = (req.body as { items: { word: string; translation: string; language?: string; translation_language?: string; example?: string }[] }).items ?? []
     const valid = items.filter(i => i.word?.trim() && i.translation?.trim())
     if (!valid.length) { res.json({ inserted: 0 }); return }
-    const values = valid.map((_, i) => `($${i * 5 + 1},$${i * 5 + 2},$${i * 5 + 3},$${i * 5 + 4},$${i * 5 + 5})`).join(',')
+    const values = valid.map((_, i) => `($${i * 6 + 1},$${i * 6 + 2},$${i * 6 + 3},$${i * 6 + 4},$${i * 6 + 5},$${i * 6 + 6})`).join(',')
     const params: (string | null)[] = valid.flatMap(i => [
-      i.word.trim(), i.translation.trim(), i.language ?? 'de', i.example?.trim() ?? null, String(uid),
+      i.word.trim(), i.translation.trim(), i.language ?? 'de', i.translation_language ?? 'tr', i.example?.trim() ?? null, String(uid),
     ])
     await pool.query(
-      `INSERT INTO vocabulary (word, translation, language, example, user_id) VALUES ${values}`,
+      `INSERT INTO vocabulary (word, translation, language, translation_language, example, user_id) VALUES ${values}`,
       params
     )
     res.json({ inserted: valid.length })
@@ -143,12 +143,12 @@ export function notebookRouter(pool: Pool): Router {
 
   router.put('/vocabulary/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { word, translation, language, image_url, example } = req.body as {
-      word: string; translation: string; language: string; image_url?: string; example?: string
+    const { word, translation, language, translation_language = 'tr', image_url, example } = req.body as {
+      word: string; translation: string; language: string; translation_language?: string; image_url?: string; example?: string
     }
     const { rows } = await pool.query(
-      'UPDATE vocabulary SET word=$1, translation=$2, language=$3, image_url=$4, example=$5 WHERE id=$6 AND user_id=$7 RETURNING *',
-      [word, translation, language, image_url ?? null, example ?? null, req.params.id, uid]
+      'UPDATE vocabulary SET word=$1, translation=$2, language=$3, translation_language=$4, image_url=$5, example=$6 WHERE id=$7 AND user_id=$8 RETURNING *',
+      [word, translation, language, translation_language, image_url ?? null, example ?? null, req.params.id, uid]
     )
     res.json(rows[0] ?? null)
   })

@@ -43,6 +43,7 @@ export interface VocabCard {
   word: string
   translation: string
   language: string
+  translation_language: string
   image_url: string | null
   example: string | null
   interval: number
@@ -140,7 +141,7 @@ export function useMindmap(id: number) {
 export function useVocabulary() {
   const { data, mutate, isLoading } = useSWR<VocabCard[]>('/api/notebook/vocabulary', fetcher)
 
-  async function addWord(payload: { word: string; translation: string; language: string; example?: string }) {
+  async function addWord(payload: { word: string; translation: string; language: string; translation_language?: string; example?: string }) {
     await fetch('/api/notebook/vocabulary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -174,7 +175,7 @@ export function useVocabulary() {
     await mutate()
   }
 
-  async function updateWord(id: number, payload: { word: string; translation: string; language: string; example?: string; image_url?: string }) {
+  async function updateWord(id: number, payload: { word: string; translation: string; language: string; translation_language?: string; example?: string; image_url?: string }) {
     await fetch(`/api/notebook/vocabulary/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

@@ -1025,9 +1025,9 @@ const LANG_LABELS: Record<string, string> = {
   de: '🇩🇪 DE', en: '🇬🇧 EN', tr: '🇹🇷 TR', fr: '🇫🇷 FR', es: '🇪🇸 ES', ja: '🇯🇵 JA',
 }
 
-type NewWord = { word: string; translation: string; language: string; example: string }
+type NewWord = { word: string; translation: string; language: string; translation_language: string; example: string }
 
-type EditCard = { id: number; word: string; translation: string; language: string; example: string; image_url: string }
+type EditCard = { id: number; word: string; translation: string; language: string; translation_language: string; example: string; image_url: string }
 
 // SM-2 targets 90% retention at due_at. Solve: 0.9 = e^(-1/k) → k = -1/ln(0.9) ≈ 9.49
 const LN09K = -1 / Math.log(0.9)
@@ -1046,6 +1046,58 @@ function forgettingCurveData(card: VocabCard): { day: string; pct: number }[] {
   }))
 }
 
+const LANG_BCP47: Record<string, string> = {
+  de: 'de-DE', en: 'en-US', tr: 'tr-TR', fr: 'fr-FR', es: 'es-ES', ja: 'ja-JP',
+}
+
+function speak(text: string, lang: string) {
+  if (!('speechSynthesis' in window)) return
+  const utt = new SpeechSynthesisUtterance(text)
+  utt.lang = LANG_BCP47[lang] ?? lang
+  window.speechSynthesis.cancel()
+  window.speechSynthesis.speak(utt)
+}
+
+interface DeConjugation {
+  ichPräsens: string
+  duPräsens: string
+  erPräsens: string
+  ichPräteritum: string
+  partizipII: string
+  hilfsverb: string
+  imperativSg: string
+}
+
+function parseWiktionaryConj(wikitext: string): DeConjugation | null {
+  const match = wikitext.match(/\{\{Deutsch Verb Übersicht[\s\S]*?\}\}/)
+  if (!match) return null
+  const block = match[0]
+  function get(key: string) {
+    const m = block.match(new RegExp(`\\|${key}\\s*=\\s*([^\n|]+)`))
+    return m?.[1]?.trim() ?? ''
+  }
+  return {
+    ichPräsens:    get('Präsens_ich'),
+    duPräsens:     get('Präsens_du'),
+    erPräsens:     get('Präsens_er, sie, es'),
+    ichPräteritum: get('Präteritum_ich'),
+    partizipII:    get('Partizip II'),
+    hilfsverb:     get('Hilfsverb'),
+    imperativSg:   get('Imperativ Singular'),
+  }
+}
+
+async function fetchDeConj(word: string): Promise<DeConjugation | null> {
+  const url = `https://de.wiktionary.org/w/api.php?action=query&titles=${encodeURIComponent(word)}&prop=revisions&rvprop=content&format=json&origin=*`
+  try {
+    const res = await fetch(url)
+    const json = await res.json() as { query: { pages: Record<string, { revisions?: { '*': string }[] }> } }
+    const page = Object.values(json.query.pages)[0]
+    const wikitext = page?.revisions?.[0]?.['*'] ?? ''
+    return parseWiktionaryConj(wikitext)
+  } catch { return null }
+}
+
 function VocabView() {
   const { t } = useLanguage()
   const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord, bulkMove } = useVocabulary()
@@ -1055,7 +1107,8 @@ function VocabView() {
   const [flipped, setFlipped] = useState(false)
   const [reviewIdx, setReviewIdx] = useState(0)
   const [showAdd, setShowAdd] = useState(false)
-  const [newWord, setNewWord] = useState<NewWord>({ word: '', translation: '', language: 'de', example: '' })
+  const [newWord, setNewWord] = useState<NewWord>({ word: '', translation: '', language: 'de', translation_language: 'tr', example: '' })
+  const [deConj, setDeConj] = useState<DeConjugation | null | 'loading' | 'none'>(null)
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set())
   const [editCard, setEditCard] = useState<EditCard | null>(null)
@@ -1121,7 +1174,7 @@ function VocabView() {
     e.preventDefault()
     if (!newWord.word.trim() || !newWord.translation.trim()) return
     await addWord({ ...newWord, example: newWord.example.trim() || undefined })
-    setNewWord({ word: '', translation: '', language: newWord.language, example: '' })
+    setNewWord({ word: '', translation: '', language: newWord.language, translation_language: newWord.translation_language, example: '' })
     setShowAdd(false)
   }
 
@@ -1132,6 +1185,7 @@ function VocabView() {
       word: editCard.word,
       translation: editCard.translation,
       language: editCard.language,
+      translation_language: editCard.translation_language,
       example: editCard.example || undefined,
       image_url: editCard.image_url || undefined,
     })
@@ -1139,11 +1193,13 @@ function VocabView() {
   }
 
   function openEdit(card: VocabCard) {
+    setDeConj(null)
     setEditCard({
       id: card.id,
       word: card.word,
       translation: card.translation,
       language: card.language,
+      translation_language: card.translation_language,
       example: card.example ?? '',
       image_url: card.image_url ?? '',
     })
@@ -1366,13 +1422,23 @@ function VocabView() {
             placeholder="Example sentence (optional)"
             className="text-sm border border-gray-200 rounded-lg px-3 py-2 flex-1 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-xero-green"
           />
-          <select
-            value={newWord.language}
-            onChange={e => setNewWord(p => ({ ...p, language: e.target.value }))}
-            className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none"
-          >
-            {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
-          </select>
+          <div className="flex items-center gap-1">
+            <select
+              value={newWord.language}
+              onChange={e => setNewWord(p => ({ ...p, language: e.target.value }))}
+              className="text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg px-2 py-2 focus:outline-none"
+            >
+              {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+            </select>
+            <span className="text-gray-400 text-xs px-0.5">→</span>
+            <select
+              value={newWord.translation_language}
+              onChange={e => setNewWord(p => ({ ...p, translation_language: e.target.value }))}
+              className="text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg px-2 py-2 focus:outline-none"
+            >
+              {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+            </select>
+          </div>
           <button type="submit" className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium">Add</button>
           <button type="button" onClick={() => setShowAdd(false)} className="text-sm text-gray-400 hover:text-gray-600 px-1">Cancel</button>
         </form>
@@ -1393,7 +1459,7 @@ function VocabView() {
           >
             <div className="flex items-start justify-between mb-1.5">
               <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
-                {LANG_LABELS[card.language] ?? card.language}
+                {LANG_LABELS[card.language] ?? card.language} → {LANG_LABELS[card.translation_language] ?? card.translation_language}
               </span>
               {selectMode ? (
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -1432,7 +1498,14 @@ function VocabView() {
             >
               {flippedCards.has(card.id) ? (
                 <div className="min-h-[64px] flex flex-col gap-1">
-                  <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-300">{card.translation}</p>
+                  <div className="flex items-start gap-1">
+                    <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-300 flex-1">{card.translation}</p>
+                    <button
+                      onClick={e => { e.stopPropagation(); speak(card.translation, card.translation_language) }}
+                      className="text-indigo-300 dark:text-indigo-500 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors text-sm flex-shrink-0 leading-none"
+                      aria-label="Pronounce translation"
+                    >🔊</button>
+                  </div>
                   {card.example && (
                     <p className="text-[10px] text-gray-400 dark:text-slate-400 italic">"{card.example}"</p>
                   )}
@@ -1443,7 +1516,14 @@ function VocabView() {
                 </div>
               ) : (
                 <div className="min-h-[64px] flex flex-col gap-1">
-                  <p className="text-base font-bold text-gray-900 dark:text-slate-100">{card.word}</p>
+                  <div className="flex items-start gap-1">
+                    <p className="text-base font-bold text-gray-900 dark:text-slate-100 flex-1">{card.word}</p>
+                    <button
+                      onClick={e => { e.stopPropagation(); speak(card.word, card.language) }}
+                      className="text-gray-300 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors text-sm flex-shrink-0 leading-none"
+                      aria-label="Pronounce word"
+                    >🔊</button>
+                  </div>
                   <p className="text-[9px] text-gray-300 dark:text-slate-500 mt-auto pt-1">{t.tapReveal}</p>
                 </div>
               )}
@@ -1618,13 +1698,71 @@ function VocabView() {
                 </div>
               )
             })()}
-            <select
-              value={editCard.language}
-              onChange={e => setEditCard(p => p && ({ ...p, language: e.target.value }))}
-              className="text-sm border border-gray-200 rounded-lg px-2 py-2 w-full focus:outline-none"
-            >
-              {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
-            </select>
+            {/* Conjugation panel — DE only */}
+            {editCard.language === 'de' && (
+              <div className="pt-3 border-t border-gray-100">
+                {deConj === null && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setDeConj('loading')
+                      const c = await fetchDeConj(editCard.word)
+                      setDeConj(c ?? 'none')
+                    }}
+                    className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    📖 Load conjugation
+                  </button>
+                )}
+                {deConj === 'loading' && <p className="text-xs text-gray-400">Loading…</p>}
+                {deConj === 'none' && <p className="text-xs text-gray-400">No verb conjugation found.</p>}
+                {deConj && typeof deConj === 'object' && (
+                  <div>
+                    <p className="text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Konjugation</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs mb-2">
+                      {([
+                        ['ich', deConj.ichPräsens],
+                        ['du', deConj.duPräsens],
+                        ['er/sie/es', deConj.erPräsens],
+                        ['ich (Prät.)', deConj.ichPräteritum],
+                        ['Partizip II', deConj.partizipII],
+                        ['Hilfsverb', deConj.hilfsverb],
+                      ] as [string, string][]).filter(([, v]) => v).map(([label, value]) => (
+                        <div key={label} className="flex gap-2">
+                          <span className="text-gray-400 w-20 flex-shrink-0">{label}</span>
+                          <span className="font-medium text-gray-700">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <a
+                      href={`https://www.verbformen.de/?w=${encodeURIComponent(editCard.word)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-[10px] text-blue-400 hover:text-blue-600 transition-colors"
+                    >
+                      Full table on verbformen.de →
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Language pair selectors */}
+            <div className="flex items-center gap-2">
+              <select
+                value={editCard.language}
+                onChange={e => setEditCard(p => p && ({ ...p, language: e.target.value }))}
+                className="text-sm border border-gray-200 rounded-lg px-2 py-2 flex-1 focus:outline-none"
+              >
+                {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+              </select>
+              <span className="text-gray-400 text-xs">→</span>
+              <select
+                value={editCard.translation_language}
+                onChange={e => setEditCard(p => p && ({ ...p, translation_language: e.target.value }))}
+                className="text-sm border border-gray-200 rounded-lg px-2 py-2 flex-1 focus:outline-none"
+              >
+                {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+              </select>
+            </div>
             <div className="flex gap-2 pt-1">
               <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">{t.save}</button>
               <button type="button" onClick={() => setEditCard(null)} className="flex-1 text-sm bg-gray-100 text-gray-600 py-2 rounded-lg font-medium">{t.cancel}</button>

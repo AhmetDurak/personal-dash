@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS vocabulary (
   due_at       DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at   TIMESTAMPTZ DEFAULT now()
 );
+ALTER TABLE vocabulary ADD COLUMN IF NOT EXISTS translation_language TEXT NOT NULL DEFAULT 'tr';
 
 CREATE TABLE IF NOT EXISTS recurring_templates (
   id         SERIAL PRIMARY KEY,

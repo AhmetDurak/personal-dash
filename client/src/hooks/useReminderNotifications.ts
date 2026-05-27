@@ -60,7 +60,7 @@ async function checkVocabNotifications() {
     const cards = await res.json() as { due_at: string }[]
     const today = new Date(); today.setHours(0, 0, 0, 0)
     const n = cards.filter(c => new Date(c.due_at) <= today).length
-    if (n === 0) return
+    if (n < 20) return
     new Notification('Vocabulary Review', {
       body: `You have ${n} card${n !== 1 ? 's' : ''} to review today.`,
       icon: '/favicon.ico',
