@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders } from '../hooks/useNotebook'
+import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
-import type { MMNode, MMEdge, VocabCard } from '../hooks/useNotebook'
+import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, WordLink } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -2214,7 +2214,627 @@ function SectionShell({
   )
 }
 
-// ─── Learn tab (Notes · Mindmap · Vocab) ──────────────────────────────────────
+// ─── WordLinker ───────────────────────────────────────────────────────────────
+
+interface WordLinkerProps {
+  text:         string
+  links:        WordLink[]
+  vocab:        VocabCard[]
+  sourceLang:   string
+  onAddLink:    (link: WordLink) => void
+  onRemoveLink: (vocabId: number, start: number) => void
+  readOnly?:    boolean
+}
+
+function getSelectionOffsets(container: HTMLElement): { start: number; end: number; text: string } | null {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null
+  const range = sel.getRangeAt(0)
+  if (!container.contains(range.commonAncestorContainer)) return null
+  const preRange = range.cloneRange()
+  preRange.selectNodeContents(container)
+  preRange.setEnd(range.startContainer, range.startOffset)
+  const start = preRange.toString().length
+  const selText = range.toString()
+  if (!selText.trim()) return null
+  return { start, end: start + selText.length, text: selText }
+}
+
+function buildSegments(text: string, links: WordLink[]): { text: string; link?: WordLink }[] {
+  const sorted = [...links].sort((a, b) => a.start - b.start)
+  const segments: { text: string; link?: WordLink }[] = []
+  let cursor = 0
+  for (const link of sorted) {
+    if (link.start > cursor) segments.push({ text: text.slice(cursor, link.start) })
+    segments.push({ text: text.slice(link.start, link.end), link })
+    cursor = link.end
+  }
+  if (cursor < text.length) segments.push({ text: text.slice(cursor) })
+  return segments
+}
+
+function WordLinker({ text, links, vocab, sourceLang, onAddLink, onRemoveLink, readOnly }: WordLinkerProps) {
+  const { t } = useLanguage()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [floatBtn, setFloatBtn] = useState<{ x: number; y: number; start: number; end: number; selText: string } | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSearch, setShowSearch] = useState(false)
+  const [popup, setPopup] = useState<{ link: WordLink; x: number; y: number } | null>(null)
+  const { dark } = useDarkMode()
+
+  useEffect(() => {
+    function onOutside(e: MouseEvent) {
+      if (floatBtn && !(e.target as Element)?.closest('[data-linker-ui]')) {
+        setFloatBtn(null); setShowSearch(false); setSearchQuery('')
+      }
+      if (popup && !(e.target as Element)?.closest('[data-linker-popup]')) setPopup(null)
+    }
+    document.addEventListener('mousedown', onOutside)
+    return () => document.removeEventListener('mousedown', onOutside)
+  }, [floatBtn, popup])
+
+  function handleMouseUp() {
+    if (readOnly || !containerRef.current) return
+    const offsets = getSelectionOffsets(containerRef.current)
+    if (!offsets) { setFloatBtn(null); return }
+    const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+    setFloatBtn({ x: rect.left + rect.width / 2, y: rect.top - 8, start: offsets.start, end: offsets.end, selText: offsets.text })
+    setShowSearch(false); setSearchQuery('')
+  }
+
+  function handleConfirmLink(card: VocabCard) {
+    if (!floatBtn) return
+    const overlaps = links.some(l => !(floatBtn.end <= l.start || floatBtn.start >= l.end))
+    if (overlaps) { setFloatBtn(null); return }
+    onAddLink({ vocab_id: card.id, word: floatBtn.selText, start: floatBtn.start, end: floatBtn.end })
+    setFloatBtn(null); setShowSearch(false); setSearchQuery('')
+    window.getSelection()?.removeAllRanges()
+  }
+
+  function handleSpanClick(e: React.MouseEvent, link: WordLink) {
+    e.stopPropagation()
+    const rect = (e.target as HTMLElement).getBoundingClientRect()
+    setPopup({ link, x: rect.left + rect.width / 2, y: rect.top - 8 })
+  }
+
+  const segments = buildSegments(text, links)
+  const filteredVocab = vocab.filter(c => c.word.toLowerCase().includes(searchQuery.toLowerCase()) || c.translation.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 8)
+
+  return (
+    <>
+      <div
+        ref={containerRef}
+        onMouseUp={handleMouseUp}
+        className={`whitespace-pre-wrap break-words leading-relaxed select-text ${readOnly ? '' : 'cursor-text'}`}
+      >
+        {segments.map((seg, i) => {
+          if (!seg.link) return <span key={i}>{seg.text}</span>
+          const card = vocab.find(c => c.id === seg.link!.vocab_id)
+          const dangling = !card
+          return (
+            <span
+              key={i}
+              onClick={e => handleSpanClick(e, seg.link!)}
+              className={`cursor-pointer rounded px-0.5 ${dangling ? 'line-through text-gray-400 dark:text-slate-500' : 'underline decoration-blue-400 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+              title={dangling ? 'Vocabulary entry deleted' : card.translation}
+            >
+              {seg.text}
+            </span>
+          )
+        })}
+      </div>
+
+      {/* Floating link button */}
+      {floatBtn && !readOnly && (
+        <div data-linker-ui className="fixed z-50" style={{ left: floatBtn.x, top: floatBtn.y, transform: 'translate(-50%, -100%)' }}>
+          {!showSearch ? (
+            <button
+              onClick={() => setShowSearch(true)}
+              className="text-xs bg-gray-900 text-white px-2.5 py-1.5 rounded-lg shadow-lg hover:bg-gray-700 transition-colors"
+            >
+              🔗 {t.linkToVocab}
+            </button>
+          ) : (
+            <div className={`rounded-xl shadow-xl border p-2 w-56 ${dark ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200'}`}>
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={t.searchVocab}
+                className={`text-xs w-full px-2 py-1.5 rounded-lg border mb-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 ${dark ? 'bg-slate-700 border-slate-500 text-slate-100' : 'border-gray-200'}`}
+              />
+              {filteredVocab.length === 0 ? (
+                <p className="text-xs text-gray-400 px-1 py-1">{t.searchVocab}</p>
+              ) : (
+                <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                  {filteredVocab.map(card => (
+                    <button
+                      key={card.id}
+                      onClick={() => handleConfirmLink(card)}
+                      className={`w-full text-left text-xs px-2 py-1.5 rounded-lg transition-colors ${dark ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-gray-50 text-gray-700'}`}
+                    >
+                      <span className="font-medium">{card.word}</span>
+                      <span className={`ml-1.5 ${dark ? 'text-slate-400' : 'text-gray-400'}`}>{card.translation}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Linked word popup */}
+      {popup && (() => {
+        const card = vocab.find(c => c.id === popup.link.vocab_id)
+        return (
+          <div
+            data-linker-popup
+            className={`fixed z-50 rounded-xl shadow-xl border p-3 w-52 ${dark ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200'}`}
+            style={{ left: popup.x, top: popup.y, transform: 'translate(-50%, -100%)' }}
+          >
+            {card ? (
+              <>
+                <p className={`text-sm font-semibold mb-0.5 ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{card.word}</p>
+                <p className={`text-xs mb-2 ${dark ? 'text-slate-300' : 'text-gray-500'}`}>{card.translation}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => speak(card.word, sourceLang)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">🔊</button>
+                  <button
+                    onClick={() => { onRemoveLink(popup.link.vocab_id, popup.link.start); setPopup(null) }}
+                    className="text-xs text-red-400 hover:text-red-600 transition-colors ml-auto"
+                  >✕</button>
+                </div>
+              </>
+            ) : (
+              <div>
+                <p className="text-xs text-gray-400 line-through mb-1">{popup.link.word}</p>
+                <button onClick={() => { onRemoveLink(popup.link.vocab_id, popup.link.start); setPopup(null) }} className="text-xs text-red-400">✕ Remove</button>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+    </>
+  )
+}
+
+// ─── SentenceView ─────────────────────────────────────────────────────────────
+
+function SentenceView() {
+  const { t } = useLanguage()
+  const { dark } = useDarkMode()
+  const { sentences, createSentence, saveSentence, deleteSentence } = useLanguageSentences()
+  const { vocab } = useVocabulary()
+  const [editingId, setEditingId] = useState<number | 'new' | null>(null)
+  const [draft, setDraft] = useState<Partial<LanguageSentence>>({})
+  const [translating, setTranslating] = useState(false)
+  const [translateResult, setTranslateResult] = useState<{ translation: string; alternatives: string[] } | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function openNew() {
+    setDraft({ source_text: '', translation: null, source_lang: 'de', target_lang: 'tr', word_links: [] })
+    setEditingId('new')
+    setTranslateResult(null)
+  }
+
+  function openEdit(s: LanguageSentence) {
+    setDraft({ ...s })
+    setEditingId(s.id)
+    setTranslateResult(null)
+  }
+
+  function scheduleSave(id: number, patch: Partial<LanguageSentence>) {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => saveSentence(id, patch), 1000)
+  }
+
+  async function handleSave() {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    if (editingId === 'new') {
+      const s = await createSentence()
+      await saveSentence(s.id, draft)
+    } else if (editingId !== null) {
+      await saveSentence(editingId, draft)
+    }
+    setEditingId(null)
+  }
+
+  async function handleTranslate() {
+    if (!draft.source_text?.trim()) return
+    setTranslating(true); setTranslateResult(null)
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: draft.source_text, sourceLang: draft.source_lang, targetLang: draft.target_lang }),
+      })
+      if (res.ok) {
+        const data = await res.json() as { translation: string; alternatives: string[] }
+        setDraft(d => ({ ...d, translation: data.translation }))
+        setTranslateResult(data)
+      }
+    } finally { setTranslating(false) }
+  }
+
+  function handleAddLink(link: WordLink) {
+    const links = [...(draft.word_links ?? []), link]
+    setDraft(d => ({ ...d, word_links: links }))
+    if (editingId && editingId !== 'new') saveSentence(editingId, { word_links: links })
+  }
+
+  function handleRemoveLink(vocabId: number, start: number) {
+    const links = (draft.word_links ?? []).filter(l => !(l.vocab_id === vocabId && l.start === start))
+    setDraft(d => ({ ...d, word_links: links }))
+    if (editingId && editingId !== 'new') saveSentence(editingId, { word_links: links })
+  }
+
+  const inputCls = `text-sm border rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-blue-400 ${dark ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400' : 'border-gray-200'}`
+  const cardCls = `rounded-2xl border p-4 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'}`
+
+  return (
+    <div className="p-4 space-y-3 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between">
+        <button onClick={openNew} className="text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 px-3 py-1.5 rounded-xl font-medium">+ {t.addSentence}</button>
+      </div>
+
+      {(editingId === 'new') && (
+        <div className={cardCls}>
+          <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">{t.addSentence}</p>
+          <div className="space-y-2">
+            <textarea
+              autoFocus
+              value={draft.source_text ?? ''}
+              onChange={e => setDraft(d => ({ ...d, source_text: e.target.value }))}
+              placeholder="Ich laufe jeden Tag…"
+              rows={2}
+              className={inputCls + ' resize-none'}
+            />
+            <div className="flex gap-2 items-center">
+              <input
+                value={draft.translation ?? ''}
+                onChange={e => setDraft(d => ({ ...d, translation: e.target.value }))}
+                placeholder={t.translation}
+                className={inputCls + ' flex-1'}
+              />
+              <button onClick={handleTranslate} disabled={translating} className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 disabled:opacity-50 flex-shrink-0">
+                {translating ? '…' : '🌐'}
+              </button>
+            </div>
+            {translateResult && translateResult.alternatives.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {translateResult.alternatives.map((alt, i) => (
+                  <button key={i} type="button" onClick={() => setDraft(d => ({ ...d, translation: alt }))}
+                    className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100">{alt}</button>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 text-xs">
+              <select value={draft.source_lang ?? 'de'} onChange={e => setDraft(d => ({ ...d, source_lang: e.target.value }))}
+                className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
+                {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+              </select>
+              <span className="text-gray-400 self-center">→</span>
+              <select value={draft.target_lang ?? 'tr'} onChange={e => setDraft(d => ({ ...d, target_lang: e.target.value }))}
+                className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
+                {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={handleSave} className="flex-1 text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 py-2 rounded-xl font-medium">{t.save}</button>
+              <button onClick={() => setEditingId(null)} className="flex-1 text-sm bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 py-2 rounded-xl font-medium">{t.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sentences.length === 0 && editingId !== 'new' && (
+        <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">{t.noSentencesYet}</p>
+      )}
+
+      {sentences.map(s => (
+        <div key={s.id} className={cardCls}>
+          {editingId === s.id ? (
+            <div className="space-y-2">
+              <textarea
+                autoFocus
+                value={draft.source_text ?? ''}
+                onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, source_text: v })); scheduleSave(s.id, { source_text: v }) }}
+                rows={2}
+                className={inputCls + ' resize-none'}
+              />
+              <div className="flex gap-2 items-center">
+                <input
+                  value={draft.translation ?? ''}
+                  onChange={e => setDraft(d => ({ ...d, translation: e.target.value }))}
+                  placeholder={t.translation}
+                  className={inputCls + ' flex-1'}
+                />
+                <button onClick={handleTranslate} disabled={translating} className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 disabled:opacity-50 flex-shrink-0">
+                  {translating ? '…' : '🌐'}
+                </button>
+              </div>
+              {translateResult && translateResult.alternatives.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {translateResult.alternatives.map((alt, i) => (
+                    <button key={i} type="button" onClick={() => setDraft(d => ({ ...d, translation: alt }))}
+                      className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100">{alt}</button>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2 text-xs">
+                <select value={draft.source_lang ?? 'de'} onChange={e => setDraft(d => ({ ...d, source_lang: e.target.value }))}
+                  className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
+                  {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+                </select>
+                <span className="text-gray-400 self-center">→</span>
+                <select value={draft.target_lang ?? 'tr'} onChange={e => setDraft(d => ({ ...d, target_lang: e.target.value }))}
+                  className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
+                  {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+                </select>
+              </div>
+              {draft.source_text && (
+                <div className={`rounded-xl p-3 text-sm ${dark ? 'bg-slate-700' : 'bg-gray-50'}`}>
+                  <p className="text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">{t.linkToVocab}</p>
+                  <WordLinker
+                    text={draft.source_text}
+                    links={draft.word_links ?? []}
+                    vocab={vocab}
+                    sourceLang={draft.source_lang ?? 'de'}
+                    onAddLink={handleAddLink}
+                    onRemoveLink={handleRemoveLink}
+                  />
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleSave} className="flex-1 text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 py-2 rounded-xl font-medium">{t.save}</button>
+                <button onClick={() => setEditingId(null)} className="flex-1 text-sm bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 py-2 rounded-xl font-medium">{t.cancel}</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-sm mb-1">
+                <WordLinker
+                  text={s.source_text || '—'}
+                  links={s.word_links}
+                  vocab={vocab}
+                  sourceLang={s.source_lang}
+                  onAddLink={() => {}}
+                  onRemoveLink={() => {}}
+                  readOnly
+                />
+              </div>
+              {s.translation && <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">{s.translation}</p>}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
+                  {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
+                </span>
+                <div className="flex gap-2">
+                  <button onClick={() => openEdit(s)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">{t.edit}</button>
+                  <button onClick={() => setConfirmDeleteId(s.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {confirmDeleteId !== null && (
+        <ConfirmDialog
+          message="Delete this sentence?"
+          onConfirm={async () => { if (confirmDeleteId !== null) { await deleteSentence(confirmDeleteId); setConfirmDeleteId(null) } }}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── ScenarioView ─────────────────────────────────────────────────────────────
+
+function ScenarioView() {
+  const { t } = useLanguage()
+  const { dark } = useDarkMode()
+  const { scenarios, createScenario, saveScenario, deleteScenario } = useLanguageScenarios()
+  const { vocab } = useVocabulary()
+  const [activeId, setActiveId] = useState<number | null>(null)
+  const [draft, setDraft] = useState<Partial<LanguageScenario>>({})
+  const [isEditingContent, setIsEditingContent] = useState(false)
+  const [translating, setTranslating] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const active = scenarios.find(s => s.id === activeId) ?? null
+
+  async function handleNew() {
+    const s = await createScenario()
+    setDraft({ ...s })
+    setActiveId(s.id)
+    setIsEditingContent(true)
+  }
+
+  function openScenario(s: LanguageScenario) {
+    setDraft({ ...s })
+    setActiveId(s.id)
+    setIsEditingContent(false)
+  }
+
+  function scheduleTitle(id: number, title: string) {
+    if (titleTimer.current) clearTimeout(titleTimer.current)
+    titleTimer.current = setTimeout(() => saveScenario(id, { title }), 800)
+  }
+
+  function scheduleContent(id: number, content: string) {
+    if (contentTimer.current) clearTimeout(contentTimer.current)
+    contentTimer.current = setTimeout(() => { saveScenario(id, { content }); setIsEditingContent(false) }, 1200)
+  }
+
+  async function handleTranslate() {
+    if (!draft.content?.trim() || !activeId) return
+    setTranslating(true)
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: draft.content.slice(0, 500), sourceLang: draft.source_lang, targetLang: draft.target_lang }),
+      })
+      if (res.ok) {
+        const data = await res.json() as { translation: string }
+        alert(data.translation)
+      }
+    } finally { setTranslating(false) }
+  }
+
+  function handleAddLink(link: WordLink) {
+    if (!activeId) return
+    const links = [...(draft.word_links ?? []), link]
+    setDraft(d => ({ ...d, word_links: links }))
+    saveScenario(activeId, { word_links: links })
+  }
+
+  function handleRemoveLink(vocabId: number, start: number) {
+    if (!activeId) return
+    const links = (draft.word_links ?? []).filter(l => !(l.vocab_id === vocabId && l.start === start))
+    setDraft(d => ({ ...d, word_links: links }))
+    saveScenario(activeId, { word_links: links })
+  }
+
+  if (activeId !== null && active) {
+    return (
+      <div className="p-4 max-w-2xl mx-auto space-y-3">
+        <button onClick={() => { setActiveId(null); setIsEditingContent(false) }}
+          className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors mb-1">
+          ← {t.scenario}
+        </button>
+        <input
+          value={draft.title ?? ''}
+          onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, title: v })); scheduleTitle(active.id, v) }}
+          placeholder={t.scenarioTitle}
+          className={`text-base font-semibold border-0 border-b-2 rounded-none bg-transparent w-full focus:outline-none pb-1 ${dark ? 'border-slate-600 text-slate-100' : 'border-gray-200 text-gray-800'}`}
+        />
+        <div className="flex gap-2 text-xs items-center">
+          <select value={draft.source_lang ?? 'de'} onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, source_lang: v })); saveScenario(active.id, { source_lang: v }) }}
+            className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
+            {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+          </select>
+          <span className="text-gray-400">→</span>
+          <select value={draft.target_lang ?? 'tr'} onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, target_lang: v })); saveScenario(active.id, { target_lang: v }) }}
+            className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
+            {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+          </select>
+          <button onClick={handleTranslate} disabled={translating} className="ml-auto text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 disabled:opacity-50">
+            {translating ? '…' : '🌐'}
+          </button>
+        </div>
+
+        <div className={`rounded-xl border p-3 min-h-32 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'}`}>
+          {isEditingContent ? (
+            <textarea
+              autoFocus
+              value={draft.content ?? ''}
+              onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, content: v })); scheduleContent(active.id, v) }}
+              onBlur={() => { if (contentTimer.current) clearTimeout(contentTimer.current); saveScenario(active.id, { content: draft.content ?? '' }); setIsEditingContent(false) }}
+              placeholder="Write your scenario here…"
+              rows={8}
+              className={`w-full resize-none focus:outline-none text-sm leading-relaxed bg-transparent ${dark ? 'text-slate-100 placeholder-slate-500' : 'text-gray-800'}`}
+            />
+          ) : (
+            <div onClick={() => setIsEditingContent(true)} className="cursor-text">
+              {draft.content ? (
+                <WordLinker
+                  text={draft.content}
+                  links={draft.word_links ?? []}
+                  vocab={vocab}
+                  sourceLang={draft.source_lang ?? 'de'}
+                  onAddLink={handleAddLink}
+                  onRemoveLink={handleRemoveLink}
+                />
+              ) : (
+                <p className="text-sm text-gray-400 dark:text-slate-500">Click to write…</p>
+              )}
+            </div>
+          )}
+        </div>
+        <button onClick={() => setConfirmDeleteId(active.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
+        {confirmDeleteId !== null && (
+          <ConfirmDialog
+            message="Delete this scenario?"
+            onConfirm={async () => { if (confirmDeleteId !== null) { await deleteScenario(confirmDeleteId); setActiveId(null); setConfirmDeleteId(null) } }}
+            onCancel={() => setConfirmDeleteId(null)}
+          />
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 space-y-3 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between">
+        <button onClick={handleNew} className="text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 px-3 py-1.5 rounded-xl font-medium">+ {t.addScenario}</button>
+      </div>
+      {scenarios.length === 0 && (
+        <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">{t.noScenariosYet}</p>
+      )}
+      <div className="space-y-2">
+        {scenarios.map(s => (
+          <button
+            key={s.id}
+            onClick={() => openScenario(s)}
+            className={`w-full text-left rounded-2xl border p-4 transition-colors ${dark ? 'bg-slate-800 border-slate-700 hover:border-slate-500' : 'bg-white border-gray-100 hover:border-gray-300'}`}
+          >
+            <p className={`text-sm font-semibold mb-1 ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{s.title || t.untitled}</p>
+            <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-2">{s.content || '—'}</p>
+            <span className="mt-2 inline-block text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
+              {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── LanguageTab (inner: Vocabulary · Sentence · Scenario) ───────────────────
+
+type LangView = 'vocab' | 'sentence' | 'scenario'
+
+function LanguageTab() {
+  const { t } = useLanguage()
+  const { dark } = useDarkMode()
+  const [view, setView] = useState<LangView>('vocab')
+
+  const LANG_VIEWS: { id: LangView; label: string }[] = [
+    { id: 'vocab',    label: t.vocab },
+    { id: 'sentence', label: t.sentence },
+    { id: 'scenario', label: t.scenario },
+  ]
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <header className={`flex items-center gap-1 px-4 py-2.5 border-b flex-shrink-0 ${dark ? 'bg-slate-900 border-slate-700' : 'bg-white border-xero-border'}`}>
+        {LANG_VIEWS.map(v => (
+          <button
+            key={v.id}
+            onClick={() => setView(v.id)}
+            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              view === v.id
+                ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900'
+                : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+            }`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </header>
+      <div className="flex-1 overflow-y-auto">
+        {view === 'vocab'    && <VocabView />}
+        {view === 'sentence' && <SentenceView />}
+        {view === 'scenario' && <ScenarioView />}
+      </div>
+    </div>
+  )
+}
+
+// ─── Learn tab (Notes · Mindmap · Language) ───────────────────────────────────
 
 export function LearnSectionTab() {
   const { t } = useLanguage()
@@ -2222,7 +2842,7 @@ export function LearnSectionTab() {
   const VIEWS: SectionView[] = [
     { path: '/learn/notes',   label: t.notes,   icon: '📓' },
     { path: '/learn/mindmap', label: t.mindmap, icon: '🧠' },
-    { path: '/learn/vocab',   label: t.vocab,   icon: '📚' },
+    { path: '/learn/language', label: t.languageSection, icon: '🌍' },
   ]
 
   return (
@@ -2237,7 +2857,7 @@ export function LearnSectionTab() {
         <>
           <Route path="notes"   element={<NotesView />} />
           <Route path="mindmap" element={<MindmapView />} />
-          <Route path="vocab"   element={<VocabView />} />
+          <Route path="language/*" element={<LanguageTab />} />
         </>
       )}
     </SectionShell>

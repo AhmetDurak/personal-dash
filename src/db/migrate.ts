@@ -196,6 +196,32 @@ CREATE TABLE IF NOT EXISTS daily_plans (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(user_id, date)
 );
+
+CREATE TABLE IF NOT EXISTS language_sentences (
+  id           SERIAL PRIMARY KEY,
+  user_id      INTEGER REFERENCES users(id),
+  source_text  TEXT NOT NULL DEFAULT '',
+  translation  TEXT,
+  source_lang  TEXT NOT NULL DEFAULT 'de',
+  target_lang  TEXT NOT NULL DEFAULT 'tr',
+  word_links   JSONB NOT NULL DEFAULT '[]',
+  created_at   TIMESTAMPTZ DEFAULT now(),
+  updated_at   TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_lang_sentences_user ON language_sentences(user_id);
+
+CREATE TABLE IF NOT EXISTS language_scenarios (
+  id           SERIAL PRIMARY KEY,
+  user_id      INTEGER REFERENCES users(id),
+  title        TEXT NOT NULL DEFAULT 'Untitled',
+  content      TEXT NOT NULL DEFAULT '',
+  source_lang  TEXT NOT NULL DEFAULT 'de',
+  target_lang  TEXT NOT NULL DEFAULT 'tr',
+  word_links   JSONB NOT NULL DEFAULT '[]',
+  created_at   TIMESTAMPTZ DEFAULT now(),
+  updated_at   TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_lang_scenarios_user ON language_scenarios(user_id);
 `
 
 export async function migrate() {

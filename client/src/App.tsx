@@ -92,7 +92,8 @@ export function App() {
             <Route path="/workspace/reminders" element={<Navigate to="/life/reminders" replace />} />
             <Route path="/workspace/notes"   element={<Navigate to="/learn/notes" replace />} />
             <Route path="/workspace/mindmap" element={<Navigate to="/learn/mindmap" replace />} />
-            <Route path="/workspace/vocab"   element={<Navigate to="/learn/vocab" replace />} />
+            <Route path="/workspace/vocab"   element={<Navigate to="/learn/language" replace />} />
+            <Route path="/learn/vocab"       element={<Navigate to="/learn/language" replace />} />
             <Route path="/workspace/*"       element={<Navigate to="/learn/notes" replace />} />
             <Route path="*"            element={<Navigate to="/today" replace />} />
           </Routes>

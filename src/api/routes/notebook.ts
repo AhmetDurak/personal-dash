@@ -195,6 +195,88 @@ export function notebookRouter(pool: Pool): Router {
     res.json(updated[0])
   })
 
+  // ─── Language Sentences ───────────────────────────────────────────────────────
+
+  router.get('/language/sentences', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      'SELECT * FROM language_sentences WHERE user_id=$1 ORDER BY updated_at DESC',
+      [uid]
+    )
+    res.json(rows)
+  })
+
+  router.post('/language/sentences', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { source_text = '', translation = null, source_lang = 'de', target_lang = 'tr' } = req.body as {
+      source_text?: string; translation?: string | null; source_lang?: string; target_lang?: string
+    }
+    const { rows } = await pool.query(
+      'INSERT INTO language_sentences (user_id, source_text, translation, source_lang, target_lang) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [uid, source_text, translation, source_lang, target_lang]
+    )
+    res.json(rows[0])
+  })
+
+  router.put('/language/sentences/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { source_text, translation, source_lang, target_lang, word_links = [] } = req.body as {
+      source_text: string; translation: string | null; source_lang: string; target_lang: string; word_links?: unknown[]
+    }
+    const { rows } = await pool.query(
+      'UPDATE language_sentences SET source_text=$1, translation=$2, source_lang=$3, target_lang=$4, word_links=$5, updated_at=now() WHERE id=$6 AND user_id=$7 RETURNING *',
+      [source_text, translation, source_lang, target_lang, JSON.stringify(word_links), req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
+  })
+
+  router.delete('/language/sentences/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    await pool.query('DELETE FROM language_sentences WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
+  })
+
+  // ─── Language Scenarios ───────────────────────────────────────────────────────
+
+  router.get('/language/scenarios', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      'SELECT * FROM language_scenarios WHERE user_id=$1 ORDER BY updated_at DESC',
+      [uid]
+    )
+    res.json(rows)
+  })
+
+  router.post('/language/scenarios', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { title = 'Untitled', content = '', source_lang = 'de', target_lang = 'tr' } = req.body as {
+      title?: string; content?: string; source_lang?: string; target_lang?: string
+    }
+    const { rows } = await pool.query(
+      'INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [uid, title, content, source_lang, target_lang]
+    )
+    res.json(rows[0])
+  })
+
+  router.put('/language/scenarios/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { title, content, source_lang, target_lang, word_links = [] } = req.body as {
+      title: string; content: string; source_lang: string; target_lang: string; word_links?: unknown[]
+    }
+    const { rows } = await pool.query(
+      'UPDATE language_scenarios SET title=$1, content=$2, source_lang=$3, target_lang=$4, word_links=$5, updated_at=now() WHERE id=$6 AND user_id=$7 RETURNING *',
+      [title, content, source_lang, target_lang, JSON.stringify(word_links), req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
+  })
+
+  router.delete('/language/scenarios/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    await pool.query('DELETE FROM language_scenarios WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
+  })
+
   // ─── Reminders (all — including done) ────────────────────────────────────────
 
   router.get('/reminders', async (req: Request, res: Response) => {

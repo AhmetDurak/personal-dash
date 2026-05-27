@@ -63,6 +63,40 @@ export interface Reminder {
   created_at: string
 }
 
+// ─── Language ─────────────────────────────────────────────────────────────────
+
+export interface WordLink {
+  vocab_id: number
+  word:     string  // display text at time of linking
+  start:    number  // char offset in source_text / content (inclusive)
+  end:      number  // char offset (exclusive)
+  // extensible: note?, color?, confidence? — add without breaking existing data
+}
+
+export interface LanguageSentence {
+  id:          number
+  user_id:     number
+  source_text: string
+  translation: string | null
+  source_lang: string
+  target_lang: string
+  word_links:  WordLink[]
+  created_at:  string
+  updated_at:  string
+}
+
+export interface LanguageScenario {
+  id:          number
+  user_id:     number
+  title:       string
+  content:     string
+  source_lang: string
+  target_lang: string
+  word_links:  WordLink[]
+  created_at:  string
+  updated_at:  string
+}
+
 // ─── Notes ────────────────────────────────────────────────────────────────────
 
 export function useNotes() {
@@ -221,4 +255,74 @@ export function useAllReminders() {
   }
 
   return { reminders: data ?? [], isLoading, add, toggle, remove }
+}
+
+// ─── Language Sentences ───────────────────────────────────────────────────────
+
+export function useLanguageSentences() {
+  const { data, mutate, isLoading } = useSWR<LanguageSentence[]>('/api/notebook/language/sentences', fetcher)
+
+  async function createSentence(): Promise<LanguageSentence> {
+    const res = await fetch('/api/notebook/language/sentences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const s = await res.json() as LanguageSentence
+    await mutate()
+    return s
+  }
+
+  async function saveSentence(id: number, payload: Partial<Pick<LanguageSentence, 'source_text' | 'translation' | 'source_lang' | 'target_lang' | 'word_links'>>) {
+    const current = (data ?? []).find(s => s.id === id)
+    const merged = { ...current, ...payload }
+    await fetch(`/api/notebook/language/sentences/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(merged),
+    })
+    await mutate()
+  }
+
+  async function deleteSentence(id: number) {
+    await fetch(`/api/notebook/language/sentences/${id}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { sentences: data ?? [], isLoading, createSentence, saveSentence, deleteSentence }
+}
+
+// ─── Language Scenarios ───────────────────────────────────────────────────────
+
+export function useLanguageScenarios() {
+  const { data, mutate, isLoading } = useSWR<LanguageScenario[]>('/api/notebook/language/scenarios', fetcher)
+
+  async function createScenario(): Promise<LanguageScenario> {
+    const res = await fetch('/api/notebook/language/scenarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    const s = await res.json() as LanguageScenario
+    await mutate()
+    return s
+  }
+
+  async function saveScenario(id: number, payload: Partial<Pick<LanguageScenario, 'title' | 'content' | 'source_lang' | 'target_lang' | 'word_links'>>) {
+    const current = (data ?? []).find(s => s.id === id)
+    const merged = { ...current, ...payload }
+    await fetch(`/api/notebook/language/scenarios/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(merged),
+    })
+    await mutate()
+  }
+
+  async function deleteScenario(id: number) {
+    await fetch(`/api/notebook/language/scenarios/${id}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { scenarios: data ?? [], isLoading, createScenario, saveScenario, deleteScenario }
 }
