@@ -1122,7 +1122,7 @@ function VocabView() {
   const { t } = useLanguage()
   const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord, bulkMove } = useVocabulary()
   const [confirmDeleteVocabId, setConfirmDeleteVocabId] = useState<number | null>(null)
-  const [langFilter, setLangFilter] = useState<string | null>(null)
+  const [langFilter, setLangFilter] = useState<string | null>(() => localStorage.getItem('vocab:langFilter') ?? null)
   const [reviewMode, setReviewMode] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [reviewIdx, setReviewIdx] = useState(0)
@@ -1151,7 +1151,7 @@ function VocabView() {
   const [csvTooltipOpen, setCsvTooltipOpen] = useState(false)
   const csvInputRef = useRef<HTMLInputElement>(null)
   const csvTooltipRef = useRef<HTMLDivElement>(null)
-  const [sortBy, setSortBy] = useState<'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc'>('newest')
+  const [sortBy, setSortBy] = useState<'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc'>(() => (localStorage.getItem('vocab:sortBy') as 'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc') ?? 'newest')
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [movePicking, setMovePicking] = useState(false)
@@ -1354,7 +1354,7 @@ function VocabView() {
             {/* Sort */}
             <select
               value={sortBy}
-              onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              onChange={e => { const v = e.target.value as typeof sortBy; setSortBy(v); localStorage.setItem('vocab:sortBy', v) }}
               className="text-xs border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none"
             >
               <option value="newest">Newest</option>
@@ -1420,7 +1420,7 @@ function VocabView() {
         {/* Folder strip */}
         <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           <button
-            onClick={() => setLangFilter(null)}
+            onClick={() => { setLangFilter(null); localStorage.removeItem('vocab:langFilter') }}
             className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${!langFilter ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
           >
             🌐 All <span className="opacity-60">({vocab.length})</span>
@@ -1428,7 +1428,7 @@ function VocabView() {
           {folders.map(lang => (
             <button
               key={lang}
-              onClick={() => setLangFilter(langFilter === lang ? null : lang)}
+              onClick={() => { const next = langFilter === lang ? null : lang; setLangFilter(next); next ? localStorage.setItem('vocab:langFilter', next) : localStorage.removeItem('vocab:langFilter') }}
               className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${langFilter === lang ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
             >
               {LANG_LABELS[lang] ?? lang} <span className="opacity-60">({vocab.filter(v => v.language === lang).length})</span>
