@@ -58,14 +58,32 @@ function fmtDueLabel(due: string, group: 'overdue' | 'today' | 'upcoming'): stri
 
 // ─── NotesView ────────────────────────────────────────────────────────────────
 
-const URL_RE = /(https?:\/\/[^\s<>"']+)/g
+const BARE_URL_RE = /(https?:\/\/[^\s<>"']+)/g
+const MD_LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g
 
-function renderWithLinks(text: string) {
-  return text.split(URL_RE).map((part, i) =>
-    i % 2 === 1
-      ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{part}</a>
-      : <span key={i}>{part}</span>
-  )
+function renderWithLinks(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = []
+  let key = 0
+  let lastIndex = 0
+  const re = new RegExp(MD_LINK_RE.source, 'g')
+  let m: RegExpExecArray | null
+
+  function pushBare(chunk: string) {
+    chunk.split(BARE_URL_RE).forEach((part, i) => {
+      nodes.push(i % 2 === 1
+        ? <a key={key++} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline break-all">{part}</a>
+        : <span key={key++}>{part}</span>
+      )
+    })
+  }
+
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIndex) pushBare(text.slice(lastIndex, m.index))
+    nodes.push(<a key={key++} href={m[2]} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{m[1]}</a>)
+    lastIndex = m.index + m[0].length
+  }
+  if (lastIndex < text.length) pushBare(text.slice(lastIndex))
+  return nodes
 }
 
 function NotesView() {
