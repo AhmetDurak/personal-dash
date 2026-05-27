@@ -183,7 +183,16 @@ export function useVocabulary() {
     await mutate()
   }
 
-  return { vocab: data ?? [], isLoading, addWord, deleteWord, review, bulkImport, updateWord }
+  async function bulkMove(ids: number[], language: string) {
+    await fetch('/api/notebook/vocabulary/bulk-move', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, language }),
+    })
+    await mutate()
+  }
+
+  return { vocab: data ?? [], isLoading, addWord, deleteWord, review, bulkImport, updateWord, bulkMove }
 }
 
 // ─── All Reminders (notebook view — includes done) ────────────────────────────

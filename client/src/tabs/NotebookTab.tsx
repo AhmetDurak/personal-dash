@@ -1048,7 +1048,7 @@ function forgettingCurveData(card: VocabCard): { day: string; pct: number }[] {
 
 function VocabView() {
   const { t } = useLanguage()
-  const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord } = useVocabulary()
+  const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord, bulkMove } = useVocabulary()
   const [confirmDeleteVocabId, setConfirmDeleteVocabId] = useState<number | null>(null)
   const [langFilter, setLangFilter] = useState<string | null>(null)
   const [reviewMode, setReviewMode] = useState(false)
@@ -1062,6 +1062,10 @@ function VocabView() {
   const [csvTooltipOpen, setCsvTooltipOpen] = useState(false)
   const csvInputRef = useRef<HTMLInputElement>(null)
   const csvTooltipRef = useRef<HTMLDivElement>(null)
+  const [sortBy, setSortBy] = useState<'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc'>('newest')
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [movePicking, setMovePicking] = useState(false)
 
   useEffect(() => {
     if (!csvTooltipOpen) return
@@ -1092,7 +1096,18 @@ function VocabView() {
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const dueCards = vocab.filter(v => new Date(v.due_at) <= today)
-  const filtered = langFilter ? vocab.filter(v => v.language === langFilter) : vocab
+  const folders = [...new Set(vocab.map(v => v.language))].sort()
+  const base = langFilter ? vocab.filter(v => v.language === langFilter) : vocab
+  const filtered = [...base].sort((a, b) => {
+    switch (sortBy) {
+      case 'word-asc':  return a.word.localeCompare(b.word)
+      case 'word-desc': return b.word.localeCompare(a.word)
+      case 'due-asc':   return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
+      case 'due-desc':  return new Date(b.due_at).getTime() - new Date(a.due_at).getTime()
+      case 'oldest':    return a.id - b.id
+      default:          return b.id - a.id
+    }
+  })
   const reviewCard: VocabCard | null = dueCards[reviewIdx] ?? null
 
   async function handleRate(quality: number) {
@@ -1140,6 +1155,22 @@ function VocabView() {
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  async function handleBulkMove(lang: string) {
+    if (!selectedIds.size) return
+    await bulkMove([...selectedIds], lang)
+    setSelectedIds(new Set())
+    setMovePicking(false)
+    setSelectMode(false)
   }
 
   if (reviewMode) {
@@ -1210,83 +1241,107 @@ function VocabView() {
   }
 
   return (
-    <div className="p-6 overflow-y-auto h-full">
-      {/* Header row */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-gray-500">
-            {dueCards.length} card{dueCards.length !== 1 ? 's' : ''} due
-          </p>
-          {dueCards.length > 0 && (
-            <button
-              onClick={() => setReviewMode(true)}
-              className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
-            >
-              {t.reviewNow}
-            </button>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setLangFilter(null)}
-            className={`text-xs px-2.5 py-1 rounded-full transition-colors ${!langFilter ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            All
-          </button>
-          {LANGS.map(l => (
-            <button
-              key={l}
-              onClick={() => setLangFilter(langFilter === l ? null : l)}
-              className={`text-xs px-2.5 py-1 rounded-full transition-colors ${langFilter === l ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              {LANG_LABELS[l]}
-            </button>
-          ))}
-          <button
-            onClick={() => setShowAdd(v => !v)}
-            className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors ml-1"
-          >
-            + {t.addWord}
-          </button>
-          <div className="relative" ref={csvTooltipRef}>
-            <div className="flex items-center gap-1">
-              {/* Hover (desktop) shows tooltip; click opens file picker */}
+    <div className={`p-6 overflow-y-auto h-full ${selectMode ? 'pb-24' : ''}`}>
+      {/* Header: row 1 — stats + actions */}
+      <div className="mb-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-gray-500 dark:text-slate-400">
+              {dueCards.length} card{dueCards.length !== 1 ? 's' : ''} due
+            </p>
+            {dueCards.length > 0 && (
               <button
-                onClick={() => csvInputRef.current?.click()}
-                onMouseEnter={() => setCsvTooltipOpen(true)}
-                onMouseLeave={() => setCsvTooltipOpen(false)}
-                className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                onClick={() => setReviewMode(true)}
+                className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
               >
-                {t.importCsv}
+                {t.reviewNow}
               </button>
-              {/* Tap (mobile) toggles tooltip */}
-              <button
-                onClick={() => setCsvTooltipOpen(v => !v)}
-                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
-                aria-label="CSV format info"
-              >
-                ?
-              </button>
-            </div>
-            {csvTooltipOpen && (
-              <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
-                <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
-                  <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`word,translation,language,example\nApfel,Apple,de,Der Apfel ist rot 🍎\nWasser,Water,de,`}</code>
-                  <div className="mt-2 space-y-0.5">
-                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">word</span> &amp; <span className="text-white font-medium">translation</span> — required</p>
-                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">language</span> — <code className="text-green-300">en</code> / <code className="text-green-300">de</code> / <code className="text-green-300">tr</code> (optional)</p>
-                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">example</span> — text or emoji hint (optional)</p>
-                  </div>
-                  <div className="absolute bottom-full right-4 border-4 border-transparent border-b-gray-900" />
-                </div>
-              </div>
             )}
           </div>
-          <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvImport} />
-          {importMsg && (
-            <span className="text-xs text-xero-green font-medium">{importMsg}</span>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Sort */}
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              className="text-xs border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none"
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="word-asc">A → Z</option>
+              <option value="word-desc">Z → A</option>
+              <option value="due-asc">Due soon</option>
+              <option value="due-desc">Due late</option>
+            </select>
+            {/* Select mode toggle */}
+            <button
+              onClick={() => { setSelectMode(v => !v); setSelectedIds(new Set()) }}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${selectMode ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+            >
+              {selectMode ? 'Done' : 'Select'}
+            </button>
+            <button
+              onClick={() => setShowAdd(v => !v)}
+              className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+            >
+              + {t.addWord}
+            </button>
+            <div className="relative" ref={csvTooltipRef}>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => csvInputRef.current?.click()}
+                  onMouseEnter={() => setCsvTooltipOpen(true)}
+                  onMouseLeave={() => setCsvTooltipOpen(false)}
+                  className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+                >
+                  {t.importCsv}
+                </button>
+                <button
+                  onClick={() => setCsvTooltipOpen(v => !v)}
+                  className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
+                  aria-label="CSV format info"
+                >
+                  ?
+                </button>
+              </div>
+              {csvTooltipOpen && (
+                <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
+                  <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
+                    <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`word,translation,language,example\nApfel,Apple,de,Der Apfel ist rot 🍎\nWasser,Water,de,`}</code>
+                    <div className="mt-2 space-y-0.5">
+                      <p className="text-[10px] text-gray-300"><span className="text-white font-medium">word</span> &amp; <span className="text-white font-medium">translation</span> — required</p>
+                      <p className="text-[10px] text-gray-300"><span className="text-white font-medium">language</span> — <code className="text-green-300">en</code> / <code className="text-green-300">de</code> / <code className="text-green-300">tr</code> (optional)</p>
+                      <p className="text-[10px] text-gray-300"><span className="text-white font-medium">example</span> — text or emoji hint (optional)</p>
+                    </div>
+                    <div className="absolute bottom-full right-4 border-4 border-transparent border-b-gray-900" />
+                  </div>
+                </div>
+              )}
+            </div>
+            <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvImport} />
+            {importMsg && (
+              <span className="text-xs text-xero-green font-medium">{importMsg}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Folder strip */}
+        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <button
+            onClick={() => setLangFilter(null)}
+            className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${!langFilter ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+          >
+            🌐 All <span className="opacity-60">({vocab.length})</span>
+          </button>
+          {folders.map(lang => (
+            <button
+              key={lang}
+              onClick={() => setLangFilter(langFilter === lang ? null : lang)}
+              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${langFilter === lang ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+            >
+              {LANG_LABELS[lang] ?? lang} <span className="opacity-60">({vocab.filter(v => v.language === lang).length})</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1327,31 +1382,53 @@ function VocabView() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {filtered.map(card => (
-          <div key={card.id} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4 relative group hover:shadow-sm transition-shadow">
+          <div
+            key={card.id}
+            onClick={selectMode ? () => toggleSelect(card.id) : undefined}
+            className={`bg-white dark:bg-slate-800 rounded-xl p-4 relative group hover:shadow-sm transition-all ${
+              selectMode
+                ? `cursor-pointer border-2 ${selectedIds.has(card.id) ? 'border-xero-green ring-2 ring-xero-green/20' : 'border-gray-100 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-500'}`
+                : 'border border-gray-100 dark:border-slate-700'
+            }`}
+          >
             <div className="flex items-start justify-between mb-1.5">
               <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
                 {LANG_LABELS[card.language] ?? card.language}
               </span>
-              <button
-                onClick={() => setConfirmDeleteVocabId(card.id)}
-                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none"
-              >
-                ×
-              </button>
-              {confirmDeleteVocabId === card.id && (
-                <ConfirmDialog
-                  message={`"${card.word}" will be permanently deleted.`}
-                  confirmLabel="Delete"
-                  onConfirm={() => { deleteWord(card.id); setConfirmDeleteVocabId(null) }}
-                  onCancel={() => setConfirmDeleteVocabId(null)}
-                />
+              {selectMode ? (
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                  selectedIds.has(card.id) ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'
+                }`}>
+                  {selectedIds.has(card.id) && (
+                    <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setConfirmDeleteVocabId(card.id)}
+                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none"
+                  >
+                    ×
+                  </button>
+                  {confirmDeleteVocabId === card.id && (
+                    <ConfirmDialog
+                      message={`"${card.word}" will be permanently deleted.`}
+                      confirmLabel="Delete"
+                      onConfirm={() => { deleteWord(card.id); setConfirmDeleteVocabId(null) }}
+                      onCancel={() => setConfirmDeleteVocabId(null)}
+                    />
+                  )}
+                </>
               )}
             </div>
             {/* Front / Back faces */}
             <div
               className="mt-1 cursor-pointer select-none"
-              onClick={() => toggleFlip(card.id)}
-              onDoubleClick={e => { e.stopPropagation(); openEdit(card) }}
+              onClick={selectMode ? undefined : () => toggleFlip(card.id)}
+              onDoubleClick={selectMode ? undefined : e => { e.stopPropagation(); openEdit(card) }}
             >
               {flippedCards.has(card.id) ? (
                 <div className="min-h-[64px] flex flex-col gap-1">
@@ -1415,6 +1492,68 @@ function VocabView() {
 
       {filtered.length === 0 && !isLoading && (
         <p className="text-sm text-gray-400 text-center py-12">No words yet. Add your first word!</p>
+      )}
+
+      {/* Selection bottom bar */}
+      {selectMode && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 z-40 shadow-lg">
+          <span className="text-sm text-gray-700 dark:text-slate-300 flex-shrink-0">
+            {selectedIds.size} selected
+          </span>
+          <button
+            onClick={() => {
+              if (selectedIds.size === filtered.length) setSelectedIds(new Set())
+              else setSelectedIds(new Set(filtered.map(c => c.id)))
+            }}
+            className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 transition-colors"
+          >
+            {selectedIds.size === filtered.length ? 'Deselect All' : 'Select All'}
+          </button>
+          <div className="flex-1" />
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => setMovePicking(true)}
+              className="text-xs bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+            >
+              Move to…
+            </button>
+          )}
+          <button
+            onClick={() => { setSelectMode(false); setSelectedIds(new Set()) }}
+            className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Move to folder picker */}
+      {movePicking && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4" onClick={() => setMovePicking(false)}>
+          <div
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm space-y-3"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">Move to folder</p>
+            <div className="grid grid-cols-2 gap-2">
+              {LANGS.map(lang => (
+                <button
+                  key={lang}
+                  onClick={() => handleBulkMove(lang)}
+                  className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-slate-300"
+                >
+                  {LANG_LABELS[lang]}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setMovePicking(false)}
+              className="w-full text-sm text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 py-1 transition-colors"
+            >
+              {t.cancel}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Edit modal */}

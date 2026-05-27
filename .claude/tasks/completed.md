@@ -426,3 +426,38 @@ A full plan exists at: `.claude/plans/dreamy-foraging-puppy.md`
 - 738167d chore: auto-commit session changes — 2026-05-25 21:13
 - c985cc6 chore: auto-commit session changes — 2026-05-25 17:59
 
+
+
+## Completed from Backlog — 2026-05-27
+
+---
+
+## TASK-VOC-A — Vocabulary Sorting
+
+**Difficulty:** 1/10
+
+- Sort dropdown in toolbar: Newest, Oldest, A→Z, Z→A, Due soon, Due late
+- Client-side only — `sortBy` state + `.sort()` on filtered array
+
+---
+
+## TASK-VOC-B — Vocabulary Folders
+
+**Difficulty:** 3/10
+
+- Language filter pills replaced with horizontal scrollable folder strip
+- Each folder shows flag emoji + language code + card count in parens
+- Folders derived dynamically from unique languages in vocab data
+- "🌐 All" button at the start; active folder highlighted
+
+---
+
+## TASK-VOC-C — Card Selection & Move
+
+**Difficulty:** 3/10
+
+- "Select" toggle button in toolbar enters selection mode
+- Cards get circular checkbox in top-right; clicking card body toggles selection
+- Fixed bottom action bar: count | Select All / Deselect All | Move to… | Cancel
+- "Move to…" opens a sheet modal with all language folders as buttons
+- Calls `bulkMove(ids, language)` → `PUT /api/notebook/vocabulary/bulk-move`

@@ -129,6 +129,18 @@ export function notebookRouter(pool: Pool): Router {
     res.json({ inserted: valid.length })
   })
 
+  router.put('/vocabulary/bulk-move', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { ids, language } = req.body as { ids: number[]; language: string }
+    if (!ids?.length || !language) { res.status(400).json({ error: 'ids and language required' }); return }
+    const placeholders = ids.map((_, i) => `$${i + 2}`).join(',')
+    await pool.query(
+      `UPDATE vocabulary SET language=$1 WHERE id IN (${placeholders}) AND user_id=$${ids.length + 2}`,
+      [language, ...ids, uid]
+    )
+    res.json({ moved: ids.length })
+  })
+
   router.put('/vocabulary/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { word, translation, language, image_url, example } = req.body as {
