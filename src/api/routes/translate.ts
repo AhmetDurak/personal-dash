@@ -1,21 +1,43 @@
 import { Router, Request, Response } from 'express'
 
-// To switch to per-user keys later (TASK-010):
-// replace this with a DB lookup: SELECT deepl_api_key FROM users WHERE id=$1
-// then fall back to process.env.DEEPL_API_KEY
-function getDeepLKey(_userId: number): string | undefined {
-  return process.env.DEEPL_API_KEY
-}
+// Primary: MyMemory (free, no key, 1000 req/day)
+// Optional upgrade: set DEEPL_API_KEY in .env to use DeepL instead
+// Per-user keys: see TASK-010 in backlog
 
 const DEEPL_LANG: Record<string, string> = {
   de: 'DE', en: 'EN', tr: 'TR', fr: 'FR', es: 'ES', ja: 'JA',
+}
+
+async function translateWithDeepL(text: string, sourceLang: string | undefined, targetLang: string, key: string): Promise<string> {
+  const target = DEEPL_LANG[targetLang] ?? targetLang.toUpperCase()
+  const body: Record<string, unknown> = { text: [text], target_lang: target }
+  if (sourceLang && DEEPL_LANG[sourceLang]) body.source_lang = DEEPL_LANG[sourceLang]
+
+  const host = key.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com'
+  const res = await fetch(`https://${host}/v2/translate`, {
+    method: 'POST',
+    headers: { 'Authorization': `DeepL-Auth-Key ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  const data = await res.json() as { translations: { text: string }[] }
+  return data.translations[0]?.text ?? ''
+}
+
+async function translateWithMyMemory(text: string, sourceLang: string | undefined, targetLang: string): Promise<string> {
+  const src = sourceLang ?? 'autodetect'
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${src}|${targetLang}`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('MyMemory request failed')
+  const data = await res.json() as { responseData: { translatedText: string }; responseStatus: number }
+  if (data.responseStatus !== 200) throw new Error('MyMemory translation failed')
+  return data.responseData.translatedText
 }
 
 export function translateRouter(): Router {
   const router = Router()
 
   router.post('/', async (req: Request, res: Response) => {
-    const uid = (req.user as Express.User).id
     const { text, sourceLang, targetLang } = req.body as {
       text: string
       sourceLang?: string
@@ -26,34 +48,15 @@ export function translateRouter(): Router {
       res.status(400).json({ error: 'text and targetLang required' }); return
     }
 
-    const key = getDeepLKey(uid)
-    if (!key) {
-      res.status(503).json({ error: 'DeepL API key not configured' }); return
+    try {
+      const deeplKey = process.env.DEEPL_API_KEY
+      const translation = deeplKey
+        ? await translateWithDeepL(text.trim(), sourceLang, targetLang, deeplKey)
+        : await translateWithMyMemory(text.trim(), sourceLang, targetLang)
+      res.json({ translation })
+    } catch (err) {
+      res.status(502).json({ error: String(err) })
     }
-
-    const target = DEEPL_LANG[targetLang] ?? targetLang.toUpperCase()
-    const body: Record<string, unknown> = { text: [text.trim()], target_lang: target }
-    if (sourceLang && DEEPL_LANG[sourceLang]) body.source_lang = DEEPL_LANG[sourceLang]
-
-    // free-tier key ends with ':fx'; paid keys use api.deepl.com
-    const host = key.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com'
-
-    const deeplRes = await fetch(`https://${host}/v2/translate`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `DeepL-Auth-Key ${key}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-
-    if (!deeplRes.ok) {
-      const err = await deeplRes.text()
-      res.status(502).json({ error: `DeepL error: ${err}` }); return
-    }
-
-    const data = await deeplRes.json() as { translations: { text: string }[] }
-    res.json({ translation: data.translations[0]?.text ?? '' })
   })
 
   return router
