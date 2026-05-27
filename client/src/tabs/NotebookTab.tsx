@@ -2496,7 +2496,7 @@ function SentenceView() {
                 placeholder={t.translation}
                 className={inputCls + ' flex-1'}
               />
-              <button onClick={handleTranslate} disabled={translating} className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 disabled:opacity-50 flex-shrink-0">
+              <button onClick={handleTranslate} disabled={translating} className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 flex-shrink-0">
                 {translating ? '…' : '🌐'}
               </button>
             </div>
@@ -2504,7 +2504,7 @@ function SentenceView() {
               <div className="flex flex-wrap gap-1.5">
                 {translateResult.alternatives.map((alt, i) => (
                   <button key={i} type="button" onClick={() => setDraft(d => ({ ...d, translation: alt }))}
-                    className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100">{alt}</button>
+                    className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-100 dark:border-blue-800/50">{alt}</button>
                 ))}
               </div>
             )}
@@ -2549,7 +2549,7 @@ function SentenceView() {
                   placeholder={t.translation}
                   className={inputCls + ' flex-1'}
                 />
-                <button onClick={handleTranslate} disabled={translating} className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 disabled:opacity-50 flex-shrink-0">
+                <button onClick={handleTranslate} disabled={translating} className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 flex-shrink-0">
                   {translating ? '…' : '🌐'}
                 </button>
               </div>
@@ -2557,7 +2557,7 @@ function SentenceView() {
                 <div className="flex flex-wrap gap-1.5">
                   {translateResult.alternatives.map((alt, i) => (
                     <button key={i} type="button" onClick={() => setDraft(d => ({ ...d, translation: alt }))}
-                      className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100">{alt}</button>
+                      className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-100 dark:border-blue-800/50">{alt}</button>
                   ))}
                 </div>
               )}
@@ -2574,7 +2574,7 @@ function SentenceView() {
               </div>
               {draft.source_text && (
                 <div className={`rounded-xl p-3 text-sm ${dark ? 'bg-slate-700' : 'bg-gray-50'}`}>
-                  <p className="text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">{t.linkToVocab}</p>
+                  <p className="text-[10px] text-gray-400 dark:text-slate-500 mb-1.5 uppercase tracking-wider">{t.linkToVocab}</p>
                   <WordLinker
                     text={draft.source_text}
                     links={draft.word_links ?? []}
@@ -2592,7 +2592,7 @@ function SentenceView() {
             </div>
           ) : (
             <div>
-              <div className="text-sm mb-1">
+              <div className="text-sm mb-1 text-gray-800 dark:text-slate-100">
                 <WordLinker
                   text={s.source_text || '—'}
                   links={s.word_links}
@@ -2721,7 +2721,7 @@ function ScenarioView() {
             className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
             {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
           </select>
-          <button onClick={handleTranslate} disabled={translating} className="ml-auto text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 disabled:opacity-50">
+          <button onClick={handleTranslate} disabled={translating} className="ml-auto text-xs px-2.5 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50">
             {translating ? '…' : '🌐'}
           </button>
         </div>
