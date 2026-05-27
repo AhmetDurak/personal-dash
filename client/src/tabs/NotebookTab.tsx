@@ -1111,7 +1111,23 @@ function VocabView() {
   const [showAdd, setShowAdd] = useState(false)
   const [newWord, setNewWord] = useState<NewWord>({ word: '', translation: '', language: 'de', translation_language: 'tr', example: '' })
   const [deConj, setDeConj] = useState<DeConjugation | null | 'loading' | 'none'>(null)
+  const [translating, setTranslating] = useState(false)
   const [importMsg, setImportMsg] = useState<string | null>(null)
+
+  async function translateWord(word: string, sourceLang: string, targetLang: string): Promise<string | null> {
+    if (!word.trim()) return null
+    setTranslating(true)
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: word, sourceLang, targetLang }),
+      })
+      if (!res.ok) return null
+      const data = await res.json() as { translation: string }
+      return data.translation ?? null
+    } catch { return null } finally { setTranslating(false) }
+  }
   const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set())
   const [editCard, setEditCard] = useState<EditCard | null>(null)
   const [csvTooltipOpen, setCsvTooltipOpen] = useState(false)
@@ -1653,12 +1669,26 @@ function VocabView() {
               placeholder="Word"
               className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
             />
-            <input
-              value={editCard.translation}
-              onChange={e => setEditCard(p => p && ({ ...p, translation: e.target.value }))}
-              placeholder="Translation"
-              className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
-            />
+            <div className="flex gap-2 items-center">
+              <input
+                value={editCard.translation}
+                onChange={e => setEditCard(p => p && ({ ...p, translation: e.target.value }))}
+                placeholder="Translation"
+                className="text-sm border border-gray-200 rounded-lg px-3 py-2 flex-1 focus:outline-none focus:ring-1 focus:ring-xero-green"
+              />
+              <button
+                type="button"
+                disabled={translating}
+                onClick={async () => {
+                  const result = await translateWord(editCard.word, editCard.language, editCard.translation_language)
+                  if (result) setEditCard(p => p && ({ ...p, translation: result }))
+                }}
+                className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 disabled:opacity-50 transition-colors flex-shrink-0"
+                title="Translate with DeepL"
+              >
+                {translating ? '…' : '🌐'}
+              </button>
+            </div>
             <input
               value={editCard.example}
               onChange={e => setEditCard(p => p && ({ ...p, example: e.target.value }))}

@@ -26,6 +26,7 @@ import { journalRouter } from './routes/journal'
 import { mealRouter } from './routes/meal'
 import { sportRouter } from './routes/sport'
 import { planRouter } from './routes/plan'
+import { translateRouter } from './routes/translate'
 
 const PgSession = connectPgSimple(session)
 
@@ -91,6 +92,7 @@ app.use('/api/journal',       journalRouter(pool))
 app.use('/api/meal',          mealRouter(pool))
 app.use('/api/sport',         sportRouter(pool))
 app.use('/api/plan',          planRouter(pool))
+app.use('/api/translate',     translateRouter())
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
 
