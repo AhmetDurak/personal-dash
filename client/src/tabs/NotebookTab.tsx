@@ -452,7 +452,9 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     const d = dragRef.current
     if (d) {
       if (!d.moved && Math.hypot(x - d.startSvgX, y - d.startSvgY) > 4) dragRef.current = { ...d, moved: true }
-      setNodes(prev => prev.map(n => n.id === d.id ? { ...n, x: x - d.offsetX, y: y - d.offsetY } : n))
+      const moved = nodesRef.current.map(n => n.id === d.id ? { ...n, x: x - d.offsetX, y: y - d.offsetY } : n)
+      nodesRef.current = moved
+      setNodes(moved)
       return
     }
     const c = connectRef.current
@@ -494,7 +496,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
         setCtxMenu(null)
       } else {
         setSelectedForConnect(null)
-        saveMindmap(titleRef.current, nodesRef.current)
+        saveMindmap(titleRef.current, nodesRef.current, edgesRef.current)
       }
       return
     }
@@ -796,7 +798,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       <div className="absolute top-3 left-3 z-10" onClick={e => e.stopPropagation()}>
         <input
           value={mmTitle}
-          onChange={e => { setMmTitle(e.target.value); saveMindmap(e.target.value, nodesRef.current) }}
+          onChange={e => { setMmTitle(e.target.value); saveMindmap(e.target.value, nodesRef.current, edgesRef.current) }}
           placeholder="Map title…"
           className="text-sm font-semibold bg-white/90 backdrop-blur border border-xero-border rounded-xl px-3 py-1.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-xero-green w-44"
         />
