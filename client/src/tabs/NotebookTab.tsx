@@ -1130,11 +1130,13 @@ function VocabView() {
   const [newWord, setNewWord] = useState<NewWord>({ word: '', translation: '', language: 'de', translation_language: 'tr', example: '' })
   const [deConj, setDeConj] = useState<DeConjugation | null | 'loading' | 'none'>(null)
   const [translating, setTranslating] = useState(false)
+  const [translateResult, setTranslateResult] = useState<{ alternatives: string[]; examples: { source: string; target: string }[] } | null>(null)
   const [importMsg, setImportMsg] = useState<string | null>(null)
 
-  async function translateWord(word: string, sourceLang: string, targetLang: string): Promise<string | null> {
+  async function translateWord(word: string, sourceLang: string, targetLang: string): Promise<{ translation: string; alternatives: string[]; examples: { source: string; target: string }[] } | null> {
     if (!word.trim()) return null
     setTranslating(true)
+    setTranslateResult(null)
     try {
       const res = await fetch('/api/translate', {
         method: 'POST',
@@ -1142,8 +1144,7 @@ function VocabView() {
         body: JSON.stringify({ text: word, sourceLang, targetLang }),
       })
       if (!res.ok) return null
-      const data = await res.json() as { translation: string }
-      return data.translation ?? null
+      return await res.json() as { translation: string; alternatives: string[]; examples: { source: string; target: string }[] }
     } catch { return null } finally { setTranslating(false) }
   }
   const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set())
@@ -1230,6 +1231,7 @@ function VocabView() {
 
   function openEdit(card: VocabCard) {
     setDeConj(null)
+    setTranslateResult(null)
     setEditCard({
       id: card.id,
       word: card.word,
@@ -1699,7 +1701,10 @@ function VocabView() {
                 disabled={translating}
                 onClick={async () => {
                   const result = await translateWord(editCard.word, editCard.language, editCard.translation_language)
-                  if (result) setEditCard(p => p && ({ ...p, translation: result }))
+                  if (result) {
+                    setEditCard(p => p && ({ ...p, translation: result.translation }))
+                    setTranslateResult({ alternatives: result.alternatives, examples: result.examples })
+                  }
                 }}
                 className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 disabled:opacity-50 transition-colors flex-shrink-0"
                 title="Translate with DeepL"
@@ -1707,6 +1712,35 @@ function VocabView() {
                 {translating ? '…' : '🌐'}
               </button>
             </div>
+            {translateResult && (translateResult.alternatives.length > 0 || translateResult.examples.length > 0) && (
+              <div className="space-y-2 px-1">
+                {translateResult.alternatives.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {translateResult.alternatives.map((alt, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setEditCard(p => p && ({ ...p, translation: alt }))}
+                        className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100"
+                      >
+                        {alt}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {translateResult.examples.length > 0 && (
+                  <div className="space-y-1.5">
+                    {translateResult.examples.map((ex, i) => (
+                      <div key={i} className="text-[11px] text-gray-500 dark:text-slate-400 leading-tight">
+                        <span className="italic">{ex.source}</span>
+                        <span className="mx-1 text-gray-300 dark:text-slate-600">→</span>
+                        <span>{ex.target}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <input
               value={editCard.example}
               onChange={e => setEditCard(p => p && ({ ...p, example: e.target.value }))}
