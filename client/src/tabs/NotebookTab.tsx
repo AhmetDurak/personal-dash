@@ -1327,9 +1327,9 @@ function VocabView() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {filtered.map(card => (
-          <div key={card.id} className="bg-white border border-gray-100 rounded-xl p-4 relative group hover:shadow-sm transition-shadow">
+          <div key={card.id} className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4 relative group hover:shadow-sm transition-shadow">
             <div className="flex items-start justify-between mb-1.5">
-              <span className="text-[10px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">
+              <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
                 {LANG_LABELS[card.language] ?? card.language}
               </span>
               <button
@@ -1355,19 +1355,19 @@ function VocabView() {
             >
               {flippedCards.has(card.id) ? (
                 <div className="min-h-[64px] flex flex-col gap-1">
-                  <p className="text-sm font-semibold text-indigo-700">{card.translation}</p>
+                  <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-300">{card.translation}</p>
                   {card.example && (
-                    <p className="text-[10px] text-gray-400 italic">"{card.example}"</p>
+                    <p className="text-[10px] text-gray-400 dark:text-slate-400 italic">"{card.example}"</p>
                   )}
                   {card.image_url && (
                     <img src={card.image_url} alt="" className="mt-1.5 rounded-lg w-full object-cover max-h-24" />
                   )}
-                  <p className="text-[9px] text-indigo-300 mt-auto pt-1">{t.tapFlipBack}</p>
+                  <p className="text-[9px] text-indigo-300 dark:text-indigo-500 mt-auto pt-1">{t.tapFlipBack}</p>
                 </div>
               ) : (
                 <div className="min-h-[64px] flex flex-col gap-1">
-                  <p className="text-base font-bold text-gray-900">{card.word}</p>
-                  <p className="text-[9px] text-gray-300 mt-auto pt-1">{t.tapReveal}</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-slate-100">{card.word}</p>
+                  <p className="text-[9px] text-gray-300 dark:text-slate-500 mt-auto pt-1">{t.tapReveal}</p>
                 </div>
               )}
             </div>
@@ -1395,15 +1395,15 @@ function VocabView() {
               const pct = retentionPct(card)
               const color = pct >= 90 ? '#10B981' : pct >= 70 ? '#F59E0B' : '#EF4444'
               return (
-                <div className="mt-2 pt-1.5 border-t border-gray-50">
+                <div className="mt-2 pt-1.5 border-t border-gray-50 dark:border-slate-700">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] text-gray-300">×{card.repetitions}</span>
+                    <span className="text-[9px] text-gray-300 dark:text-slate-500">×{card.repetitions}</span>
                     <span className="text-[10px] font-bold" style={{ color }}>{pct}%</span>
                   </div>
-                  <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-1 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
                   </div>
-                  <span className={`text-[9px] mt-0.5 block ${new Date(card.due_at) <= today ? 'text-red-400' : 'text-gray-300'}`}>
+                  <span className={`text-[9px] mt-0.5 block ${new Date(card.due_at) <= today ? 'text-red-400' : 'text-gray-300 dark:text-slate-500'}`}>
                     Due {new Date(card.due_at).toLocaleDateString('de-DE')}
                   </span>
                 </div>
