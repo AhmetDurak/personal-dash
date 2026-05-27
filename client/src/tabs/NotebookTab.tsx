@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
@@ -58,32 +60,10 @@ function fmtDueLabel(due: string, group: 'overdue' | 'today' | 'upcoming'): stri
 
 // ─── NotesView ────────────────────────────────────────────────────────────────
 
-const BARE_URL_RE = /(https?:\/\/[^\s<>"']+)/g
-const MD_LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g
+marked.use({ gfm: true, breaks: true })
 
-function renderWithLinks(text: string): React.ReactNode[] {
-  const nodes: React.ReactNode[] = []
-  let key = 0
-  let lastIndex = 0
-  const re = new RegExp(MD_LINK_RE.source, 'g')
-  let m: RegExpExecArray | null
-
-  function pushBare(chunk: string) {
-    chunk.split(BARE_URL_RE).forEach((part, i) => {
-      nodes.push(i % 2 === 1
-        ? <a key={key++} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline break-all">{part}</a>
-        : <span key={key++}>{part}</span>
-      )
-    })
-  }
-
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > lastIndex) pushBare(text.slice(lastIndex, m.index))
-    nodes.push(<a key={key++} href={m[2]} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{m[1]}</a>)
-    lastIndex = m.index + m[0].length
-  }
-  if (lastIndex < text.length) pushBare(text.slice(lastIndex))
-  return nodes
+function parseMarkdown(src: string): string {
+  return DOMPurify.sanitize(marked.parse(src) as string, { ADD_ATTR: ['target'] })
 }
 
 function NotesView() {
@@ -214,14 +194,13 @@ function NotesView() {
               </div>
             </div>
             {preview ? (
-              <div className="flex-1 p-6 text-sm text-gray-700 bg-white overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                {localContent
-                  ? localContent.split('\n').map((line, i) => (
-                      <p key={i} className="min-h-[1.4em]">{renderWithLinks(line)}</p>
-                    ))
-                  : <span className="text-gray-300">Write your note here…</span>
-                }
-              </div>
+              <div
+                className="flex-1 p-6 text-sm text-gray-700 bg-white overflow-y-auto note-prose"
+                dangerouslySetInnerHTML={{ __html: localContent
+                  ? parseMarkdown(localContent)
+                  : '<span class="text-gray-300">Write your note here…</span>'
+                }}
+              />
             ) : (
               <textarea
                 value={localContent}

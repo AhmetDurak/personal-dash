@@ -95,6 +95,35 @@ html, body { overflow-x: hidden; }
 .dark .divide-gray-50 > * + * { border-color: #1E293B; }
 .dark .divide-gray-100 > * + * { border-color: #273348; }
 
+/* Note markdown prose */
+.note-prose { line-height: 1.7; }
+.note-prose h1 { font-size: 1.5rem; font-weight: 700; margin: 1.25rem 0 0.5rem; line-height: 1.3; }
+.note-prose h2 { font-size: 1.2rem; font-weight: 600; margin: 1rem 0 0.4rem; line-height: 1.3; }
+.note-prose h3 { font-size: 1rem; font-weight: 600; margin: 0.75rem 0 0.3rem; }
+.note-prose p  { margin: 0.4rem 0; min-height: 1.4em; }
+.note-prose ul { list-style: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+.note-prose ol { list-style: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+.note-prose li { margin: 0.2rem 0; }
+.note-prose a  { color: #2563eb; text-decoration: underline; word-break: break-all; }
+.note-prose strong { font-weight: 600; }
+.note-prose em { font-style: italic; }
+.note-prose code { font-family: ui-monospace, monospace; font-size: 0.85em; background: #f1f5f9; padding: 0.1em 0.35em; border-radius: 4px; }
+.note-prose pre  { background: #f1f5f9; border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 0.75rem 0; }
+.note-prose pre code { background: none; padding: 0; font-size: 0.875em; }
+.note-prose blockquote { border-left: 3px solid #e2e8f0; padding-left: 1rem; color: #64748b; margin: 0.5rem 0; font-style: italic; }
+.note-prose hr { border: none; border-top: 1px solid #e2e8f0; margin: 1rem 0; }
+.note-prose table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.875em; }
+.note-prose th, .note-prose td { border: 1px solid #e2e8f0; padding: 0.4rem 0.75rem; text-align: left; }
+.note-prose th { background: #f8fafc; font-weight: 600; }
+
+.dark .note-prose a          { color: #60a5fa; }
+.dark .note-prose code       { background: #0F172A; color: #e2e8f0; }
+.dark .note-prose pre        { background: #0F172A; }
+.dark .note-prose blockquote { border-left-color: #334155; color: #94a3b8; }
+.dark .note-prose hr         { border-top-color: #334155; }
+.dark .note-prose th         { background: #162032; }
+.dark .note-prose th, .dark .note-prose td { border-color: #334155; }
+
 /* Scrollbar in dark mode */
 .dark ::-webkit-scrollbar { width: 6px; height: 6px; }
 .dark ::-webkit-scrollbar-track { background: #0F172A; }
