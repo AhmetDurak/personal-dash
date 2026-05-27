@@ -32,12 +32,16 @@ export function TopBar() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!userMenuOpen) return
     function handleClick(e: MouseEvent) {
-      if (!userMenuRef.current?.contains(e.target as Node)) setUserMenuOpen(false)
+      if (!userMenuRef.current?.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+        setSettingsOpen(false)
+      }
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
@@ -94,15 +98,6 @@ export function TopBar() {
       <div className="ml-auto flex items-center gap-1">
         <NotificationsPanel />
 
-        {/* Dark / Light toggle */}
-        <button
-          onClick={toggle}
-          className="flex items-center gap-1 px-2 md:px-3 py-1 rounded text-sm text-gray-500 hover:text-gray-200 hover:bg-white/5 transition-colors"
-        >
-          <span>{dark ? '☀️' : '🌙'}</span>
-          <span className="hidden md:inline font-medium">{dark ? t.light : t.dark}</span>
-        </button>
-
         {/* User menu */}
         {user && (
           <div ref={userMenuRef} className="relative flex items-center pl-2 ml-1 border-l border-gray-800">
@@ -121,46 +116,97 @@ export function TopBar() {
             </button>
 
             {userMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl py-2 min-w-[180px] z-50">
-                {/* Language */}
-                <div className="px-3 py-2">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">{t.language}</p>
-                  <div className="flex gap-1">
-                    {LANG_OPTIONS.map(o => (
-                      <button
-                        key={o.value}
-                        onClick={() => setLang(o.value)}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors flex-1 ${
-                          lang === o.value ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-white/10'
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <div className="absolute right-0 top-full mt-2 bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl py-2 min-w-[200px] z-50">
 
-                <div className="border-t border-gray-800 my-1" />
+                {settingsOpen ? (
+                  /* ── Settings sub-panel ── */
+                  <>
+                    <button
+                      onClick={() => setSettingsOpen(false)}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1.5 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                      Back
+                    </button>
 
-                {/* Mobile token */}
-                <button
-                  onClick={copyMobileToken}
-                  className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center gap-2"
-                >
-                  <span>{tokenCopied ? '✓' : '📱'}</span>
-                  <span>{tokenCopied ? 'Copied!' : 'Copy mobile token'}</span>
-                </button>
+                    <div className="border-t border-gray-800 my-1" />
 
-                <div className="border-t border-gray-800 my-1" />
+                    {/* Language */}
+                    <div className="px-3 py-2">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">{t.language}</p>
+                      <div className="flex gap-1">
+                        {LANG_OPTIONS.map(o => (
+                          <button
+                            key={o.value}
+                            onClick={() => setLang(o.value)}
+                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors flex-1 ${
+                              lang === o.value ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-white/10'
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Sign out */}
-                <button
-                  onClick={() => { setUserMenuOpen(false); setShowLogoutConfirm(true) }}
-                  className="w-full text-left px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-white/5 transition-colors flex items-center gap-2"
-                >
-                  <span>↪</span>
-                  <span>{t.signOut}</span>
-                </button>
+                    <div className="border-t border-gray-800 my-1" />
+
+                    {/* Dark / Light toggle */}
+                    <button
+                      onClick={toggle}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{dark ? '☀️' : '🌙'}</span>
+                        <span>{dark ? t.light : t.dark}</span>
+                      </span>
+                      <span className={`w-8 h-4 rounded-full relative flex-shrink-0 transition-colors ${dark ? 'bg-blue-500' : 'bg-gray-600'}`}>
+                        <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${dark ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                      </span>
+                    </button>
+                  </>
+                ) : (
+                  /* ── Main menu ── */
+                  <>
+                    {/* Settings entry */}
+                    <button
+                      onClick={() => setSettingsOpen(true)}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>⚙</span>
+                        <span>Settings</span>
+                      </span>
+                      <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+
+                    <div className="border-t border-gray-800 my-1" />
+
+                    {/* Mobile token */}
+                    <button
+                      onClick={copyMobileToken}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center gap-2"
+                    >
+                      <span>{tokenCopied ? '✓' : '📱'}</span>
+                      <span>{tokenCopied ? 'Copied!' : 'Copy mobile token'}</span>
+                    </button>
+
+                    <div className="border-t border-gray-800 my-1" />
+
+                    {/* Sign out */}
+                    <button
+                      onClick={() => { setUserMenuOpen(false); setShowLogoutConfirm(true) }}
+                      className="w-full text-left px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-white/5 transition-colors flex items-center gap-2"
+                    >
+                      <span>↪</span>
+                      <span>{t.signOut}</span>
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

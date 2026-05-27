@@ -1485,10 +1485,10 @@ function VocabView() {
           <div
             key={card.id}
             onClick={selectMode ? () => toggleSelect(card.id) : undefined}
-            className={`bg-white dark:bg-slate-800 rounded-xl p-4 relative group hover:shadow-sm transition-all ${
+            className={`bg-slate-50 dark:bg-slate-800 rounded-xl p-4 relative group hover:shadow-sm transition-all ${
               selectMode
-                ? `cursor-pointer border-2 ${selectedIds.has(card.id) ? 'border-xero-green ring-2 ring-xero-green/20' : 'border-gray-100 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-500'}`
-                : 'border border-gray-100 dark:border-slate-700'
+                ? `cursor-pointer border-2 ${selectedIds.has(card.id) ? 'border-xero-green ring-2 ring-xero-green/20' : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-500'}`
+                : 'border border-gray-200 dark:border-slate-700'
             }`}
           >
             <div className="flex items-start justify-between mb-1.5">
