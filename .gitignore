@@ -71,3 +71,5 @@ tmp/
 /hooks/logs/
 /hooks/
 financedash_dump.sql
+
+.claude/
