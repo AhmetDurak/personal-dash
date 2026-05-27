@@ -6,6 +6,7 @@ import { LanguageContext, useLanguageState } from './hooks/useLanguage'
 import { LoginPage } from './pages/LoginPage'
 import { TopBar } from './components/web/TopBar'
 import { Sidebar } from './components/web/Sidebar'
+import { AppTour } from './components/web/AppTour'
 import { DashboardHeader } from './components/web/DashboardHeader'
 import { OverviewTab } from './tabs/OverviewTab'
 import { CashFlowTab } from './tabs/CashFlowTab'
@@ -78,6 +79,7 @@ export function App() {
     <LanguageContext.Provider value={langCtx}>
       <div className="flex flex-col h-dvh overflow-hidden">
         <TopBar />
+        <AppTour />
         <div className="flex-1 overflow-hidden">
           <Routes>
             <Route path="/today"       element={<TodayTab />} />

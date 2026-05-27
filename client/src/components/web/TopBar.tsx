@@ -6,6 +6,7 @@ import { useLanguage } from '../../hooks/useLanguage'
 import type { Lang } from '../../hooks/useLanguage'
 import { NotificationsPanel } from './NotificationsPanel'
 import { ConfirmDialog } from './ConfirmDialog'
+import { resetTour } from './AppTour'
 
 const LANG_OPTIONS: { value: Lang; label: string }[] = [
   { value: 'en', label: 'EN' },
@@ -66,7 +67,7 @@ export function TopBar() {
 
   return (
     <>
-    <div className="h-10 bg-gray-950 flex items-center px-3 md:px-4 gap-1 flex-shrink-0 border-b border-gray-800 w-full">
+    <div className="h-10 bg-gray-950/95 backdrop-blur-md flex items-center px-3 md:px-4 gap-1 flex-shrink-0 border-b border-white/5 w-full sticky top-0 z-30">
       {/* Brand */}
       <div className="flex items-center gap-2 pr-3 md:pr-4 mr-1 md:mr-2 border-r border-gray-800 flex-shrink-0">
         <Logo />
@@ -165,6 +166,17 @@ export function TopBar() {
                       <span className={`w-8 h-4 rounded-full relative flex-shrink-0 transition-colors ${dark ? 'bg-blue-500' : 'bg-gray-600'}`}>
                         <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${dark ? 'translate-x-4' : 'translate-x-0.5'}`} />
                       </span>
+                    </button>
+
+                    <div className="border-t border-gray-800 my-1" />
+
+                    {/* Replay tour */}
+                    <button
+                      onClick={() => { resetTour(); window.location.reload() }}
+                      className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center gap-2"
+                    >
+                      <span>🗺</span>
+                      <span>Replay intro tour</span>
                     </button>
                   </>
                 ) : (
