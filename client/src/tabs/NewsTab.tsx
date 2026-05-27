@@ -120,7 +120,7 @@ export function NewsTab() {
   const filtered = (data?.news ?? []).filter(n => category === 'all' || n.category === category)
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto">
       {/* Metal strip */}
       {data?.metals && <MetalStrip metals={data.metals} />}
 
@@ -156,7 +156,7 @@ export function NewsTab() {
       {isLoading && (
         <div className="space-y-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white border border-xero-border rounded-xl p-4 h-24 animate-pulse bg-gray-50" />
+            <div key={i} className="bg-gray-50 border border-xero-border rounded-xl p-4 h-24 animate-pulse" />
           ))}
         </div>
       )}

@@ -28,7 +28,7 @@ export function CashFlowTab({ month, span, onSpanChange }: Props) {
       {summary && <CashFlowKPIs summary={summary} barData={bar} />}
       {balance && <BalanceChart data={balance} span={span} onSpanChange={onSpanChange} />}
       {stackedExp && <CategoryStackedBar data={stackedExp} />}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {donut && <CategoryDonut data={donut} />}
         {summary && <CashFlowStatement summary={summary} prevEndBalance={prevSummary?.endBalance} />}
       </div>

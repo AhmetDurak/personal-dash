@@ -1054,14 +1054,13 @@ function speak(text: string, lang: string) {
   const bcp47 = LANG_BCP47[lang] ?? lang
 
   function doSpeak() {
-    window.speechSynthesis.cancel()
     const utt = new SpeechSynthesisUtterance(text)
     utt.lang = bcp47
     const voices = window.speechSynthesis.getVoices()
     const voice = voices.find(v => v.lang.startsWith(bcp47.slice(0, 2))) ?? null
     if (voice) utt.voice = voice
-    // small delay so cancel() fully clears before speak() (Chrome bug)
-    setTimeout(() => window.speechSynthesis.speak(utt), 50)
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utt)
   }
 
   const voices = window.speechSynthesis.getVoices()

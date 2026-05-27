@@ -47,10 +47,17 @@ html, body { overflow-x: hidden; }
 .dark input::placeholder, .dark textarea::placeholder { color: #475569; }
 .dark input:focus, .dark textarea:focus { border-color: #00B087; }
 
-/* Recharts tooltip */
-.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+/* Recharts tooltip — override all inline styles in dark mode */
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip,
+.dark .recharts-tooltip-wrapper .recharts-tooltip-label,
+.dark .recharts-tooltip-wrapper .recharts-tooltip-item {
   background-color: #1E293B !important;
-  border-color: #334155 !important;
+  border: 1px solid #334155 !important;
+  color: #F1F5F9 !important;
+}
+.dark .recharts-tooltip-wrapper .recharts-tooltip-item-name,
+.dark .recharts-tooltip-wrapper .recharts-tooltip-item-value,
+.dark .recharts-tooltip-wrapper .recharts-tooltip-item-separator {
   color: #F1F5F9 !important;
 }
 

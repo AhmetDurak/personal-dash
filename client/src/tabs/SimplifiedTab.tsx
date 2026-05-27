@@ -37,7 +37,7 @@ export function SimplifiedTab({ month, span, onSpanChange }: Props) {
             <KPIGrid summary={summary} />
             <CashFlowTable summary={summary} />
             {series && <BalanceChart data={series} span={span} onSpanChange={onSpanChange} />}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {donut && <CategoryDonut data={donut} />}
               {bar && <IncomeExpenseBar data={bar} />}
             </div>

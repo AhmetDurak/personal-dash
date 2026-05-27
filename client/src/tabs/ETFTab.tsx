@@ -814,10 +814,13 @@ export function ETFTab() {
 
   const compareList = Array.from(compareSet)
 
+  // On mobile: show detail panel full-screen when an ETF is selected
+  const showDetailMobile = !compareMode && selected
+
   return (
     <div className="flex h-full min-h-0">
-      {/* Watchlist sidebar */}
-      <div className="w-56 flex-shrink-0 border-r border-xero-border bg-white flex flex-col min-h-0">
+      {/* Watchlist sidebar — hidden on mobile when detail is open */}
+      <div className={`${showDetailMobile ? 'hidden md:flex' : 'flex'} w-full md:w-56 flex-shrink-0 border-r border-xero-border bg-white flex-col min-h-0`}>
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Watchlist</p>
           <button onClick={toggleCompareMode}
@@ -852,31 +855,42 @@ export function ETFTab() {
         )}
       </div>
 
-      {/* Right panel */}
-      {compareMode
-        ? compareList.length >= 2
-          ? <ComparePanel tickers={compareList} />
-          : (
-            <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-              <div className="text-center">
-                <p className="text-4xl mb-3">⇄</p>
-                <p className="font-medium text-gray-600 mb-1">ETFs für Vergleich wählen</p>
-                <p>Mindestens 2 ETFs aus der Watchlist anklicken</p>
+      {/* Right panel — full-screen on mobile when detail is open */}
+      <div className={`${showDetailMobile ? 'flex' : 'hidden md:flex'} flex-1 flex-col min-h-0 overflow-hidden`}>
+        {/* Mobile back button */}
+        {showDetailMobile && (
+          <button
+            onClick={() => setSelected(null)}
+            className="md:hidden flex items-center gap-1.5 px-4 py-2.5 text-sm text-gray-500 hover:text-gray-800 border-b border-xero-border bg-white flex-shrink-0"
+          >
+            ← Watchlist
+          </button>
+        )}
+        {compareMode
+          ? compareList.length >= 2
+            ? <ComparePanel tickers={compareList} />
+            : (
+              <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+                <div className="text-center">
+                  <p className="text-4xl mb-3">⇄</p>
+                  <p className="font-medium text-gray-600 mb-1">ETFs für Vergleich wählen</p>
+                  <p>Mindestens 2 ETFs aus der Watchlist anklicken</p>
+                </div>
               </div>
-            </div>
-          )
-        : selected
-          ? <ETFDetailPanel ticker={selected} onRemove={() => handleRemove(selected)} />
-          : (
-            <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-              <div className="text-center">
-                <p className="text-4xl mb-3">◈</p>
-                <p className="font-medium text-gray-600 mb-1">ETF auswählen</p>
-                <p>Ticker in der Watchlist hinzufügen und anklicken</p>
+            )
+          : selected
+            ? <ETFDetailPanel ticker={selected} onRemove={() => handleRemove(selected)} />
+            : (
+              <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+                <div className="text-center">
+                  <p className="text-4xl mb-3">◈</p>
+                  <p className="font-medium text-gray-600 mb-1">ETF auswählen</p>
+                  <p>Ticker in der Watchlist hinzufügen und anklicken</p>
+                </div>
               </div>
-            </div>
-          )
-      }
+            )
+        }
+      </div>
     </div>
   )
 }
