@@ -701,8 +701,8 @@ function WeightView() {
   }
 
   const chartData = useMemo(() => entries.map(e => ({
-    date:  new Date(e.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-    dateRaw: e.date,
+    date:  new Date(e.date.slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+    dateRaw: e.date.slice(0, 10),
     kg:    Number(e.weight_kg),
   })), [entries])
 
@@ -800,7 +800,7 @@ function WeightView() {
             {[...entries].reverse().map(e => (
               <div key={e.id} className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 px-4 py-3 group">
                 <p className="text-sm text-gray-500 dark:text-slate-400 w-24 flex-shrink-0">
-                  {new Date(e.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  {new Date(e.date.slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </p>
                 <p className="text-sm font-bold text-gray-900 dark:text-slate-100">{Number(e.weight_kg).toFixed(1)} kg</p>
                 {e.note && <p className="text-xs text-gray-400 dark:text-slate-500 flex-1 truncate">{e.note}</p>}
@@ -808,7 +808,7 @@ function WeightView() {
                   className="p-1 text-gray-300 dark:text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 ml-auto flex-shrink-0 rounded"><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
                 {confirmId === e.id && (
                   <ConfirmDialog
-                    message={`Delete entry for ${e.date}?`}
+                    message={`Delete entry for ${e.date.slice(0, 10)}?`}
                     confirmLabel="Delete"
                     onConfirm={() => { deleteEntry(e.id); setConfirmId(null) }}
                     onCancel={() => setConfirmId(null)}

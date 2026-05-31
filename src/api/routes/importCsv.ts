@@ -23,10 +23,32 @@ function splitRow(line: string, sep: string): string[] {
 }
 
 function detectSeparator(lines: string[]): string {
-  const sample = lines.slice(0, 5).join('\n')
-  const counts: Record<string, number> = { ',': 0, ';': 0, '\t': 0, '|': 0 }
-  for (const sep of Object.keys(counts)) counts[sep] = (sample.match(new RegExp(`\\${sep}`, 'g')) ?? []).length
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+  const candidates = [';', '\t', ',', '|']
+  // Find the separator that produces the most columns on any single line (up to first 20)
+  let bestSep = ','
+  let bestCount = 0
+  for (const sep of candidates) {
+    for (const line of lines.slice(0, 20)) {
+      const count = splitRow(line, sep).length
+      if (count > bestCount) { bestCount = count; bestSep = sep }
+    }
+  }
+  return bestSep
+}
+
+// Returns { headerIdx, headers } — skips leading metadata rows (< 3 columns or single-cell info rows)
+function findHeaderRow(lines: string[], sep: string): { headerIdx: number; headers: string[] } {
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    const cols = splitRow(lines[i], sep)
+    if (cols.filter(c => c.trim()).length < 3) continue
+    // A row with ≥3 columns where the first cell is NOT a parseable date is a header row
+    if (parseDate(cols[0].trim().replace(/^"|"$/g, '')) === null) {
+      return { headerIdx: i, headers: cols }
+    }
+    // A row with ≥3 columns where the first cell IS a date means data starts here (no header)
+    return { headerIdx: -1, headers: cols.map((_, idx) => `Column ${idx + 1}`) }
+  }
+  return { headerIdx: 0, headers: splitRow(lines[0], sep) }
 }
 
 function parseAmount(raw: string): number | null {
@@ -74,7 +96,7 @@ const NAME_ALIASES = ['begünstigter', 'beguenstigter', 'auftraggeber', 'empfän
   'payee', 'description', 'memo', 'verwendungszweck', 'name', 'counterparty', 'merchant name',
   'transaction description', 'reference', 'kundenreferenz', 'payment reference']
 const AMOUNT_ALIASES = ['betrag', 'amount', 'umsatz', 'summe', 'value', 'transaktionsbetrag',
-  'amount (eur)', 'betrag (eur)', 'credit', 'debit', 'einnahmen', 'ausgaben', 'net amount']
+  'amount (eur)', 'betrag (eur)', 'einnahmen', 'ausgaben', 'net amount', 'soll', 'haben']
 const TYPE_ALIASES   = ['type', 'typ', 'transaction type', 'umsatzart', 'art', 'direction']
 const CAT_ALIASES    = ['category', 'kategorie', 'kat']
 
@@ -86,9 +108,10 @@ export interface ColumnMapping {
   catCol:     number | null
   separator:  string
   hasHeader:  boolean
+  dataStart:  number
 }
 
-function autoDetectMapping(headers: string[], sep: string): Omit<ColumnMapping, 'separator' | 'hasHeader'> {
+function autoDetectMapping(headers: string[], sep: string): Omit<ColumnMapping, 'separator' | 'hasHeader' | 'dataStart'> {
   function findCol(aliases: string[]): number | null {
     for (let i = 0; i < headers.length; i++) {
       const h = headers[i].toLowerCase().trim().replace(/["']/g, '')
@@ -135,7 +158,7 @@ function parseDataRow(cols: string[], mapping: ColumnMapping): ParsedRow | strin
   let type: 'income' | 'expense'
   if (mapping.typeCol !== null) {
     const typeRaw = get(mapping.typeCol).toLowerCase()
-    type = ['income', 'einnahme', 'credit', 'gutschrift', 'haben'].some(w => typeRaw.includes(w))
+    type = ['income', 'einnahme', 'credit', 'gutschrift', 'haben', 'zinsen', 'dividende', 'erstattung'].some(w => typeRaw.includes(w))
       ? 'income' : 'expense'
   } else {
     type = amountNum >= 0 ? 'income' : 'expense'
@@ -172,17 +195,15 @@ export function importCsvRouter(): Router {
       if (lines.length < 2) { res.json({ error: 'File too short' }); return }
 
       const sep      = detectSeparator(lines)
-      const firstRow = splitRow(lines[0], sep)
-      // Check if first row looks like a header (first cell not a date)
-      const hasHeader = parseDate(firstRow[0]) === null
-      const headers   = hasHeader ? firstRow : firstRow.map((_, i) => `Column ${i + 1}`)
-      const dataStart = hasHeader ? 1 : 0
+      const { headerIdx, headers } = findHeaderRow(lines, sep)
+      const hasHeader = headerIdx >= 0
+      const dataStart = hasHeader ? headerIdx + 1 : 0
 
       const detected = autoDetectMapping(headers, sep)
       // Sample rows for display (up to 3)
       const sampleRows = lines.slice(dataStart, dataStart + 3).map(l => splitRow(l, sep))
 
-      res.json({ headers, sampleRows, detected, separator: sep, hasHeader, totalRows: lines.length - dataStart })
+      res.json({ headers, sampleRows, detected, separator: sep, hasHeader, dataStart, totalRows: lines.length - dataStart })
     } finally {
       await unlink(tmpPath).catch(() => undefined)
     }
@@ -198,7 +219,7 @@ export function importCsvRouter(): Router {
       const lines = raw.split(/\r?\n/).filter(l => l.trim())
 
       const sep       = mapping.separator
-      const dataStart = mapping.hasHeader ? 1 : 0
+      const dataStart = mapping.dataStart ?? (mapping.hasHeader ? 1 : 0)
 
       let imported = 0
       let skipped  = 0

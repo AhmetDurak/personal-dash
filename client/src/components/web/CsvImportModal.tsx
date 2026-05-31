@@ -10,14 +10,16 @@ export interface ColumnMapping {
   catCol:    number | null
   separator: string
   hasHeader: boolean
+  dataStart: number
 }
 
 interface PreviewData {
   headers:   string[]
   sampleRows: string[][]
-  detected:  Omit<ColumnMapping, 'separator' | 'hasHeader'>
+  detected:  Omit<ColumnMapping, 'separator' | 'hasHeader' | 'dataStart'>
   separator: string
   hasHeader: boolean
+  dataStart: number
   totalRows: number
 }
 
@@ -41,6 +43,7 @@ export function CsvImportModal({ file, preview, onConfirm, onClose }: Props) {
     ...preview.detected,
     separator: preview.separator,
     hasHeader: preview.hasHeader,
+    dataStart: preview.dataStart,
   })
 
   const isReady = mapping.dateCol !== null && mapping.nameCol !== null && mapping.amountCol !== null
