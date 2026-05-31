@@ -74,27 +74,38 @@ export interface WordLink {
 }
 
 export interface LanguageSentence {
-  id:          number
-  user_id:     number
-  source_text: string
-  translation: string | null
-  source_lang: string
-  target_lang: string
-  word_links:  WordLink[]
-  created_at:  string
-  updated_at:  string
+  id:            number
+  user_id:       number
+  source_text:   string
+  translation:   string | null
+  source_lang:   string
+  target_lang:   string
+  word_links:    WordLink[]
+  interval:      number
+  repetitions:   number
+  ease_factor:   number
+  due_at:        string   // ISO date YYYY-MM-DD
+  memory_palace: string | null
+  image_url:     string | null
+  created_at:    string
+  updated_at:    string
 }
 
 export interface LanguageScenario {
-  id:          number
-  user_id:     number
-  title:       string
-  content:     string
-  source_lang: string
-  target_lang: string
-  word_links:  WordLink[]
-  created_at:  string
-  updated_at:  string
+  id:            number
+  user_id:       number
+  title:         string
+  content:       string
+  source_lang:   string
+  target_lang:   string
+  word_links:    WordLink[]
+  interval:      number
+  repetitions:   number
+  ease_factor:   number
+  due_at:        string
+  memory_palace: string | null
+  created_at:    string
+  updated_at:    string
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
@@ -273,7 +284,7 @@ export function useLanguageSentences() {
     return s
   }
 
-  async function saveSentence(id: number, payload: Partial<Pick<LanguageSentence, 'source_text' | 'translation' | 'source_lang' | 'target_lang' | 'word_links'>>) {
+  async function saveSentence(id: number, payload: Partial<LanguageSentence>) {
     const current = (data ?? []).find(s => s.id === id)
     const merged = { ...current, ...payload }
     await fetch(`/api/notebook/language/sentences/${id}`, {
@@ -284,12 +295,21 @@ export function useLanguageSentences() {
     await mutate()
   }
 
+  async function reviewSentence(id: number, quality: number) {
+    await fetch(`/api/notebook/language/sentences/${id}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quality }),
+    })
+    await mutate()
+  }
+
   async function deleteSentence(id: number) {
     await fetch(`/api/notebook/language/sentences/${id}`, { method: 'DELETE' })
     await mutate()
   }
 
-  return { sentences: data ?? [], isLoading, createSentence, saveSentence, deleteSentence }
+  return { sentences: data ?? [], isLoading, createSentence, saveSentence, reviewSentence, deleteSentence }
 }
 
 // ─── Language Scenarios ───────────────────────────────────────────────────────
@@ -308,7 +328,7 @@ export function useLanguageScenarios() {
     return s
   }
 
-  async function saveScenario(id: number, payload: Partial<Pick<LanguageScenario, 'title' | 'content' | 'source_lang' | 'target_lang' | 'word_links'>>) {
+  async function saveScenario(id: number, payload: Partial<LanguageScenario>) {
     const current = (data ?? []).find(s => s.id === id)
     const merged = { ...current, ...payload }
     await fetch(`/api/notebook/language/scenarios/${id}`, {
@@ -319,10 +339,19 @@ export function useLanguageScenarios() {
     await mutate()
   }
 
+  async function reviewScenario(id: number, quality: number) {
+    await fetch(`/api/notebook/language/scenarios/${id}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quality }),
+    })
+    await mutate()
+  }
+
   async function deleteScenario(id: number) {
     await fetch(`/api/notebook/language/scenarios/${id}`, { method: 'DELETE' })
     await mutate()
   }
 
-  return { scenarios: data ?? [], isLoading, createScenario, saveScenario, deleteScenario }
+  return { scenarios: data ?? [], isLoading, createScenario, saveScenario, reviewScenario, deleteScenario }
 }

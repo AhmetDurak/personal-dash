@@ -2395,22 +2395,135 @@ function WordLinker({ text, links, vocab, sourceLang, onAddLink, onRemoveLink, r
   )
 }
 
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+const PALACE_SUGGESTIONS = [
+  'At the bakery', 'At a restaurant', 'At work', 'Job interview',
+  'Shopping', 'Doctor visit', 'On the phone', 'Travel / Airport',
+  'Morning commute', 'At school / University', 'Meeting', 'At home',
+]
+
+function isDueSR(dateStr: string): boolean {
+  return dateStr <= new Date().toISOString().slice(0, 10)
+}
+
+function nextReviewLabel(dateStr: string): string {
+  const diff = Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000)
+  if (diff <= 0) return 'Due now'
+  if (diff === 1) return 'Tomorrow'
+  return `In ${diff}d`
+}
+
+// ─── Review Session (shared by sentence + scenario) ───────────────────────────
+
+type ReviewItem = { id: number; front: string; back: string | null; palace: string | null }
+type ReviewQuality = 1 | 3 | 5   // again | good | easy
+
+function ReviewSession({
+  items, onRate, onDone,
+}: { items: ReviewItem[]; onRate: (id: number, q: ReviewQuality) => Promise<void>; onDone: () => void }) {
+  const [idx, setIdx]         = useState(0)
+  const [revealed, setRevealed] = useState(false)
+  const [loading, setLoading]   = useState(false)
+  const [reviewed, setReviewed] = useState(0)
+
+  const current = items[idx]
+  if (!current) return (
+    <div className="flex flex-col items-center justify-center py-20 space-y-4">
+      <p className="text-4xl">🎉</p>
+      <p className="text-base font-semibold text-gray-800 dark:text-slate-100">Review complete!</p>
+      <p className="text-sm text-gray-400 dark:text-slate-500">{reviewed} of {items.length} reviewed</p>
+      <button onClick={onDone} className="mt-2 px-6 py-2 bg-xero-green text-white rounded-xl text-sm font-medium hover:bg-xero-green-dark transition-colors">
+        Done
+      </button>
+    </div>
+  )
+
+  async function rate(q: ReviewQuality) {
+    setLoading(true)
+    await onRate(current.id, q)
+    setReviewed(r => r + 1)
+    setIdx(i => i + 1)
+    setRevealed(false)
+    setLoading(false)
+  }
+
+  return (
+    <div className="max-w-lg mx-auto p-4 space-y-4">
+      {/* Progress */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-gray-400 dark:text-slate-500">{idx + 1} / {items.length}</span>
+        <button onClick={onDone} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Exit review</button>
+      </div>
+      <div className="h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+        <div className="h-full bg-xero-green rounded-full transition-all duration-300" style={{ width: `${(idx / items.length) * 100}%` }} />
+      </div>
+
+      {/* Card */}
+      <div className="rounded-2xl border bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 p-6 space-y-4 min-h-[200px]">
+        {current.palace && (
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2.5 py-1 rounded-full">
+            <span>🏛️</span>
+            <span>{current.palace}</span>
+          </div>
+        )}
+
+        <p className="text-lg font-semibold text-gray-900 dark:text-slate-100 leading-relaxed">{current.front}</p>
+
+        {!revealed ? (
+          <button
+            onClick={() => setRevealed(true)}
+            className="w-full py-2.5 text-sm font-medium rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-600 text-gray-400 dark:text-slate-500 hover:border-xero-green hover:text-xero-green transition-colors"
+          >
+            Show translation →
+          </button>
+        ) : (
+          <div className="space-y-4">
+            <div className="pt-2 border-t border-gray-100 dark:border-slate-700">
+              <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">{current.back ?? '—'}</p>
+            </div>
+
+            {/* Rating */}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => rate(1)} disabled={loading}
+                className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50">
+                Again
+              </button>
+              <button onClick={() => rate(3)} disabled={loading}
+                className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors disabled:opacity-50">
+                Hard
+              </button>
+              <button onClick={() => rate(5)} disabled={loading}
+                className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50">
+                Easy
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── SentenceView ─────────────────────────────────────────────────────────────
 
 function SentenceView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { sentences, createSentence, saveSentence, deleteSentence } = useLanguageSentences()
+  const { sentences, createSentence, saveSentence, reviewSentence, deleteSentence } = useLanguageSentences()
   const { vocab } = useVocabulary()
-  const [editingId, setEditingId] = useState<number | 'new' | null>(null)
-  const [draft, setDraft] = useState<Partial<LanguageSentence>>({})
+  const [editingId, setEditingId]   = useState<number | 'new' | null>(null)
+  const [draft, setDraft]           = useState<Partial<LanguageSentence>>({})
   const [translating, setTranslating] = useState(false)
   const [translateResult, setTranslateResult] = useState<{ translation: string; alternatives: string[] } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [reviewMode, setReviewMode]   = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const dueItems = sentences.filter(s => isDueSR(s.due_at))
+
   function openNew() {
-    setDraft({ source_text: '', translation: null, source_lang: 'de', target_lang: 'tr', word_links: [] })
+    setDraft({ source_text: '', translation: null, source_lang: 'de', target_lang: 'tr', word_links: [], memory_palace: null })
     setEditingId('new')
     setTranslateResult(null)
   }
@@ -2468,59 +2581,123 @@ function SentenceView() {
   const inputCls = `text-sm border rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-blue-400 ${dark ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400' : 'border-gray-200'}`
   const cardCls = `rounded-2xl border p-4 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'}`
 
+  // Reusable edit form fields (shared between new-card and inline edit)
+  function EditFormFields({ isInline = false }: { isInline?: boolean }) {
+    return (
+      <div className="space-y-2">
+        <textarea
+          autoFocus={!isInline}
+          value={draft.source_text ?? ''}
+          onChange={e => {
+            const v = e.target.value
+            setDraft(d => ({ ...d, source_text: v }))
+            if (isInline && editingId && editingId !== 'new') scheduleSave(editingId as number, { source_text: v })
+          }}
+          placeholder="Ich laufe jeden Tag…"
+          rows={2}
+          className={inputCls + ' resize-none'}
+        />
+        <div className="flex gap-2 items-center">
+          <input
+            value={draft.translation ?? ''}
+            onChange={e => setDraft(d => ({ ...d, translation: e.target.value }))}
+            placeholder={t.translation}
+            className={inputCls + ' flex-1'}
+          />
+          <button onClick={handleTranslate} disabled={translating} className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 flex-shrink-0">
+            {translating ? '…' : '🌐'}
+          </button>
+        </div>
+        {translateResult && translateResult.alternatives.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {translateResult.alternatives.map((alt, i) => (
+              <button key={i} type="button" onClick={() => setDraft(d => ({ ...d, translation: alt }))}
+                className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-100 dark:border-blue-800/50">{alt}</button>
+            ))}
+          </div>
+        )}
+        {/* Memory palace field */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm flex-shrink-0">🏛️</span>
+          <input
+            value={draft.memory_palace ?? ''}
+            onChange={e => setDraft(d => ({ ...d, memory_palace: e.target.value || null }))}
+            placeholder="Memory palace — where will you use this? (optional)"
+            list="palace-suggestions"
+            className={inputCls}
+          />
+        </div>
+        <div className="flex gap-2 text-xs">
+          <select value={draft.source_lang ?? 'de'} onChange={e => setDraft(d => ({ ...d, source_lang: e.target.value }))}
+            className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
+            {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+          </select>
+          <span className="text-gray-400 self-center">→</span>
+          <select value={draft.target_lang ?? 'tr'} onChange={e => setDraft(d => ({ ...d, target_lang: e.target.value }))}
+            className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
+            {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+          </select>
+        </div>
+        {draft.source_text && (
+          <div className={`rounded-xl p-3 text-sm ${dark ? 'bg-slate-700' : 'bg-gray-50'}`}>
+            <p className="text-[10px] text-gray-400 dark:text-slate-500 mb-1.5 uppercase tracking-wider">{t.linkToVocab}</p>
+            <WordLinker
+              text={draft.source_text}
+              links={draft.word_links ?? []}
+              vocab={vocab}
+              sourceLang={draft.source_lang ?? 'de'}
+              onAddLink={handleAddLink}
+              onRemoveLink={handleRemoveLink}
+            />
+          </div>
+        )}
+        <div className="flex gap-2 pt-1">
+          <button onClick={handleSave} className="flex-1 text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 py-2 rounded-xl font-medium">{t.save}</button>
+          <button onClick={() => setEditingId(null)} className="flex-1 text-sm bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 py-2 rounded-xl font-medium">{t.cancel}</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (reviewMode) {
+    return (
+      <ReviewSession
+        items={dueItems.map(s => ({ id: s.id, front: s.source_text, back: s.translation, palace: s.memory_palace }))}
+        onRate={async (id, q) => { await reviewSentence(id, q) }}
+        onDone={() => setReviewMode(false)}
+      />
+    )
+  }
+
   return (
     <div className="p-4 space-y-3 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between">
-        <button onClick={openNew} className="text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 px-3 py-1.5 rounded-xl font-medium">+ {t.addSentence}</button>
+      {/* Autocomplete list for memory palace suggestions */}
+      <datalist id="palace-suggestions">
+        {PALACE_SUGGESTIONS.map(p => <option key={p} value={p} />)}
+      </datalist>
+
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button onClick={openNew} className="text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 px-3 py-1.5 rounded-xl font-medium">
+          + {t.addSentence}
+        </button>
+        {dueItems.length > 0 && (
+          <button
+            onClick={() => setReviewMode(true)}
+            className="text-sm font-semibold px-3 py-1.5 rounded-xl bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1.5"
+          >
+            🏛️ Review {dueItems.length} due
+          </button>
+        )}
+        <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">
+          {sentences.length} sentences
+        </span>
       </div>
 
-      {(editingId === 'new') && (
+      {editingId === 'new' && (
         <div className={cardCls}>
           <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">{t.addSentence}</p>
-          <div className="space-y-2">
-            <textarea
-              autoFocus
-              value={draft.source_text ?? ''}
-              onChange={e => setDraft(d => ({ ...d, source_text: e.target.value }))}
-              placeholder="Ich laufe jeden Tag…"
-              rows={2}
-              className={inputCls + ' resize-none'}
-            />
-            <div className="flex gap-2 items-center">
-              <input
-                value={draft.translation ?? ''}
-                onChange={e => setDraft(d => ({ ...d, translation: e.target.value }))}
-                placeholder={t.translation}
-                className={inputCls + ' flex-1'}
-              />
-              <button onClick={handleTranslate} disabled={translating} className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 flex-shrink-0">
-                {translating ? '…' : '🌐'}
-              </button>
-            </div>
-            {translateResult && translateResult.alternatives.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {translateResult.alternatives.map((alt, i) => (
-                  <button key={i} type="button" onClick={() => setDraft(d => ({ ...d, translation: alt }))}
-                    className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-100 dark:border-blue-800/50">{alt}</button>
-                ))}
-              </div>
-            )}
-            <div className="flex gap-2 text-xs">
-              <select value={draft.source_lang ?? 'de'} onChange={e => setDraft(d => ({ ...d, source_lang: e.target.value }))}
-                className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
-                {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
-              </select>
-              <span className="text-gray-400 self-center">→</span>
-              <select value={draft.target_lang ?? 'tr'} onChange={e => setDraft(d => ({ ...d, target_lang: e.target.value }))}
-                className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
-                {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
-              </select>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button onClick={handleSave} className="flex-1 text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 py-2 rounded-xl font-medium">{t.save}</button>
-              <button onClick={() => setEditingId(null)} className="flex-1 text-sm bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 py-2 rounded-xl font-medium">{t.cancel}</button>
-            </div>
-          </div>
+          <EditFormFields />
         </div>
       )}
 
@@ -2528,92 +2705,53 @@ function SentenceView() {
         <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">{t.noSentencesYet}</p>
       )}
 
-      {sentences.map(s => (
-        <div key={s.id} className={cardCls}>
-          {editingId === s.id ? (
-            <div className="space-y-2">
-              <textarea
-                autoFocus
-                value={draft.source_text ?? ''}
-                onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, source_text: v })); scheduleSave(s.id, { source_text: v }) }}
-                rows={2}
-                className={inputCls + ' resize-none'}
-              />
-              <div className="flex gap-2 items-center">
-                <input
-                  value={draft.translation ?? ''}
-                  onChange={e => setDraft(d => ({ ...d, translation: e.target.value }))}
-                  placeholder={t.translation}
-                  className={inputCls + ' flex-1'}
-                />
-                <button onClick={handleTranslate} disabled={translating} className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 flex-shrink-0">
-                  {translating ? '…' : '🌐'}
-                </button>
-              </div>
-              {translateResult && translateResult.alternatives.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {translateResult.alternatives.map((alt, i) => (
-                    <button key={i} type="button" onClick={() => setDraft(d => ({ ...d, translation: alt }))}
-                      className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-100 dark:border-blue-800/50">{alt}</button>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2 text-xs">
-                <select value={draft.source_lang ?? 'de'} onChange={e => setDraft(d => ({ ...d, source_lang: e.target.value }))}
-                  className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
-                  {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
-                </select>
-                <span className="text-gray-400 self-center">→</span>
-                <select value={draft.target_lang ?? 'tr'} onChange={e => setDraft(d => ({ ...d, target_lang: e.target.value }))}
-                  className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
-                  {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
-                </select>
-              </div>
-              {draft.source_text && (
-                <div className={`rounded-xl p-3 text-sm ${dark ? 'bg-slate-700' : 'bg-gray-50'}`}>
-                  <p className="text-[10px] text-gray-400 dark:text-slate-500 mb-1.5 uppercase tracking-wider">{t.linkToVocab}</p>
+      {sentences.map(s => {
+        const due = isDueSR(s.due_at)
+        return (
+          <div key={s.id} className={cardCls}>
+            {editingId === s.id ? (
+              <EditFormFields isInline />
+            ) : (
+              <div>
+                {/* Memory palace badge */}
+                {s.memory_palace && (
+                  <div className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded-full mb-2">
+                    🏛️ {s.memory_palace}
+                  </div>
+                )}
+
+                <div className="text-sm mb-1 text-gray-800 dark:text-slate-100">
                   <WordLinker
-                    text={draft.source_text}
-                    links={draft.word_links ?? []}
+                    text={s.source_text || '—'}
+                    links={s.word_links}
                     vocab={vocab}
-                    sourceLang={draft.source_lang ?? 'de'}
-                    onAddLink={handleAddLink}
-                    onRemoveLink={handleRemoveLink}
+                    sourceLang={s.source_lang}
+                    onAddLink={() => {}}
+                    onRemoveLink={() => {}}
+                    readOnly
                   />
                 </div>
-              )}
-              <div className="flex gap-2 pt-1">
-                <button onClick={handleSave} className="flex-1 text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 py-2 rounded-xl font-medium">{t.save}</button>
-                <button onClick={() => setEditingId(null)} className="flex-1 text-sm bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 py-2 rounded-xl font-medium">{t.cancel}</button>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="text-sm mb-1 text-gray-800 dark:text-slate-100">
-                <WordLinker
-                  text={s.source_text || '—'}
-                  links={s.word_links}
-                  vocab={vocab}
-                  sourceLang={s.source_lang}
-                  onAddLink={() => {}}
-                  onRemoveLink={() => {}}
-                  readOnly
-                />
-              </div>
-              {s.translation && <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">{s.translation}</p>}
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
-                  {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
-                </span>
-                <div className="flex gap-2">
-                  <button onClick={() => openEdit(s)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">{t.edit}</button>
-                  <button onClick={() => setConfirmDeleteId(s.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
+                {s.translation && <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">{s.translation}</p>}
+
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
+                      {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
+                    </span>
+                    <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${due ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
+                      {due ? '⚡ Due' : nextReviewLabel(s.due_at)}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => openEdit(s)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">{t.edit}</button>
+                    <button onClick={() => setConfirmDeleteId(s.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      ))}
+            )}
+          </div>
+        )
+      })}
 
       {confirmDeleteId !== null && (
         <ConfirmDialog
@@ -2631,17 +2769,19 @@ function SentenceView() {
 function ScenarioView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { scenarios, createScenario, saveScenario, deleteScenario } = useLanguageScenarios()
+  const { scenarios, createScenario, saveScenario, reviewScenario, deleteScenario } = useLanguageScenarios()
   const { vocab } = useVocabulary()
-  const [activeId, setActiveId] = useState<number | null>(null)
-  const [draft, setDraft] = useState<Partial<LanguageScenario>>({})
+  const [activeId, setActiveId]         = useState<number | null>(null)
+  const [draft, setDraft]               = useState<Partial<LanguageScenario>>({})
   const [isEditingContent, setIsEditingContent] = useState(false)
-  const [translating, setTranslating] = useState(false)
+  const [translating, setTranslating]   = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
-  const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [reviewMode, setReviewMode]     = useState(false)
+  const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const active = scenarios.find(s => s.id === activeId) ?? null
+  const active   = scenarios.find(s => s.id === activeId) ?? null
+  const dueItems = scenarios.filter(s => isDueSR(s.due_at))
 
   async function handleNew() {
     const s = await createScenario()
@@ -2695,6 +2835,18 @@ function ScenarioView() {
     saveScenario(activeId, { word_links: links })
   }
 
+  // ── Review mode ──────────────────────────────────────────────────────────────
+  if (reviewMode) {
+    return (
+      <ReviewSession
+        items={dueItems.map(s => ({ id: s.id, front: s.title, back: s.content || null, palace: s.memory_palace }))}
+        onRate={async (id, q) => { await reviewScenario(id, q) }}
+        onDone={() => setReviewMode(false)}
+      />
+    )
+  }
+
+  // ── Detail / edit view ───────────────────────────────────────────────────────
   if (activeId !== null && active) {
     return (
       <div className="p-4 max-w-2xl mx-auto space-y-3">
@@ -2702,12 +2854,26 @@ function ScenarioView() {
           className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors mb-1">
           ← {t.scenario}
         </button>
+
         <input
           value={draft.title ?? ''}
           onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, title: v })); scheduleTitle(active.id, v) }}
           placeholder={t.scenarioTitle}
           className={`text-base font-semibold border-0 border-b-2 rounded-none bg-transparent w-full focus:outline-none pb-1 ${dark ? 'border-slate-600 text-slate-100' : 'border-gray-200 text-gray-800'}`}
         />
+
+        {/* Memory palace field */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm flex-shrink-0">🏛️</span>
+          <input
+            value={draft.memory_palace ?? ''}
+            onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, memory_palace: v || null })); saveScenario(active.id, { memory_palace: v || null }) }}
+            placeholder="Memory palace — where/when does this scenario happen? (optional)"
+            list="palace-suggestions"
+            className={`text-sm border rounded-lg px-3 py-1.5 flex-1 focus:outline-none focus:ring-1 focus:ring-blue-400 ${dark ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400' : 'border-gray-200'}`}
+          />
+        </div>
+
         <div className="flex gap-2 text-xs items-center">
           <select value={draft.source_lang ?? 'de'} onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, source_lang: v })); saveScenario(active.id, { source_lang: v }) }}
             className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
@@ -2751,7 +2917,15 @@ function ScenarioView() {
             </div>
           )}
         </div>
-        <button onClick={() => setConfirmDeleteId(active.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
+
+        {/* Due status */}
+        <div className="flex items-center justify-between">
+          <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${isDueSR(active.due_at) ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
+            {isDueSR(active.due_at) ? '⚡ Due for review' : `Next review: ${nextReviewLabel(active.due_at)}`}
+          </span>
+          <button onClick={() => setConfirmDeleteId(active.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
+        </div>
+
         {confirmDeleteId !== null && (
           <ConfirmDialog
             message="Delete this scenario?"
@@ -2763,28 +2937,55 @@ function ScenarioView() {
     )
   }
 
+  // ── List view ────────────────────────────────────────────────────────────────
   return (
     <div className="p-4 space-y-3 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between">
+      {/* Autocomplete shared with SentenceView */}
+      <datalist id="palace-suggestions">
+        {PALACE_SUGGESTIONS.map(p => <option key={p} value={p} />)}
+      </datalist>
+
+      <div className="flex items-center gap-2 flex-wrap">
         <button onClick={handleNew} className="text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 px-3 py-1.5 rounded-xl font-medium">+ {t.addScenario}</button>
+        {dueItems.length > 0 && (
+          <button
+            onClick={() => setReviewMode(true)}
+            className="text-sm font-semibold px-3 py-1.5 rounded-xl bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1.5"
+          >
+            🏛️ Review {dueItems.length} due
+          </button>
+        )}
+        <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">{scenarios.length} scenarios</span>
       </div>
+
       {scenarios.length === 0 && (
         <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">{t.noScenariosYet}</p>
       )}
       <div className="space-y-2">
-        {scenarios.map(s => (
-          <button
-            key={s.id}
-            onClick={() => openScenario(s)}
-            className={`w-full text-left rounded-2xl border p-4 transition-colors ${dark ? 'bg-slate-800 border-slate-700 hover:border-slate-500' : 'bg-white border-gray-100 hover:border-gray-300'}`}
-          >
-            <p className={`text-sm font-semibold mb-1 ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{s.title || t.untitled}</p>
-            <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-2">{s.content || '—'}</p>
-            <span className="mt-2 inline-block text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
-              {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
-            </span>
-          </button>
-        ))}
+        {scenarios.map(s => {
+          const due = isDueSR(s.due_at)
+          return (
+            <button
+              key={s.id}
+              onClick={() => openScenario(s)}
+              className={`w-full text-left rounded-2xl border p-4 transition-colors ${dark ? 'bg-slate-800 border-slate-700 hover:border-slate-500' : 'bg-white border-gray-100 hover:border-gray-300'}`}
+            >
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <p className={`text-sm font-semibold ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{s.title || t.untitled}</p>
+                <span className={`text-[9px] rounded-full px-1.5 py-0.5 font-semibold flex-shrink-0 ${due ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
+                  {due ? '⚡ Due' : nextReviewLabel(s.due_at)}
+                </span>
+              </div>
+              {s.memory_palace && (
+                <p className="text-[10px] text-violet-500 dark:text-violet-400 mb-1">🏛️ {s.memory_palace}</p>
+              )}
+              <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-2">{s.content || '—'}</p>
+              <span className="mt-2 inline-block text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
+                {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )

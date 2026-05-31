@@ -251,6 +251,21 @@ CREATE TABLE IF NOT EXISTS body_weight (
   UNIQUE(user_id, date)
 );
 CREATE INDEX IF NOT EXISTS idx_body_weight_user ON body_weight(user_id);
+
+-- Spaced repetition + memory palace for language sentences (idempotent ALTER)
+ALTER TABLE language_sentences ADD COLUMN IF NOT EXISTS interval     INTEGER  NOT NULL DEFAULT 1;
+ALTER TABLE language_sentences ADD COLUMN IF NOT EXISTS repetitions  INTEGER  NOT NULL DEFAULT 0;
+ALTER TABLE language_sentences ADD COLUMN IF NOT EXISTS ease_factor  NUMERIC  NOT NULL DEFAULT 2.5;
+ALTER TABLE language_sentences ADD COLUMN IF NOT EXISTS due_at       DATE     NOT NULL DEFAULT CURRENT_DATE;
+ALTER TABLE language_sentences ADD COLUMN IF NOT EXISTS memory_palace TEXT;
+ALTER TABLE language_sentences ADD COLUMN IF NOT EXISTS image_url    TEXT;
+
+-- Spaced repetition + memory palace for language scenarios (idempotent ALTER)
+ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS interval     INTEGER  NOT NULL DEFAULT 1;
+ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS repetitions  INTEGER  NOT NULL DEFAULT 0;
+ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS ease_factor  NUMERIC  NOT NULL DEFAULT 2.5;
+ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS due_at       DATE     NOT NULL DEFAULT CURRENT_DATE;
+ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS memory_palace TEXT;
 `
 
 export async function migrate() {

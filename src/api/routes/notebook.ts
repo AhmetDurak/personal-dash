@@ -195,12 +195,26 @@ export function notebookRouter(pool: Pool): Router {
     res.json(updated[0])
   })
 
+  // ─── SM-2 helper (shared by sentences and scenarios) ─────────────────────────
+
+  function sm2(interval: number, repetitions: number, easeFactor: number, quality: number) {
+    let i = interval, r = repetitions, e = easeFactor
+    if (quality >= 3) {
+      i = r === 0 ? 1 : r === 1 ? 6 : Math.round(i * e)
+      r += 1
+    } else { i = 1; r = 0 }
+    e = Math.max(1.3, e + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+    const due = new Date()
+    due.setDate(due.getDate() + i)
+    return { interval: i, repetitions: r, easeFactor: e, dueAt: due.toISOString().slice(0, 10) }
+  }
+
   // ─── Language Sentences ───────────────────────────────────────────────────────
 
   router.get('/language/sentences', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { rows } = await pool.query(
-      'SELECT * FROM language_sentences WHERE user_id=$1 ORDER BY updated_at DESC',
+      'SELECT * FROM language_sentences WHERE user_id=$1 ORDER BY due_at ASC, updated_at DESC',
       [uid]
     )
     res.json(rows)
@@ -208,26 +222,44 @@ export function notebookRouter(pool: Pool): Router {
 
   router.post('/language/sentences', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { source_text = '', translation = null, source_lang = 'de', target_lang = 'tr' } = req.body as {
-      source_text?: string; translation?: string | null; source_lang?: string; target_lang?: string
-    }
+    const { source_text = '', translation = null, source_lang = 'de', target_lang = 'tr',
+            memory_palace = null, image_url = null } = req.body as Record<string, unknown>
     const { rows } = await pool.query(
-      'INSERT INTO language_sentences (user_id, source_text, translation, source_lang, target_lang) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-      [uid, source_text, translation, source_lang, target_lang]
+      `INSERT INTO language_sentences
+         (user_id, source_text, translation, source_lang, target_lang, memory_palace, image_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [uid, source_text, translation, source_lang, target_lang, memory_palace, image_url]
     )
     res.json(rows[0])
   })
 
   router.put('/language/sentences/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { source_text, translation, source_lang, target_lang, word_links = [] } = req.body as {
-      source_text: string; translation: string | null; source_lang: string; target_lang: string; word_links?: unknown[]
-    }
+    const { source_text, translation, source_lang, target_lang, word_links = [],
+            memory_palace = null, image_url = null } = req.body as Record<string, unknown>
     const { rows } = await pool.query(
-      'UPDATE language_sentences SET source_text=$1, translation=$2, source_lang=$3, target_lang=$4, word_links=$5, updated_at=now() WHERE id=$6 AND user_id=$7 RETURNING *',
-      [source_text, translation, source_lang, target_lang, JSON.stringify(word_links), req.params.id, uid]
+      `UPDATE language_sentences
+       SET source_text=$1, translation=$2, source_lang=$3, target_lang=$4,
+           word_links=$5, memory_palace=$6, image_url=$7, updated_at=now()
+       WHERE id=$8 AND user_id=$9 RETURNING *`,
+      [source_text, translation, source_lang, target_lang,
+       JSON.stringify(word_links), memory_palace, image_url, req.params.id, uid]
     )
     res.json(rows[0] ?? null)
+  })
+
+  router.post('/language/sentences/:id/review', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const quality = Number((req.body as { quality: number }).quality)
+    const { rows } = await pool.query('SELECT * FROM language_sentences WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    if (!rows[0]) { res.status(404).json({ error: 'not found' }); return }
+    const { interval, repetitions, ease_factor } = rows[0] as { interval: number; repetitions: number; ease_factor: string }
+    const sr = sm2(interval, repetitions, Number(ease_factor), quality)
+    const { rows: updated } = await pool.query(
+      'UPDATE language_sentences SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
+      [sr.interval, sr.repetitions, sr.easeFactor, sr.dueAt, req.params.id, uid]
+    )
+    res.json(updated[0])
   })
 
   router.delete('/language/sentences/:id', async (req: Request, res: Response) => {
@@ -241,7 +273,7 @@ export function notebookRouter(pool: Pool): Router {
   router.get('/language/scenarios', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { rows } = await pool.query(
-      'SELECT * FROM language_scenarios WHERE user_id=$1 ORDER BY updated_at DESC',
+      'SELECT * FROM language_scenarios WHERE user_id=$1 ORDER BY due_at ASC, updated_at DESC',
       [uid]
     )
     res.json(rows)
@@ -249,26 +281,44 @@ export function notebookRouter(pool: Pool): Router {
 
   router.post('/language/scenarios', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { title = 'Untitled', content = '', source_lang = 'de', target_lang = 'tr' } = req.body as {
-      title?: string; content?: string; source_lang?: string; target_lang?: string
-    }
+    const { title = 'Untitled', content = '', source_lang = 'de', target_lang = 'tr',
+            memory_palace = null } = req.body as Record<string, unknown>
     const { rows } = await pool.query(
-      'INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-      [uid, title, content, source_lang, target_lang]
+      `INSERT INTO language_scenarios
+         (user_id, title, content, source_lang, target_lang, memory_palace)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [uid, title, content, source_lang, target_lang, memory_palace]
     )
     res.json(rows[0])
   })
 
   router.put('/language/scenarios/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { title, content, source_lang, target_lang, word_links = [] } = req.body as {
-      title: string; content: string; source_lang: string; target_lang: string; word_links?: unknown[]
-    }
+    const { title, content, source_lang, target_lang, word_links = [],
+            memory_palace = null } = req.body as Record<string, unknown>
     const { rows } = await pool.query(
-      'UPDATE language_scenarios SET title=$1, content=$2, source_lang=$3, target_lang=$4, word_links=$5, updated_at=now() WHERE id=$6 AND user_id=$7 RETURNING *',
-      [title, content, source_lang, target_lang, JSON.stringify(word_links), req.params.id, uid]
+      `UPDATE language_scenarios
+       SET title=$1, content=$2, source_lang=$3, target_lang=$4,
+           word_links=$5, memory_palace=$6, updated_at=now()
+       WHERE id=$7 AND user_id=$8 RETURNING *`,
+      [title, content, source_lang, target_lang,
+       JSON.stringify(word_links), memory_palace, req.params.id, uid]
     )
     res.json(rows[0] ?? null)
+  })
+
+  router.post('/language/scenarios/:id/review', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const quality = Number((req.body as { quality: number }).quality)
+    const { rows } = await pool.query('SELECT * FROM language_scenarios WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    if (!rows[0]) { res.status(404).json({ error: 'not found' }); return }
+    const { interval, repetitions, ease_factor } = rows[0] as { interval: number; repetitions: number; ease_factor: string }
+    const sr = sm2(interval, repetitions, Number(ease_factor), quality)
+    const { rows: updated } = await pool.query(
+      'UPDATE language_scenarios SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
+      [sr.interval, sr.repetitions, sr.easeFactor, sr.dueAt, req.params.id, uid]
+    )
+    res.json(updated[0])
   })
 
   router.delete('/language/scenarios/:id', async (req: Request, res: Response) => {

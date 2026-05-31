@@ -67,6 +67,33 @@ async function checkChallengeNotifications() {
   }
 }
 
+async function checkLanguageDueNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  const today = new Date().toISOString().slice(0, 10)
+  const fired = getFired()
+  try {
+    const [sentRes, scenRes] = await Promise.all([
+      fetch('/api/notebook/language/sentences'),
+      fetch('/api/notebook/language/scenarios'),
+    ])
+    type SR = { id: number; due_at: string }
+    const sentences: SR[] = sentRes.ok ? await sentRes.json() : []
+    const scenarios: SR[] = scenRes.ok ? await scenRes.json() : []
+    const dueSent = sentences.filter(s => s.due_at <= today).length
+    const dueScen = scenarios.filter(s => s.due_at <= today).length
+    const total   = dueSent + dueScen
+    if (total === 0) return
+    const key = `language:due:${today}`
+    if (fired.has(key)) return
+    new Notification('Language Review Due', {
+      body: `${total} item${total !== 1 ? 's' : ''} to review (${dueSent} sentence${dueSent !== 1 ? 's' : ''}, ${dueScen} scenario${dueScen !== 1 ? 's' : ''}).`,
+      icon: '/favicon.ico',
+      tag: 'language-due',
+    })
+    addFired(key)
+  } catch { /* ignore */ }
+}
+
 const VOCAB_DAY_KEY = () => `vocab:${new Date().toISOString().slice(0, 10)}`
 
 async function checkVocabNotifications() {
@@ -96,6 +123,7 @@ export function useReminderNotifications() {
     fireNotifications(await fetchDueReminders())
     await checkVocabNotifications()
     await checkChallengeNotifications()
+    await checkLanguageDueNotifications()
   }
 
   useEffect(() => {
