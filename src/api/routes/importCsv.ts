@@ -36,18 +36,52 @@ function detectSeparator(lines: string[]): string {
   return bestSep
 }
 
-// Returns { headerIdx, headers } — skips leading metadata rows (< 3 columns or single-cell info rows)
+// Score a row by how many of its cells exactly match a known header alias.
+// Uses a tiered check: exact → starts-with-alias → alias-starts-with-cell.
+function headerScore(cols: string[]): number {
+  const ALL = [...DATE_ALIASES, ...NAME_ALIASES, ...AMOUNT_ALIASES, ...TYPE_ALIASES, ...CAT_ALIASES]
+  return cols.reduce((n, c) => {
+    const h = c.toLowerCase().trim().replace(/["﻿]/g, '')
+    if (!h) return n
+    const hit = ALL.some(a =>
+      h === a ||
+      (h.startsWith(a) && (h.length === a.length || /[\s/(]/.test(h[a.length]))) ||
+      (a.startsWith(h) && (a.length === h.length || /[\s/(]/.test(a[h.length])))
+    )
+    return n + (hit ? 1 : 0)
+  }, 0)
+}
+
+// Returns { headerIdx, headers } — finds the best-matching header row by alias score.
+// Deutsche Bank (and similar) CSVs have several metadata rows before the real headers.
 function findHeaderRow(lines: string[], sep: string): { headerIdx: number; headers: string[] } {
+  let bestIdx  = -1
+  let bestScore = 0
+
   for (let i = 0; i < Math.min(lines.length, 20); i++) {
     const cols = splitRow(lines[i], sep)
     if (cols.filter(c => c.trim()).length < 3) continue
-    // A row with ≥3 columns where the first cell is NOT a parseable date is a header row
-    if (parseDate(cols[0].trim().replace(/^"|"$/g, '')) === null) {
+    // Skip rows whose first cell is a parseable date — those are data rows, not headers
+    if (parseDate(cols[0].trim().replace(/["﻿]/g, '')) !== null) continue
+    const score = headerScore(cols)
+    if (score > bestScore) { bestScore = score; bestIdx = i }
+  }
+
+  // Require at least 2 alias hits to trust it as a header row
+  if (bestIdx >= 0 && bestScore >= 2) {
+    return { headerIdx: bestIdx, headers: splitRow(lines[bestIdx], sep) }
+  }
+
+  // Fallback: first multi-column row whose first cell isn't a date
+  for (let i = 0; i < Math.min(lines.length, 20); i++) {
+    const cols = splitRow(lines[i], sep)
+    if (cols.filter(c => c.trim()).length < 3) continue
+    if (parseDate(cols[0].trim().replace(/["﻿]/g, '')) === null) {
       return { headerIdx: i, headers: cols }
     }
-    // A row with ≥3 columns where the first cell IS a date means data starts here (no header)
     return { headerIdx: -1, headers: cols.map((_, idx) => `Column ${idx + 1}`) }
   }
+
   return { headerIdx: 0, headers: splitRow(lines[0], sep) }
 }
 
@@ -113,9 +147,30 @@ export interface ColumnMapping {
 
 function autoDetectMapping(headers: string[], sep: string): Omit<ColumnMapping, 'separator' | 'hasHeader' | 'dataStart'> {
   function findCol(aliases: string[]): number | null {
+    // Tier 1: exact match
     for (let i = 0; i < headers.length; i++) {
-      const h = headers[i].toLowerCase().trim().replace(/["']/g, '')
-      if (aliases.some(a => h.includes(a) || a.includes(h))) return i
+      const h = headers[i].toLowerCase().trim().replace(/["'﻿]/g, '')
+      if (aliases.some(a => h === a)) return i
+    }
+    // Tier 2: header starts with alias (e.g. "betrag (eur)" → "betrag")
+    //          or alias starts with header — but only at a word boundary
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i].toLowerCase().trim().replace(/["'﻿]/g, '')
+      if (aliases.some(a =>
+        (h.startsWith(a) && (h.length === a.length || /[\s/(]/.test(h[a.length]))) ||
+        (a.startsWith(h) && (a.length === h.length || /[\s/(]/.test(a[h.length])))
+      )) return i
+    }
+    // Tier 3: header contains alias as a whole word (e.g. "begünstigter / auftraggeber" → "begünstigter")
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i].toLowerCase().trim().replace(/["'﻿]/g, '')
+      if (aliases.some(a => {
+        const idx = h.indexOf(a)
+        if (idx === -1) return false
+        const before = idx === 0 || /[\s/]/.test(h[idx - 1])
+        const after  = idx + a.length === h.length || /[\s/]/.test(h[idx + a.length])
+        return before && after
+      })) return i
     }
     return null
   }
@@ -174,10 +229,11 @@ function parseDataRow(cols: string[], mapping: ColumnMapping): ParsedRow | strin
 
 async function readCsvFile(path: string): Promise<string> {
   const buf = await readFile(path)
-  // Try UTF-8 first; if it produces replacement chars, try Latin-1
+  // Try UTF-8 first; if it produces replacement chars (U+FFFD), fall back to Latin-1
   const utf8 = buf.toString('utf-8')
-  if (!utf8.includes('�')) return utf8
-  return buf.toString('latin1')
+  const text = utf8.includes('�') ? buf.toString('latin1') : utf8
+  // Strip UTF-8 BOM (U+FEFF) if present
+  return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
