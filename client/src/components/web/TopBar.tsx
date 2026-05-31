@@ -9,8 +9,9 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { resetTour } from './AppTour'
 import {
   IconSettings, IconSignOut, IconMobile, IconChevronRight, IconChevronLeft,
-  IconCheck, IconSun, IconMoon, IconChevronDown,
+  IconCheck, IconChevronDown,
 } from '../../lib/icons'
+import { THEMES } from '../../hooks/useDarkMode'
 
 const LANG_OPTIONS: { value: Lang; label: string }[] = [
   { value: 'en', label: 'EN' },
@@ -31,7 +32,7 @@ function Logo() {
 
 export function TopBar() {
   const { pathname } = useLocation()
-  const { dark, toggle } = useDarkMode()
+  const { theme, setTheme } = useDarkMode()
   const { user, logout } = useAuth()
   const { lang, t, setLang } = useLanguage()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -152,22 +153,40 @@ export function TopBar() {
 
                     <div className="border-t border-gray-800 my-1" />
 
-                    {/* Dark / Light toggle */}
-                    <button
-                      onClick={toggle}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-2">
-                        {dark
-                          ? <IconSun  className="w-3.5 h-3.5 text-amber-400" strokeWidth={2} />
-                          : <IconMoon className="w-3.5 h-3.5 text-blue-400"  strokeWidth={2} />
-                        }
-                        <span>{dark ? t.light : t.dark}</span>
-                      </span>
-                      <span className={`w-8 h-4 rounded-full relative flex-shrink-0 transition-colors ${dark ? 'bg-blue-500' : 'bg-gray-600'}`}>
-                        <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${dark ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                      </span>
-                    </button>
+                    {/* Theme grid */}
+                    <div className="px-3 pb-2">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Theme</p>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {THEMES.map(tm => {
+                          const active = theme === tm.id
+                          return (
+                            <button
+                              key={tm.id}
+                              onClick={() => setTheme(tm.id)}
+                              title={tm.label}
+                              className={`relative rounded-lg overflow-hidden border-2 transition-all ${
+                                active ? 'border-white/60 scale-105' : 'border-transparent hover:border-white/20'
+                              }`}
+                            >
+                              {/* Top strip — card bg color */}
+                              <div className="h-5" style={{ backgroundColor: tm.swatchTop }} />
+                              {/* Bottom — page bg + accent dot + label */}
+                              <div className="flex items-center gap-1 px-1.5 py-1" style={{ backgroundColor: tm.swatchBg }}>
+                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tm.accent }} />
+                                <p className="text-[7px] font-bold truncate leading-none" style={{ color: tm.labelColor }}>
+                                  {tm.label}
+                                </p>
+                              </div>
+                              {active && (
+                                <div className="absolute top-1 right-1 w-3 h-3 bg-white/90 rounded-full flex items-center justify-center">
+                                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tm.accent }} />
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
 
                     <div className="border-t border-gray-800 my-1" />
 

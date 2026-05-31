@@ -10,12 +10,14 @@ export default {
       },
       colors: {
         xero: {
-          green:       '#00B087',
-          'green-dark':'#008A6A',
-          navy:        '#1E2B4A',
-          'navy-light':'#2D3E63',
-          bg:          '#F5F6FA',
-          border:      '#E8EBF0',
+          // All xero-* colors use CSS variables so they update with the theme.
+          // Tailwind opacity syntax (<alpha-value>) is preserved for /5, /10, etc. variants.
+          green:        'rgb(var(--clr-accent)      / <alpha-value>)',
+          'green-dark': 'rgb(var(--clr-accent-dark) / <alpha-value>)',
+          navy:         'rgb(var(--clr-sidebar)     / <alpha-value>)',
+          'navy-light': 'rgb(var(--clr-sidebar-h)   / <alpha-value>)',
+          bg:           'rgb(var(--clr-page-bg)     / <alpha-value>)',
+          border:       'rgb(var(--clr-border)      / <alpha-value>)',
         },
       },
     },
