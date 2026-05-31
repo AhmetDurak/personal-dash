@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { IconClose } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -69,13 +69,35 @@ function parseMarkdown(src: string): string {
 
 function NotesView() {
   const { t } = useLanguage()
-  const { notes, isLoading, createNote, saveNote, deleteNote } = useNotes()
+  const { notes, isLoading, createNote, saveNote, moveNoteToFolder, deleteNote } = useNotes()
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [localTitle, setLocalTitle] = useState('')
   const [localContent, setLocalContent] = useState('')
   const [saving, setSaving] = useState(false)
   const [preview, setPreview] = useState(false)
+  const [activeFolder, setActiveFolder] = useState<string | null>(null)
+  const [newFolderInput, setNewFolderInput] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const previewRef  = useRef<HTMLDivElement>(null)
+  const savedScroll = useRef(0)
+
+  const folders = [...new Set(notes.map(n => n.folder).filter((f): f is string => f !== null))].sort()
+  const visibleNotes = activeFolder === null ? notes : notes.filter(n => n.folder === activeFolder)
+  const selectedNote = notes.find(n => n.id === selectedId) ?? null
+
+  useLayoutEffect(() => {
+    const el = preview ? previewRef.current : textareaRef.current
+    if (el) el.scrollTop = savedScroll.current
+  }, [preview])
+
+  function togglePreview() {
+    const el = preview ? previewRef.current : textareaRef.current
+    savedScroll.current = el?.scrollTop ?? 0
+    setPreview(p => !p)
+  }
 
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -103,8 +125,18 @@ function NotesView() {
   }
 
   async function handleNew() {
-    const note = await createNote()
+    const note = await createNote(activeFolder)
     setSelectedId(note.id)
+  }
+
+  async function handleCreateFolder() {
+    const name = newFolderName.trim()
+    if (!name) { setNewFolderInput(false); return }
+    const note = await createNote(name)
+    setActiveFolder(name)
+    setSelectedId(note.id)
+    setNewFolderName('')
+    setNewFolderInput(false)
   }
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
@@ -118,17 +150,48 @@ function NotesView() {
     <div className="flex h-full">
       {/* Sidebar list — hidden on mobile when a note is open */}
       <div className={`${selectedId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-60 border-r border-gray-100 flex-col bg-gray-50 flex-shrink-0`}>
-        <div className="p-3 border-b border-gray-100">
-          <button
-            onClick={handleNew}
-            className="w-full text-sm bg-xero-green text-white rounded-lg py-2 font-medium hover:bg-xero-green-dark transition-colors"
-          >
-            + {t.newNote}
-          </button>
+        {/* Folder strip */}
+        <div className="px-3 pt-3 pb-2 border-b border-gray-100 space-y-2">
+          <div className="flex overflow-x-auto gap-1" style={{ scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => setActiveFolder(null)}
+              className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap flex-shrink-0 transition-colors ${activeFolder === null ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+            >All</button>
+            {folders.map(f => (
+              <button
+                key={f}
+                onClick={() => setActiveFolder(f)}
+                className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap flex-shrink-0 transition-colors ${activeFolder === f ? 'bg-xero-green text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+              >{f}</button>
+            ))}
+          </div>
+          {newFolderInput ? (
+            <div className="flex gap-1">
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setNewFolderInput(false); setNewFolderName('') } }}
+                placeholder="Folder name…"
+                className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-xero-green bg-white"
+              />
+              <button onClick={handleCreateFolder} className="text-xs bg-xero-green text-white px-2 rounded-lg font-medium">✓</button>
+              <button onClick={() => { setNewFolderInput(false); setNewFolderName('') }} className="text-xs text-gray-400 hover:text-gray-600 px-1">✕</button>
+            </div>
+          ) : (
+            <div className="flex gap-1">
+              <button onClick={handleNew} className="flex-1 text-xs bg-xero-green text-white rounded-lg py-1.5 font-medium hover:bg-xero-green-dark transition-colors">
+                + {t.newNote}
+              </button>
+              <button onClick={() => setNewFolderInput(true)} className="text-xs bg-gray-200 text-gray-600 hover:bg-gray-300 rounded-lg px-2.5 py-1.5 font-medium transition-colors" title="New folder">
+                📁
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto">
           {isLoading && <p className="text-xs text-gray-400 p-4">Loading…</p>}
-          {notes.map(n => (
+          {visibleNotes.map(n => (
             <button
               key={n.id}
               onClick={() => setSelectedId(n.id)}
@@ -170,10 +233,46 @@ function NotesView() {
                 placeholder="Note title…"
                 className="text-lg font-semibold text-gray-900 bg-transparent flex-1 outline-none placeholder-gray-300 min-w-0"
               />
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {saving && <span className="text-xs text-gray-400">{t.saving}</span>}
+                {/* Folder badge */}
+                <div className="relative">
+                  <button
+                    onClick={() => setFolderPickerOpen(p => !p)}
+                    className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors flex items-center gap-1"
+                  >
+                    📁 {selectedNote?.folder ?? 'No folder'}
+                  </button>
+                  {folderPickerOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[140px]">
+                      <button
+                        onClick={() => { if (selectedId) moveNoteToFolder(selectedId, null); setFolderPickerOpen(false) }}
+                        className="w-full text-left text-xs px-3 py-1.5 hover:bg-gray-50 text-gray-500"
+                      >No folder</button>
+                      {folders.map(f => (
+                        <button
+                          key={f}
+                          onClick={() => { if (selectedId) moveNoteToFolder(selectedId, f); setFolderPickerOpen(false) }}
+                          className="w-full text-left text-xs px-3 py-1.5 hover:bg-gray-50 text-gray-700"
+                        >{f}</button>
+                      ))}
+                      <div className="border-t border-gray-100 mt-1 pt-1 px-2">
+                        <input
+                          placeholder="New folder…"
+                          className="w-full text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-xero-green"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              const name = (e.target as HTMLInputElement).value.trim()
+                              if (name && selectedId) { moveNoteToFolder(selectedId, name); setFolderPickerOpen(false) }
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <button
-                  onClick={() => setPreview(p => !p)}
+                  onClick={togglePreview}
                   className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${preview ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
                 >
                   {preview ? t.editMode : t.preview}
@@ -196,6 +295,7 @@ function NotesView() {
             </div>
             {preview ? (
               <div
+                ref={previewRef}
                 className="flex-1 p-6 text-sm text-gray-700 bg-white overflow-y-auto note-prose"
                 dangerouslySetInnerHTML={{ __html: localContent
                   ? parseMarkdown(localContent)
@@ -204,6 +304,7 @@ function NotesView() {
               />
             ) : (
               <textarea
+                ref={textareaRef}
                 value={localContent}
                 onChange={e => { setLocalContent(e.target.value); scheduleSave(localTitle, e.target.value) }}
                 placeholder="Write your note here…"
@@ -895,13 +996,19 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
 // ─── MindmapView (multi-map picker + canvas) ─────────────────────────────────
 
 function MindmapView() {
-  const { mindmaps, isLoading, createMindmap, deleteMindmap } = useMindmapList()
+  const { mindmaps, isLoading, createMindmap, moveMindmapToFolder, deleteMindmap } = useMindmapList()
   const [selectedId, setSelectedId] = useState<number | null>(() => {
     const s = localStorage.getItem('mindmap:selectedId')
     return s ? Number(s) : null
   })
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [activeFolder, setActiveFolder] = useState<string | null>(null)
+  const [newFolderInput, setNewFolderInput] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [folderPickerId, setFolderPickerId] = useState<number | null>(null)
+
+  const mmFolders = [...new Set(mindmaps.map(m => m.folder).filter((f): f is string => f !== null))].sort()
 
   useEffect(() => {
     if (mindmaps.length === 0) return
@@ -915,8 +1022,18 @@ function MindmapView() {
   }, [selectedId])
 
   async function handleNew() {
-    const m = await createMindmap('New Map')
+    const m = await createMindmap('New Map', activeFolder)
     setSelectedId(m.id)
+  }
+
+  async function handleNewInFolder(folder: string) {
+    const name = folder.trim()
+    if (!name) return
+    const m = await createMindmap('New Map', name)
+    setActiveFolder(name)
+    setSelectedId(m.id)
+    setNewFolderName('')
+    setNewFolderInput(false)
   }
 
   async function handleDelete(id: number) {
@@ -926,37 +1043,65 @@ function MindmapView() {
   }
 
   function MapList({ onSelect }: { onSelect: () => void }) {
+    const visibleMaps = activeFolder === null ? mindmaps : mindmaps.filter(m => m.folder === activeFolder)
     return (
       <>
-        <div className="px-3 py-3 border-b border-xero-navy-light flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Maps</span>
-          <button
-            onClick={handleNew}
-            className="text-gray-400 hover:text-white transition-colors text-lg leading-none"
-            title="New map"
-          >+</button>
+        {/* Folder filter strip */}
+        <div className="px-2 pt-2 pb-1 border-b border-xero-navy-light space-y-1.5">
+          <div className="flex overflow-x-auto gap-1" style={{ scrollbarWidth: 'none' }}>
+            <button onClick={() => setActiveFolder(null)} className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 font-medium transition-colors ${activeFolder === null ? 'bg-white text-gray-800' : 'text-gray-400 hover:text-gray-200'}`}>All</button>
+            {mmFolders.map(f => (
+              <button key={f} onClick={() => setActiveFolder(f)} className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 font-medium transition-colors ${activeFolder === f ? 'bg-xero-green text-white' : 'text-gray-400 hover:text-gray-200'}`}>{f}</button>
+            ))}
+          </div>
+          {newFolderInput ? (
+            <div className="flex gap-1">
+              <input autoFocus value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleNewInFolder(newFolderName); if (e.key === 'Escape') { setNewFolderInput(false); setNewFolderName('') } }}
+                placeholder="Folder name…"
+                className="flex-1 text-[10px] bg-xero-navy-light border border-xero-navy-light rounded px-2 py-1 text-gray-200 outline-none focus:ring-1 focus:ring-xero-green" />
+              <button onClick={() => handleNewInFolder(newFolderName)} className="text-[10px] bg-xero-green text-white px-1.5 rounded font-medium">✓</button>
+              <button onClick={() => { setNewFolderInput(false); setNewFolderName('') }} className="text-gray-500 hover:text-gray-300 text-[10px] px-1">✕</button>
+            </div>
+          ) : (
+            <div className="flex gap-1">
+              <button onClick={handleNew} className="flex-1 text-[10px] text-gray-300 hover:text-white transition-colors text-left px-1">+ New map</button>
+              <button onClick={() => setNewFolderInput(true)} className="text-gray-400 hover:text-white transition-colors text-xs px-1" title="New folder">📁</button>
+            </div>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto py-1">
           {isLoading && <p className="text-xs text-gray-500 px-3 py-2">Loading…</p>}
-          {mindmaps.map(m => (
-            <div
-              key={m.id}
-              onClick={() => { setSelectedId(m.id); onSelect() }}
-              className={`group flex items-center justify-between px-3 py-2 cursor-pointer rounded mx-1 my-0.5 transition-colors ${
-                selectedId === m.id
-                  ? 'bg-xero-green/20 text-xero-green'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'
-              }`}
-            >
+          {visibleMaps.map(m => (
+            <div key={m.id} className={`group flex items-center justify-between px-3 py-2 cursor-pointer rounded mx-1 my-0.5 transition-colors ${selectedId === m.id ? 'bg-xero-green/20 text-xero-green' : 'text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'}`}
+              onClick={() => { setSelectedId(m.id); onSelect() }}>
               <span className="text-sm truncate flex-1">{m.title}</span>
-              <button
-                onClick={e => { e.stopPropagation(); setConfirmDeleteId(m.id) }}
-                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all ml-1 flex-shrink-0 p-0.5 rounded"
-              ><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                {/* Folder picker for this map */}
+                <div className="relative">
+                  <button onClick={e => { e.stopPropagation(); setFolderPickerId(folderPickerId === m.id ? null : m.id) }}
+                    className="text-gray-500 hover:text-gray-300 p-0.5 rounded text-[10px]" title="Move to folder">📁</button>
+                  {folderPickerId === m.id && (
+                    <div className="absolute left-0 top-full mt-0.5 z-30 bg-xero-navy border border-xero-navy-light rounded-lg shadow-xl py-1 min-w-[130px]" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => { moveMindmapToFolder(m.id, null); setFolderPickerId(null) }} className="w-full text-left text-[10px] px-3 py-1.5 text-gray-400 hover:bg-xero-navy-light hover:text-gray-200">No folder</button>
+                      {mmFolders.map(f => (
+                        <button key={f} onClick={() => { moveMindmapToFolder(m.id, f); setFolderPickerId(null) }} className="w-full text-left text-[10px] px-3 py-1.5 text-gray-300 hover:bg-xero-navy-light hover:text-white">{f}</button>
+                      ))}
+                      <div className="border-t border-xero-navy-light mt-1 pt-1 px-2">
+                        <input placeholder="New folder…" className="w-full text-[10px] bg-xero-navy-light rounded px-2 py-1 text-gray-200 outline-none"
+                          onKeyDown={e => { if (e.key === 'Enter') { const n = (e.target as HTMLInputElement).value.trim(); if (n) { moveMindmapToFolder(m.id, n); setFolderPickerId(null) } } }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(m.id) }} className="text-gray-500 hover:text-red-400 transition-all p-0.5 rounded">
+                  <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+              </div>
             </div>
           ))}
-          {!isLoading && mindmaps.length === 0 && (
-            <p className="text-xs text-gray-500 px-3 py-3">No maps yet.</p>
+          {!isLoading && visibleMaps.length === 0 && (
+            <p className="text-xs text-gray-500 px-3 py-3">No maps{activeFolder ? ` in "${activeFolder}"` : ' yet'}.</p>
           )}
         </div>
       </>
@@ -3008,20 +3153,22 @@ function LanguageTab() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <header className={`flex items-center gap-1 px-4 py-2.5 border-b flex-shrink-0 ${dark ? 'bg-slate-900 border-slate-700' : 'bg-white border-xero-border'}`}>
-        {LANG_VIEWS.map(v => (
-          <button
-            key={v.id}
-            onClick={() => setView(v.id)}
-            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              view === v.id
-                ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900'
-                : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
+      <header className={`flex items-center gap-1 px-4 py-2.5 border-b flex-shrink-0 overflow-hidden ${dark ? 'bg-slate-900 border-slate-700' : 'bg-white border-xero-border'}`}>
+        <div className="flex overflow-x-auto gap-1 flex-1" style={{ scrollbarWidth: 'none' }}>
+          {LANG_VIEWS.map(v => (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                view === v.id
+                  ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900'
+                  : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
       </header>
       <div className="flex-1 overflow-y-auto">
         {view === 'vocab'    && <VocabView />}

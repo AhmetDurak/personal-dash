@@ -17,10 +17,10 @@ export function notebookRouter(pool: Pool): Router {
 
   router.post('/notes', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { title = 'Untitled', content = '' } = req.body as { title?: string; content?: string }
+    const { title = 'Untitled', content = '', folder = null } = req.body as { title?: string; content?: string; folder?: string | null }
     const { rows } = await pool.query(
-      'INSERT INTO notebook_notes (title, content, user_id) VALUES ($1, $2, $3) RETURNING *',
-      [title, content, uid]
+      'INSERT INTO notebook_notes (title, content, folder, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      [title, content, folder, uid]
     )
     res.json(rows[0])
   })
@@ -31,6 +31,16 @@ export function notebookRouter(pool: Pool): Router {
     const { rows } = await pool.query(
       'UPDATE notebook_notes SET title=$1, content=$2, updated_at=now() WHERE id=$3 AND user_id=$4 RETURNING *',
       [title, content, req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
+  })
+
+  router.patch('/notes/:id/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { folder } = req.body as { folder: string | null }
+    const { rows } = await pool.query(
+      'UPDATE notebook_notes SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING *',
+      [folder ?? null, req.params.id, uid]
     )
     res.json(rows[0] ?? null)
   })
@@ -46,7 +56,7 @@ export function notebookRouter(pool: Pool): Router {
   router.get('/mindmaps', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { rows } = await pool.query(
-      'SELECT id, title, created_at, updated_at FROM mindmaps WHERE user_id = $1 ORDER BY updated_at DESC',
+      'SELECT id, title, folder, created_at, updated_at FROM mindmaps WHERE user_id = $1 ORDER BY updated_at DESC',
       [uid]
     )
     res.json(rows)
@@ -63,12 +73,22 @@ export function notebookRouter(pool: Pool): Router {
 
   router.post('/mindmaps', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { title = 'New Map', nodes = [], edges = [] } = req.body as { title?: string; nodes?: unknown[]; edges?: unknown[] }
+    const { title = 'New Map', nodes = [], edges = [], folder = null } = req.body as { title?: string; nodes?: unknown[]; edges?: unknown[]; folder?: string | null }
     const { rows } = await pool.query(
-      'INSERT INTO mindmaps (title, nodes, edges, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
-      [title, JSON.stringify(nodes), JSON.stringify(edges), uid]
+      'INSERT INTO mindmaps (title, nodes, edges, folder, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [title, JSON.stringify(nodes), JSON.stringify(edges), folder, uid]
     )
     res.json(rows[0])
+  })
+
+  router.patch('/mindmaps/:id/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { folder } = req.body as { folder: string | null }
+    const { rows } = await pool.query(
+      'UPDATE mindmaps SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING id, title, folder, created_at, updated_at',
+      [folder ?? null, req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
   })
 
   router.put('/mindmaps/:id', async (req: Request, res: Response) => {

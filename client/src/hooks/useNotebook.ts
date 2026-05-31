@@ -6,6 +6,7 @@ export interface Note {
   id: number
   title: string
   content: string
+  folder: string | null
   created_at: string
   updated_at: string
 }
@@ -29,6 +30,7 @@ export interface MMEdge {
 export interface MindmapMeta {
   id: number
   title: string
+  folder: string | null
   created_at: string
   updated_at: string
 }
@@ -113,11 +115,11 @@ export interface LanguageScenario {
 export function useNotes() {
   const { data, mutate, isLoading } = useSWR<Note[]>('/api/notebook/notes', fetcher)
 
-  async function createNote(): Promise<Note> {
+  async function createNote(folder?: string | null): Promise<Note> {
     const res = await fetch('/api/notebook/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'Untitled', content: '' }),
+      body: JSON.stringify({ title: 'Untitled', content: '', folder: folder ?? null }),
     })
     const note = await res.json() as Note
     await mutate()
@@ -133,12 +135,21 @@ export function useNotes() {
     await mutate()
   }
 
+  async function moveNoteToFolder(id: number, folder: string | null) {
+    await fetch(`/api/notebook/notes/${id}/folder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    })
+    await mutate()
+  }
+
   async function deleteNote(id: number) {
     await fetch(`/api/notebook/notes/${id}`, { method: 'DELETE' })
     await mutate()
   }
 
-  return { notes: data ?? [], isLoading, createNote, saveNote, deleteNote }
+  return { notes: data ?? [], isLoading, createNote, saveNote, moveNoteToFolder, deleteNote }
 }
 
 // ─── Mindmap ──────────────────────────────────────────────────────────────────
@@ -146,15 +157,24 @@ export function useNotes() {
 export function useMindmapList() {
   const { data, mutate, isLoading } = useSWR<MindmapMeta[]>('/api/notebook/mindmaps', fetcher)
 
-  async function createMindmap(title = 'New Map'): Promise<Mindmap> {
+  async function createMindmap(title = 'New Map', folder?: string | null): Promise<Mindmap> {
     const res = await fetch('/api/notebook/mindmaps', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, folder: folder ?? null }),
     })
     const m = await res.json() as Mindmap
     await mutate()
     return m
+  }
+
+  async function moveMindmapToFolder(id: number, folder: string | null) {
+    await fetch(`/api/notebook/mindmaps/${id}/folder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    })
+    await mutate()
   }
 
   async function deleteMindmap(id: number) {
@@ -162,7 +182,7 @@ export function useMindmapList() {
     await mutate()
   }
 
-  return { mindmaps: data ?? [], isLoading, createMindmap, deleteMindmap }
+  return { mindmaps: data ?? [], isLoading, createMindmap, moveMindmapToFolder, deleteMindmap }
 }
 
 export function useMindmap(id: number) {

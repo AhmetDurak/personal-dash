@@ -488,24 +488,26 @@ export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
 
   return (
     <div className="flex flex-col h-full bg-xero-bg overflow-hidden">
-      <header className="flex items-center gap-1 px-4 py-2.5 bg-white border-b border-xero-border flex-shrink-0">
+      <header className="flex items-center gap-1 px-4 py-2.5 bg-white border-b border-xero-border flex-shrink-0 overflow-hidden">
         {onMenuClick && (
-          <button onClick={onMenuClick} className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors mr-1">
+          <button onClick={onMenuClick} className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors flex-shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
         )}
-        <span className="text-base font-semibold text-gray-800 mr-3">{t.dailyLog}</span>
-        {VIEWS.map(v => (
-          <button
-            key={v.id}
-            onClick={() => { setView(v.id); setSelectedDate(null) }}
-            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              view === v.id && !selectedDate ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
+        <span className="text-sm font-semibold text-gray-800 flex-shrink-0 mr-1">{t.dailyLog}</span>
+        <div className="flex overflow-x-auto gap-1 flex-1" style={{ scrollbarWidth: 'none' }}>
+          {VIEWS.map(v => (
+            <button
+              key={v.id}
+              onClick={() => { setView(v.id); setSelectedDate(null) }}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                view === v.id && !selectedDate ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto">

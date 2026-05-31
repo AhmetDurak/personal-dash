@@ -266,6 +266,10 @@ ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS repetitions  INTEGER  NO
 ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS ease_factor  NUMERIC  NOT NULL DEFAULT 2.5;
 ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS due_at       DATE     NOT NULL DEFAULT CURRENT_DATE;
 ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS memory_palace TEXT;
+
+-- Folders for notes and mindmaps
+ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
+ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
 `
 
 export async function migrate() {
