@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { currentMonth } from '../../utils/format'
+import { IconChevronLeft, IconChevronRight, IconChevronDown } from '../../lib/icons'
 
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
@@ -46,7 +47,7 @@ export function MonthSelector({ month, onChange, align = 'left' }: Props) {
         className="flex items-center gap-1.5 text-sm font-medium text-gray-700 border border-xero-border rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 transition-colors min-w-[160px] justify-between"
       >
         <span>{label}</span>
-        <span className={`text-gray-400 text-[10px] transition-transform duration-150 ${open ? 'rotate-180' : ''}`}>▾</span>
+        <IconChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} strokeWidth={2} />
       </button>
 
       {open && (
@@ -55,14 +56,14 @@ export function MonthSelector({ month, onChange, align = 'left' }: Props) {
           <div className="flex items-center justify-between mb-3">
             <button
               onClick={() => setViewYear(y => y - 1)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors text-base"
-            >‹</button>
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            ><IconChevronLeft className="w-4 h-4" strokeWidth={2} /></button>
             <span className="text-sm font-semibold text-gray-800">{viewYear}</span>
             <button
               onClick={() => setViewYear(y => y + 1)}
               disabled={viewYear >= nowYear}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors text-base disabled:opacity-25 disabled:cursor-not-allowed"
-            >›</button>
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+            ><IconChevronRight className="w-4 h-4" strokeWidth={2} /></button>
           </div>
 
           {/* Month grid */}

@@ -3,6 +3,7 @@ import { useJournalEntry } from '../hooks/useJournal'
 import { useDailyPlan, PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
 import { ChallengesView } from '../components/web/ChallengesView'
+import { IconClose, IconChevronLeft, IconChevronRight } from '../lib/icons'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -295,7 +296,7 @@ function PillList({ items, onChange, max, color, placeholder }: PillListProps) {
         {items.map(item => (
           <span key={item} className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${green ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
             {item}
-            <button onClick={() => onChange(items.filter(i => i !== item))} className="opacity-60 hover:opacity-100">×</button>
+            <button onClick={() => onChange(items.filter(i => i !== item))} className="opacity-60 hover:opacity-100"><IconClose className="w-3 h-3" strokeWidth={2.5} /></button>
           </span>
         ))}
         {items.length < max && (
@@ -437,9 +438,9 @@ function MonthCalendarView({ selected, onSelect }: { selected: string | null; on
   return (
     <div className="p-4 md:p-6 max-w-sm mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">‹</button>
+        <button onClick={prev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronLeft  className="w-4 h-4" strokeWidth={2} /></button>
         <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">{MONTH_NAMES[month]} {year}</p>
-        <button onClick={next} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">›</button>
+        <button onClick={next} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronRight className="w-4 h-4" strokeWidth={2} /></button>
       </div>
       <MonthGrid year={year} month={month} today={today} selected={selected} onSelect={onSelect} />
     </div>
@@ -454,9 +455,9 @@ function YearCalendarView({ selected, onSelect }: { selected: string | null; onS
   return (
     <div className="p-4 md:p-6">
       <div className="flex items-center justify-center gap-4 mb-6">
-        <button onClick={() => setYear(y => y - 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">‹</button>
+        <button onClick={() => setYear(y => y - 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronLeft  className="w-4 h-4" strokeWidth={2} /></button>
         <p className="text-base font-bold text-gray-800 dark:text-slate-100">{year}</p>
-        <button onClick={() => setYear(y => y + 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">›</button>
+        <button onClick={() => setYear(y => y + 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronRight className="w-4 h-4" strokeWidth={2} /></button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
         {MONTH_NAMES.map((name, mi) => (

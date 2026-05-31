@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom'
 import { useState } from 'react'
 import { formatEur, formatDate } from '../../utils/format'
 import type { PdfPreview, ParsedTx } from '../../types'
+import { IconClose } from '../../lib/icons'
 
 interface Props {
   preview: PdfPreview
@@ -55,7 +56,7 @@ export function PdfImportModal({ preview, onClose, onImported }: Props) {
               {preview.ready.length} ready · {totalConflicts} conflict{totalConflicts !== 1 ? 's' : ''}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-0.5 rounded"><IconClose className="w-4 h-4" strokeWidth={2} /></button>
         </div>
 
         <div className="p-6 space-y-5">

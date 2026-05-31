@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { IconClose } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
@@ -950,8 +951,8 @@ function MindmapView() {
               <span className="text-sm truncate flex-1">{m.title}</span>
               <button
                 onClick={e => { e.stopPropagation(); setConfirmDeleteId(m.id) }}
-                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all leading-none ml-1 flex-shrink-0"
-              >×</button>
+                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all ml-1 flex-shrink-0 p-0.5 rounded"
+              ><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
             </div>
           ))}
           {!isLoading && mindmaps.length === 0 && (
@@ -2079,7 +2080,7 @@ function RemindersView() {
                   <p className="text-sm text-gray-500 line-through flex-1">{r.title}</p>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                     <button onClick={() => toggle(r.id)} className="text-[10px] text-gray-400 hover:text-xero-green transition-colors">undo</button>
-                    <button onClick={() => setConfirmRemoveId(r.id)} className="text-gray-300 hover:text-red-400 transition-colors text-base leading-none">×</button>
+                    <button onClick={() => setConfirmRemoveId(r.id)} className="p-0.5 text-gray-300 hover:text-red-400 transition-colors rounded"><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
                   </div>
                 </div>
               ))}

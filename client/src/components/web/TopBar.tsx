@@ -7,6 +7,10 @@ import type { Lang } from '../../hooks/useLanguage'
 import { NotificationsPanel } from './NotificationsPanel'
 import { ConfirmDialog } from './ConfirmDialog'
 import { resetTour } from './AppTour'
+import {
+  IconSettings, IconSignOut, IconMobile, IconChevronRight, IconChevronLeft,
+  IconCheck, IconSun, IconMoon, IconChevronDown,
+} from '../../lib/icons'
 
 const LANG_OPTIONS: { value: Lang; label: string }[] = [
   { value: 'en', label: 'EN' },
@@ -74,7 +78,7 @@ export function TopBar() {
         <span className="hidden sm:inline text-sm font-semibold text-white tracking-tight">Personal Dashboard</span>
       </div>
 
-      {/* App switcher — scrollable on mobile */}
+      {/* App switcher */}
       <div className="flex-1 flex overflow-x-auto min-w-0" style={{ scrollbarWidth: 'none' }}>
         {APPS.map(app => {
           const active = app.isActive(pathname)
@@ -84,9 +88,7 @@ export function TopBar() {
               key={href}
               to={href}
               className={`flex-shrink-0 px-2.5 md:px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
-                active
-                  ? 'bg-white/10 text-white'
-                  : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
+                active ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
               }`}
             >
               {app.label}
@@ -111,9 +113,7 @@ export function TopBar() {
                 : <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[10px] text-gray-300 font-bold flex-shrink-0">{user.name[0]}</div>
               }
               <span className="hidden md:inline text-xs max-w-[100px] truncate">{user.name}</span>
-              <svg className="w-3 h-3 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <IconChevronDown className="w-3 h-3 text-gray-600 flex-shrink-0" strokeWidth={2} />
             </button>
 
             {userMenuOpen && (
@@ -126,9 +126,7 @@ export function TopBar() {
                       onClick={() => setSettingsOpen(false)}
                       className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1.5 transition-colors"
                     >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
+                      <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2} />
                       Back
                     </button>
 
@@ -160,7 +158,10 @@ export function TopBar() {
                       className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center justify-between"
                     >
                       <span className="flex items-center gap-2">
-                        <span>{dark ? '☀️' : '🌙'}</span>
+                        {dark
+                          ? <IconSun  className="w-3.5 h-3.5 text-amber-400" strokeWidth={2} />
+                          : <IconMoon className="w-3.5 h-3.5 text-blue-400"  strokeWidth={2} />
+                        }
                         <span>{dark ? t.light : t.dark}</span>
                       </span>
                       <span className={`w-8 h-4 rounded-full relative flex-shrink-0 transition-colors ${dark ? 'bg-blue-500' : 'bg-gray-600'}`}>
@@ -175,7 +176,7 @@ export function TopBar() {
                       onClick={() => { resetTour(); window.location.reload() }}
                       className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center gap-2"
                     >
-                      <span>🗺</span>
+                      <IconChevronRight className="w-3.5 h-3.5" strokeWidth={2} />
                       <span>Replay intro tour</span>
                     </button>
                   </>
@@ -188,12 +189,10 @@ export function TopBar() {
                       className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center justify-between"
                     >
                       <span className="flex items-center gap-2">
-                        <span>⚙</span>
+                        <IconSettings className="w-3.5 h-3.5" strokeWidth={2} />
                         <span>Settings</span>
                       </span>
-                      <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+                      <IconChevronRight className="w-3 h-3 text-gray-600" strokeWidth={2} />
                     </button>
 
                     <div className="border-t border-gray-800 my-1" />
@@ -203,7 +202,10 @@ export function TopBar() {
                       onClick={copyMobileToken}
                       className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center gap-2"
                     >
-                      <span>{tokenCopied ? '✓' : '📱'}</span>
+                      {tokenCopied
+                        ? <IconCheck   className="w-3.5 h-3.5 text-xero-green" strokeWidth={2.5} />
+                        : <IconMobile  className="w-3.5 h-3.5" strokeWidth={2} />
+                      }
                       <span>{tokenCopied ? 'Copied!' : 'Copy mobile token'}</span>
                     </button>
 
@@ -214,7 +216,7 @@ export function TopBar() {
                       onClick={() => { setUserMenuOpen(false); setShowLogoutConfirm(true) }}
                       className="w-full text-left px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-white/5 transition-colors flex items-center gap-2"
                     >
-                      <span>↪</span>
+                      <IconSignOut className="w-3.5 h-3.5" strokeWidth={2} />
                       <span>{t.signOut}</span>
                     </button>
                   </>

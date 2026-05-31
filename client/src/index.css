@@ -2,7 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { overflow-x: hidden; }
+html, body {
+  overflow-x: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular numbers everywhere financial values appear */
+.tabular-nums, input[type="number"] { font-variant-numeric: tabular-nums; }
 
 /* ── Dark mode overrides ────────────────────────────────────────────────────────
    .dark is set on <html>. Using ".dark .<class>" beats the single-class

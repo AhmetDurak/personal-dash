@@ -15,6 +15,7 @@ import { CAT_COLORS } from '../constants/categories'
 import { EXPENSE_CATS, INCOME_CATS } from '../types'
 import type { Transaction, Category, PdfPreview } from '../types'
 import type { ColumnMapping } from '../components/web/CsvImportModal'
+import { IconUpload, IconDownload, IconFileCsv, IconFilePdf, IconChevronDown } from '../lib/icons'
 
 type SortField = 'date' | 'amount' | 'name' | 'category'
 type SortDir = 'asc' | 'desc'
@@ -229,10 +230,9 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
               disabled={importing}
               className="text-sm border border-xero-border text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
             >
-              {importing ? 'Importing…' : '↑ Import'}
-              <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-              </svg>
+              <IconUpload className="w-3.5 h-3.5" strokeWidth={2} />
+              {importing ? 'Importing…' : 'Import'}
+              <IconChevronDown className="w-3.5 h-3.5 opacity-60" strokeWidth={2} />
             </button>
             {showImportMenu && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-xero-border rounded-xl shadow-lg z-20 overflow-hidden">
@@ -240,7 +240,7 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
                   onClick={() => { setShowImportMenu(false); csvInputRef.current?.click() }}
                   className="w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors flex items-center gap-2"
                 >
-                  <span>📊</span>
+                  <IconFileCsv className="w-4 h-4 text-emerald-500 flex-shrink-0" strokeWidth={2} />
                   <div>
                     <p className="font-medium">CSV</p>
                     <p className="text-[10px] text-gray-400">Any bank — auto-detected</p>
@@ -250,7 +250,7 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
                   onClick={() => { setShowImportMenu(false); fileInputRef.current?.click() }}
                   className="w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-xero-border flex items-center gap-2"
                 >
-                  <span>📄</span>
+                  <IconFilePdf className="w-4 h-4 text-red-400 flex-shrink-0" strokeWidth={2} />
                   <div>
                     <p className="font-medium">PDF</p>
                     <p className="text-[10px] text-amber-500">Deutsche Bank only</p>
@@ -269,8 +269,11 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
         <a
           href={`/api/entries/export?month=${month}`}
           download
-          className="text-sm border border-xero-border text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-        >↓ Export</a>
+          className="text-sm border border-xero-border text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 font-medium transition-colors flex items-center gap-1.5"
+        >
+          <IconDownload className="w-3.5 h-3.5" strokeWidth={2} />
+          Export
+        </a>
       </div>
 
       {/* Monthly summary */}

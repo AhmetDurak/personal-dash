@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard,
-  ArrowLeftRight,
-  AlignJustify,
-  ArrowUpDown,
-  TrendingUp,
-  GraduationCap,
-} from 'lucide-react'
+  IconDashboard    as LayoutDashboard,
+  IconTransfer     as ArrowLeftRight,
+  IconList         as AlignJustify,
+  IconSort         as ArrowUpDown,
+  IconIncome       as TrendingUp,
+  IconGraduation   as GraduationCap,
+} from '../../lib/icons'
 
 const NAV = [
   { path: '/finance/overview',     label: 'Profit & Loss',   Icon: LayoutDashboard },

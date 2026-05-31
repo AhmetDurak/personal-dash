@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, BarChart3, CalendarCheck } from 'lucide-react'
+import { IconIncome as TrendingUp, IconExpense as TrendingDown, IconWallet as Wallet, IconSavings as PiggyBank, IconChart as BarChart3, IconCalCheck as CalendarCheck } from '../../lib/icons'
 import { formatEur } from '../../utils/format'
 import { useCountUp } from '../../hooks/useCountUp'
 import type { MonthSummary, BarDataset } from '../../types'

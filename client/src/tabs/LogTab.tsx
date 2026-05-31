@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useJournalEntry, useRecentJournal } from '../hooks/useJournal'
 import { useDailyPlan, PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
+import { IconClose, IconChevronLeft, IconChevronRight } from '../lib/icons'
 
 type View = 'today' | 'plan' | 'calendar' | 'history'
 
@@ -47,8 +48,8 @@ function PillList({ items, onChange, max, color, placeholder }: PillListProps) {
             {item}
             <button
               onClick={() => onChange(items.filter(i => i !== item))}
-              className="opacity-60 hover:opacity-100 leading-none"
-            >×</button>
+              className="opacity-60 hover:opacity-100"
+            ><IconClose className="w-3 h-3" strokeWidth={2.5} /></button>
           </span>
         ))}
         {items.length < max && (
@@ -336,9 +337,9 @@ function CalendarView({ onSelectDate }: { onSelectDate: (d: string) => void }) {
   return (
     <div className="max-w-sm mx-auto p-6">
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prev} className="p-1 text-gray-400 hover:text-gray-700">‹</button>
+        <button onClick={prev} className="p-1 text-gray-400 hover:text-gray-700 rounded"><IconChevronLeft  className="w-4 h-4" strokeWidth={2} /></button>
         <p className="text-sm font-semibold text-gray-800">{monthLabel}</p>
-        <button onClick={next} className="p-1 text-gray-400 hover:text-gray-700">›</button>
+        <button onClick={next} className="p-1 text-gray-400 hover:text-gray-700 rounded"><IconChevronRight className="w-4 h-4" strokeWidth={2} /></button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center mb-2">
         {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { HelpCircle, X } from 'lucide-react'
+import { IconHelp as HelpCircle, IconClose as X } from '../../lib/icons'
 
 interface Props {
   id:       string

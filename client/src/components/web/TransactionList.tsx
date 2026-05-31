@@ -3,6 +3,7 @@ import { formatEur, formatDate } from '../../utils/format'
 import { CAT_COLORS, CAT_ICONS } from '../../constants/categories'
 import type { Transaction } from '../../types'
 import { ConfirmDialog } from './ConfirmDialog'
+import { IconEdit, IconClose, IconChevronUp, IconChevronDown } from '../../lib/icons'
 
 type SortField = 'date' | 'amount' | 'name' | 'category'
 type SortDir = 'asc' | 'desc'
@@ -20,11 +21,10 @@ interface Props {
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  return (
-    <span className={`ml-1 inline-block leading-none ${active ? 'text-xero-green' : 'text-gray-300'}`}>
-      {active && dir === 'asc' ? '↑' : '↓'}
-    </span>
-  )
+  const cls = `w-3 h-3 ml-1 inline-block ${active ? 'text-xero-green' : 'text-gray-300'}`
+  return active && dir === 'asc'
+    ? <IconChevronUp   className={cls} strokeWidth={2.5} />
+    : <IconChevronDown className={cls} strokeWidth={2.5} />
 }
 
 export function TransactionList({
@@ -113,8 +113,8 @@ export function TransactionList({
                 </td>
                 <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => onEdit(tx)} className="p-1 text-gray-400 hover:text-blue-500 rounded" title="Edit">✎</button>
-                    <button onClick={() => setConfirmId(tx.id)} className="p-1 text-gray-400 hover:text-red-500 rounded" title="Delete">×</button>
+                    <button onClick={() => onEdit(tx)} className="p-1 text-gray-400 hover:text-blue-500 rounded" title="Edit"><IconEdit  className="w-3.5 h-3.5" strokeWidth={2} /></button>
+                    <button onClick={() => setConfirmId(tx.id)} className="p-1 text-gray-400 hover:text-red-500 rounded" title="Delete"><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
                   </div>
                 </td>
               </tr>

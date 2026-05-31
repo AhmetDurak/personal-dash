@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNotifications } from '../../hooks/useNotifications'
 import { requestNotificationPermission } from '../../hooks/useReminderNotifications'
 import { ConfirmDialog } from './ConfirmDialog'
+import { IconBell, IconClose, IconIncome, IconExpense } from '../../lib/icons'
 
 function fmtEur(cents: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(cents / 100)
@@ -74,7 +75,7 @@ export function NotificationsPanel() {
         className="relative flex items-center justify-center w-9 h-9 rounded-xl hover:bg-gray-100 transition-colors"
         aria-label="Notifications"
       >
-        <span className="text-lg">🔔</span>
+        <IconBell className="w-4 h-4 text-gray-400" strokeWidth={2} />
         {badgeCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
             {badgeCount > 9 ? '9+' : badgeCount}
@@ -87,7 +88,7 @@ export function NotificationsPanel() {
         <div className="fixed right-2 top-10 w-96 max-w-[calc(100vw-0.5rem)] bg-white border border-xero-border rounded-2xl shadow-xl z-50 overflow-hidden">
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-900">Notifications</p>
-            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+            <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 p-0.5 rounded"><IconClose className="w-4 h-4" strokeWidth={2} /></button>
           </div>
 
           {'Notification' in window && permState === 'default' && (
@@ -118,7 +119,7 @@ export function NotificationsPanel() {
             {/* ── Monthly Summary ── */}
             {summary && (
               <section className="px-5 py-4 border-b border-gray-100">
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">📊 Monthly Overview — {summary.month}</p>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">Monthly Overview — {summary.month}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { label: 'Income',    value: fmtEur(summary.income),        color: 'text-xero-green' },
@@ -138,7 +139,7 @@ export function NotificationsPanel() {
             {/* ── ETF Alerts ── */}
             {alerts.length > 0 && (
               <section className="px-5 py-4 border-b border-gray-100">
-                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">📈 ETF Alerts (±2% today)</p>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">ETF Alerts (±2% today)</p>
                 <div className="space-y-2">
                   {alerts.map(a => (
                     <div key={a.ticker} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-gray-50">
@@ -146,8 +147,12 @@ export function NotificationsPanel() {
                         <span className="text-xs font-bold text-gray-800 font-mono">{a.ticker}</span>
                         <p className="text-[10px] text-gray-400 truncate max-w-[160px]">{a.name}</p>
                       </div>
-                      <span className={`text-sm font-bold ${a.direction === 'up' ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {a.direction === 'up' ? '▲' : '▼'} {fmtPct(a.changePct)}
+                      <span className={`text-sm font-bold flex items-center gap-1 ${a.direction === 'up' ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {a.direction === 'up'
+                          ? <IconIncome  className="w-3 h-3" strokeWidth={2.5} />
+                          : <IconExpense className="w-3 h-3" strokeWidth={2.5} />
+                        }
+                        {fmtPct(a.changePct)}
                       </span>
                     </div>
                   ))}
@@ -157,7 +162,7 @@ export function NotificationsPanel() {
 
             {/* ── Reminders ── */}
             <section className="px-5 py-4">
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">📝 Reminders</p>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">Reminders</p>
 
               {isLoading && <p className="text-xs text-gray-400 py-2">Loading…</p>}
 
@@ -182,9 +187,9 @@ export function NotificationsPanel() {
                     </div>
                     <button
                       onClick={() => setConfirmDeleteId(r.id)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none flex-shrink-0"
+                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
                     >
-                      ×
+                      <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
                     </button>
                   </div>
                 ))}

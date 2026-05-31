@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useChallenges } from '../../hooks/useChallenges'
 import type { Challenge, Checkpoint, ChallengeScope, RepeatCycle } from '../../hooks/useChallenges'
 import { ConfirmDialog } from './ConfirmDialog'
-import { Trophy, Flag, Plus, ChevronDown, ChevronUp, Check, Trash2, Pencil, X } from 'lucide-react'
+import { IconTrophy as Trophy, IconFlag as Flag, IconAdd as Plus, IconChevronDown as ChevronDown, IconChevronUp as ChevronUp, IconCheck as Check, IconDelete as Trash2, IconEdit as Pencil, IconClose as X } from '../../lib/icons'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

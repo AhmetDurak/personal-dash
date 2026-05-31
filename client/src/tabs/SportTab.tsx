@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { IconEdit, IconClose } from '../lib/icons'
 import { useExercises, useTemplates, useWorkoutLogs, useFitnessTargets, useBodyWeight } from '../hooks/useSport'
 import type { ExerciseType, MuscleGroup, WorkoutSetGroup, SetEntry } from '../hooks/useSport'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
@@ -259,12 +260,12 @@ function ExercisesView() {
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                 <button
                   onClick={() => { setEditingId(ex.id); setEditForm({ name: ex.name, type: ex.type, muscle_groups: [...ex.muscle_groups], description: ex.description ?? '' }) }}
-                  className="text-gray-300 hover:text-blue-400 transition-colors leading-none text-sm px-1"
+                  className="p-1 text-gray-300 hover:text-blue-400 transition-colors rounded"
                   title="Edit"
-                >✎</button>
+                ><IconEdit className="w-3.5 h-3.5" strokeWidth={2} /></button>
                 <button onClick={() => setConfirmId(ex.id)}
-                  className="text-gray-300 hover:text-red-400 transition-colors leading-none text-base">
-                  ×
+                  className="p-1 text-gray-300 hover:text-red-400 transition-colors rounded">
+                  <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
                 </button>
               </div>
               <div className="flex items-start gap-2 mb-2">
@@ -465,7 +466,7 @@ function LogWorkout() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
             <p className="text-sm font-semibold text-gray-800">{group.exercise_name}</p>
             <button onClick={() => setSets(p => p.filter((_, i) => i !== gi))}
-              className="text-gray-300 hover:text-red-400 transition-colors">×</button>
+              className="p-1 text-gray-300 hover:text-red-400 transition-colors rounded"><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
           </div>
           <div className="p-4 space-y-2">
             <div className="grid grid-cols-[2rem_1fr_1fr_1.5rem] gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
@@ -479,7 +480,7 @@ function LogWorkout() {
                 <input type="number" value={s.weight_kg ?? ''} onChange={e => updateSet(gi, si, 'weight_kg', e.target.value)} placeholder="—"
                   className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-1 focus:ring-xero-green" />
                 <button onClick={() => removeSet(gi, si)}
-                  className="text-gray-300 hover:text-red-400 transition-colors text-base leading-none justify-self-center">×</button>
+                  className="p-1 text-gray-300 hover:text-red-400 transition-colors rounded justify-self-center"><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
               </div>
             ))}
             <button onClick={() => addSet(gi)} className="text-xs text-xero-green hover:underline mt-1">+ Add set</button>
@@ -550,8 +551,8 @@ function LogWorkout() {
                           <div className="flex items-center gap-2">
                             {log.duration_min && <span className="text-xs text-gray-400">{log.duration_min} min</span>}
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                              <button onClick={() => loadLogForEdit(log)} className="text-gray-300 hover:text-blue-400 transition-colors text-sm px-1" title="Edit">✎</button>
-                              <button onClick={() => setConfirmDeleteId(log.id)} className="text-gray-300 hover:text-red-400 transition-colors leading-none text-base" title="Delete">×</button>
+                              <button onClick={() => loadLogForEdit(log)} className="p-1 text-gray-300 hover:text-blue-400 transition-colors rounded" title="Edit"><IconEdit  className="w-3.5 h-3.5" strokeWidth={2} /></button>
+                              <button onClick={() => setConfirmDeleteId(log.id)} className="p-1 text-gray-300 hover:text-red-400 transition-colors rounded" title="Delete"><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
                             </div>
                           </div>
                         </div>
@@ -649,7 +650,7 @@ function TargetsView() {
                     <span className="text-gray-400 font-normal"> / {target.target_value} {target.unit}</span>
                   </span>
                   <span className="text-xs font-bold text-xero-green">{pct}%</span>
-                  <button onClick={() => setConfirmId(target.id)} className="text-gray-300 hover:text-red-400 transition-colors leading-none">×</button>
+                  <button onClick={() => setConfirmId(target.id)} className="p-1 text-gray-300 hover:text-red-400 transition-colors rounded"><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
                 </div>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -804,7 +805,7 @@ function WeightView() {
                 <p className="text-sm font-bold text-gray-900 dark:text-slate-100">{Number(e.weight_kg).toFixed(1)} kg</p>
                 {e.note && <p className="text-xs text-gray-400 dark:text-slate-500 flex-1 truncate">{e.note}</p>}
                 <button onClick={() => setConfirmId(e.id)}
-                  className="text-gray-300 dark:text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 leading-none ml-auto flex-shrink-0">×</button>
+                  className="p-1 text-gray-300 dark:text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 ml-auto flex-shrink-0 rounded"><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
                 {confirmId === e.id && (
                   <ConfirmDialog
                     message={`Delete entry for ${e.date}?`}

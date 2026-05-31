@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, ChevronRight, ChevronLeft } from 'lucide-react'
+import { IconClose as X, IconChevronRight as ChevronRight, IconChevronLeft as ChevronLeft } from '../../lib/icons'
 
 const TOUR_KEY = 'app:tour:done'
 
