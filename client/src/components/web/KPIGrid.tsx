@@ -101,8 +101,8 @@ export function KPIGrid({ summary, barData }: Props) {
       avgKey:   null,
     },
     {
-      label:    'Investment',
-      rawValue: summary.byCategory.Investment ?? 0,
+      label:    'Sparen & Anlagen',
+      rawValue: summary.byCategory['Sparen und Anlagen'] ?? 0,
       display:  v => formatEur(v),
       color:    '#8B5CF6',
       bgColor:  '#8B5CF618',
