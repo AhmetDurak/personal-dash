@@ -23,9 +23,9 @@ export class PostgresRepository implements TransactionRepository {
 
   async save(tx: Transaction): Promise<Transaction> {
     const { rows } = await this.pool.query(
-      `INSERT INTO transactions (id, date, name, amount, type, category, source, raw, month, user_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [tx.id, tx.date, tx.name, tx.amount, tx.type, tx.category, tx.source, tx.raw ?? null, tx.date.slice(0, 7), this.userId]
+      `INSERT INTO transactions (id, date, name, amount, type, category, subcategory, source, raw, month, user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [tx.id, tx.date, tx.name, tx.amount, tx.type, tx.category, tx.subcategory ?? null, tx.source, tx.raw ?? null, tx.date.slice(0, 7), this.userId]
     )
     return this.toTransaction(rows[0])
   }
@@ -100,6 +100,7 @@ export class PostgresRepository implements TransactionRepository {
       amount: row.amount as number,
       type: row.type as Transaction['type'],
       category: row.category as Transaction['category'],
+      subcategory: (row.subcategory as string | null) ?? undefined,
       source: row.source as Transaction['source'],
       raw: row.raw as string | undefined,
     }

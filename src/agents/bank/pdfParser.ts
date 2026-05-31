@@ -1,46 +1,49 @@
 import { execSync } from 'child_process'
 
-const CAT_MAP: Record<string, string> = {
-  'Lohn / Gehalt':                          'Salary',
-  'Internetkäufe':                          'Market',
-  'Drogerieartikel':                        'Market',
-  'Lebensmittel / Getränke':                'Market',
-  'Tanken':                                 'Market',
-  'Kleidung / Schuhe':                      'Market',
-  'Elektronik / Computer / Games':          'Market',
-  'Auto':                                   'Market',
-  'Restaurants / Cafes / Bars':            'Entertainment',
-  'Bücher / Musik / Filme / Apps':         'Entertainment',
-  'Hobbys / Vereine / Verbände':           'Entertainment',
-  'Sport / Fitness':                        'Health',
-  'Krankenversicherung':                    'Health',
-  'Miete / Nebenkosten':                    'Fixed',
-  'Lebensversicherung':                     'Fixed',
-  'Rentenversicherung':                     'Fixed',
-  'Sonstige Ausgaben Versicherung':         'Fixed',
-  'Telefon / Internet / Fernsehen / Radio': 'Fixed',
-  'Öffentliche Verkehrsmittel':             'Fixed',
-  'Energie & Wasser':                       'Fixed',
-  'Sonstige Kredite':                       'Fixed',
-  'Autokredit':                             'Fixed',
-  'Sonstige Anlagen':                       'Investment',
-  'Sonstige Ausgaben Bildung und Beruf':   'Education',
-  'Unterhaltszahlungen':                    'Others',
-  'Bargeld':                                'Others',
-  'Öffentliche Kassen / Steuer':            'Others',
-  'Sonstiges':                              'Others',
-  'Unkategorisiert':                        'Others',
-  'Sonstige Einnahmen':                     'Other Income',
+const CAT_MAP: Record<string, { parent: string; sub: string }> = {
+  'Lohn / Gehalt':                          { parent: 'Einkommen',            sub: 'Lohn/Gehalt' },
+  'Sonstige Einnahmen':                     { parent: 'Einkommen',            sub: 'Sonstige Einnahmen' },
+  'Zinsen / Dividenden / Ausschüttungen':   { parent: 'Einkommen',            sub: 'Zinsen / Dividenden / Ausschüttungen' },
+  'Erstattungen':                           { parent: 'Einkommen',            sub: 'Erstattungen' },
+  'Lebensmittel / Getränke':                { parent: 'Lebenshaltung',         sub: 'Lebensmittel / Getränke' },
+  'Drogerieartikel':                        { parent: 'Lebenshaltung',         sub: 'Drogerieartikel' },
+  'Kleidung / Schuhe':                      { parent: 'Lebenshaltung',         sub: 'Kleidung / Schuhe' },
+  'Telefon / Internet / Fernsehen / Radio': { parent: 'Lebenshaltung',         sub: 'Telefon / Internet / Fernsehen / Radio' },
+  'Geschenke':                              { parent: 'Lebenshaltung',         sub: 'Geschenke' },
+  'Miete / Nebenkosten':                    { parent: 'Wohnen',                sub: 'Miete / Nebenkosten' },
+  'Energie & Wasser':                       { parent: 'Wohnen',                sub: 'Energie & Wasser' },
+  'Tanken':                                 { parent: 'Mobilität',             sub: 'Tanken' },
+  'Auto':                                   { parent: 'Mobilität',             sub: 'Auto' },
+  'Öffentliche Verkehrsmittel':             { parent: 'Mobilität',             sub: 'Öffentliche Verkehrsmittel' },
+  'Restaurants / Cafes / Bars':             { parent: 'Freizeit und Reise',    sub: 'Restaurants / Cafes / Bars' },
+  'Bücher / Musik / Filme / Apps':          { parent: 'Freizeit und Reise',    sub: 'Bücher / Musik / Filme / Apps' },
+  'Hobbys / Vereine / Verbände':            { parent: 'Freizeit und Reise',    sub: 'Hobbys / Vereine / Verbände' },
+  'Abonnements':                            { parent: 'Freizeit und Reise',    sub: 'Abonnements' },
+  'Elektronik / Computer / Games':          { parent: 'Freizeit und Reise',    sub: 'Elektronik / Computer / Games' },
+  'Sonstige Ausgaben Bildung und Beruf':    { parent: 'Beruf und Bildung',     sub: 'Sonstige Ausgaben Bildung und Beruf' },
+  'Sport / Fitness':                        { parent: 'Gesundheit',            sub: 'Sport / Fitness' },
+  'Krankenversicherung':                    { parent: 'Versicherungen',        sub: 'Krankenversicherung' },
+  'Lebensversicherung':                     { parent: 'Versicherungen',        sub: 'Lebensversicherung' },
+  'Rentenversicherung':                     { parent: 'Versicherungen',        sub: 'Rentenversicherung' },
+  'Sonstige Ausgaben Versicherung':         { parent: 'Versicherungen',        sub: 'Sonstige Ausgaben Versicherung' },
+  'Sonstige Kredite':                       { parent: 'Kredite',               sub: 'Sonstige Kredite' },
+  'Autokredit':                             { parent: 'Kredite',               sub: 'Autokredit' },
+  'Sonstige Anlagen':                       { parent: 'Sparen und Anlagen',    sub: 'Sonstige Anlagen' },
+  'Unterhaltszahlungen':                    { parent: 'Kinder',                sub: 'Unterhaltszahlungen' },
+  'Bargeld':                                { parent: 'Sonstige',              sub: 'Bargeld' },
+  'Öffentliche Kassen / Steuer':            { parent: 'Sonstige',              sub: 'Öffentliche Kassen / Steuer' },
+  'Internetkäufe':                          { parent: 'Sonstige',              sub: 'Internetkäufe' },
+  'Sonstiges':                              { parent: 'Sonstige',              sub: 'Sonstiges' },
+  'Unkategorisiert':                        { parent: 'Sonstige',              sub: 'Sonstiges' },
 }
-
-const INCOME_CATS = new Set(['Salary', 'Freelance', 'Investment Income', 'Other Income', 'Income'])
 
 function resolveCategory(dbCategory: string, type: 'income' | 'expense'): string {
   const mapped = CAT_MAP[dbCategory]
-  if (!mapped) return type === 'income' ? 'Income' : 'Others'
-  if (type === 'income' && !INCOME_CATS.has(mapped)) return 'Income'
-  if (type === 'expense' && INCOME_CATS.has(mapped)) return 'Others'
-  return mapped
+  return mapped ? mapped.parent : (type === 'income' ? 'Einkommen' : 'Sonstige')
+}
+
+function resolveSubcategory(dbCategory: string): string | undefined {
+  return CAT_MAP[dbCategory]?.sub
 }
 
 const SKIP_RE = [
@@ -99,6 +102,7 @@ export interface ParsedTx {
   amount: number
   type: 'income' | 'expense'
   category: string
+  subcategory?: string
   dbCategory: string
 }
 
@@ -159,7 +163,7 @@ export function parsePDF(pdfPath: string): ParsedTx[] {
       const type: 'income' | 'expense' = amt > 0 ? 'income' : 'expense'
       if (pendingMerchant && currentDate) {
         lastWasAbrechnung = pendingMerchant === 'ABRECHNUNG KARTE'
-        txs.push({ date: currentDate, name: pendingMerchant, amount: Math.abs(amt), type, category: resolveCategory(dbCategory, type), dbCategory })
+        txs.push({ date: currentDate, name: pendingMerchant, amount: Math.abs(amt), type, category: resolveCategory(dbCategory, type), subcategory: resolveSubcategory(dbCategory), dbCategory })
       }
       state = 'TRANSACTION_DONE'
       pendingMerchant = ''
@@ -173,7 +177,7 @@ export function parsePDF(pdfPath: string): ParsedTx[] {
         const type: 'income' | 'expense' = amt > 0 ? 'income' : 'expense'
         if (currentDate) {
           lastWasAbrechnung = false
-          txs.push({ date: currentDate, name, amount: Math.abs(amt), type, category: resolveCategory(dbCategory, type), dbCategory })
+          txs.push({ date: currentDate, name, amount: Math.abs(amt), type, category: resolveCategory(dbCategory, type), subcategory: resolveSubcategory(dbCategory), dbCategory })
         }
         state = 'TRANSACTION_DONE'
         pendingMerchant = ''

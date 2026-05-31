@@ -2,10 +2,10 @@ import { Router, Request, Response } from 'express'
 import multer from 'multer'
 import { readFile, unlink } from 'fs/promises'
 import os from 'os'
-import { EXPENSE_CATS, INCOME_CATS } from '../../types'
+import { ALL_CATS as VALID_CATS } from '../../types'
 
 const upload = multer({ dest: os.tmpdir(), limits: { fileSize: 10 * 1024 * 1024 } })
-const ALL_CATS = new Set([...INCOME_CATS, ...EXPENSE_CATS])
+const ALL_CATS = new Set(VALID_CATS)
 
 // ─── Parsing helpers ──────────────────────────────────────────────────────────
 

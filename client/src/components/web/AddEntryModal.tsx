@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom'
 import { useState } from 'react'
-import { EXPENSE_CATS, INCOME_CATS } from '../../types'
+import { EXPENSE_CATS, INCOME_CATS, CATEGORY_TREE } from '../../types'
 import { formatEur, formatDate } from '../../utils/format'
 import type { Category, TxType, Transaction } from '../../types'
 
@@ -12,7 +12,7 @@ const REPEAT_OPTIONS = [
   { label: '12M',  value: 12 },
 ]
 
-interface Form { type: TxType; name: string; amount: string; date: string; category: Category; repeat: number; repeatCount: number }
+interface Form { type: TxType; name: string; amount: string; date: string; category: Category; subcategory: string; repeat: number; repeatCount: number }
 interface Props { month: string; onClose: () => void; onSaved: () => void; transaction?: Transaction }
 interface ConfirmState { name: string; category: Category }
 
@@ -32,9 +32,10 @@ export function AddEntryModal({ month, onClose, onSaved, transaction }: Props) {
     amount: (transaction.amount / 100).toString(),
     date: transaction.date,
     category: transaction.category,
+    subcategory: transaction.subcategory ?? '',
     repeat: 0,
     repeatCount: 12,
-  } : { type: 'expense', name: '', amount: '', date: `${month}-01`, category: 'Others' as Category, repeat: 0, repeatCount: 12 })
+  } : { type: 'expense', name: '', amount: '', date: `${month}-01`, category: 'Sonstige' as Category, subcategory: '', repeat: 0, repeatCount: 12 })
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
@@ -52,7 +53,7 @@ export function AddEntryModal({ month, onClose, onSaved, transaction }: Props) {
     try {
       const url = transaction ? `/api/entries/${transaction.id}` : '/api/entries'
       const method = transaction ? 'PATCH' : 'POST'
-      const body: Record<string, unknown> = { ...form, amount: Math.round(Number(form.amount) * 100) }
+      const body: Record<string, unknown> = { ...form, amount: Math.round(Number(form.amount) * 100), subcategory: form.subcategory || null }
       if (transaction || form.repeat === 0) {
         delete body.repeat
         delete body.repeatCount
@@ -115,7 +116,8 @@ export function AddEntryModal({ month, onClose, onSaved, transaction }: Props) {
     setConfirm({ name: form.name.trim(), category: form.category })
   }
 
-  const categories = form.type === 'income' ? INCOME_CATS : EXPENSE_CATS
+  const parentCats = form.type === 'income' ? INCOME_CATS : EXPENSE_CATS
+  const subcats = CATEGORY_TREE[form.category] ?? []
   const isRecurring = !transaction && form.repeat > 0
   const entryCount = isRecurring ? Math.max(1, form.repeatCount) : 1
 
@@ -211,7 +213,7 @@ export function AddEntryModal({ month, onClose, onSaved, transaction }: Props) {
           <div className="flex gap-2 bg-xero-bg rounded-lg p-1">
             {(['expense', 'income'] as TxType[]).map(t => (
               <button key={t} type="button"
-                onClick={() => set({ type: t, category: t === 'income' ? 'Salary' : 'Others' })}
+                onClick={() => set({ type: t, category: t === 'income' ? 'Einkommen' : 'Sonstige', subcategory: '' })}
                 className={`flex-1 py-2 text-sm rounded-md font-medium capitalize transition-colors ${form.type === t ? 'bg-white text-xero-green shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >{t}</button>
             ))}
@@ -223,10 +225,18 @@ export function AddEntryModal({ month, onClose, onSaved, transaction }: Props) {
             placeholder="Amount (€)" type="number" min="0" step="0.01" value={form.amount} onChange={e => set({ amount: e.target.value })} />
           <input className="w-full border border-xero-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-xero-green/30 focus:border-xero-green"
             type="date" value={form.date} onChange={e => set({ date: e.target.value })} />
+          {/* Category — two level: parent then optional subcategory */}
           <select className="w-full border border-xero-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-xero-green/30 focus:border-xero-green"
-            value={form.category} onChange={e => set({ category: e.target.value as Category })}>
-            {categories.map(c => <option key={c}>{c}</option>)}
+            value={form.category} onChange={e => set({ category: e.target.value as Category, subcategory: '' })}>
+            {parentCats.map(c => <option key={c}>{c}</option>)}
           </select>
+          {subcats.length > 0 && (
+            <select className="w-full border border-xero-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-xero-green/30 focus:border-xero-green"
+              value={form.subcategory} onChange={e => set({ subcategory: e.target.value })}>
+              <option value="">— Subcategory (optional) —</option>
+              {subcats.map(s => <option key={s}>{s}</option>)}
+            </select>
+          )}
 
           {/* Repeat — hidden when editing */}
           {!transaction && (

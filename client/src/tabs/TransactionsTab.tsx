@@ -29,7 +29,7 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
   const [sortField, setSortField]     = useState<SortField>('date')
   const [sortDir, setSortDir]         = useState<SortDir>('desc')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [bulkCategory, setBulkCategory] = useState<Category>('Others')
+  const [bulkCategory, setBulkCategory] = useState<Category>('Sonstige')
   const [bulkWorking, setBulkWorking] = useState(false)
   const [importing, setImporting]       = useState(false)
   const [importResult, setImportResult] = useState<{ imported: number; overridden: number; skipped?: number } | null>(null)

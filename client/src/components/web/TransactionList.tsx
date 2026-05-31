@@ -106,6 +106,9 @@ export function TransactionList({
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS[tx.category] }} />
                     <span className="text-gray-600">{tx.category}</span>
                   </span>
+                  {tx.subcategory && (
+                    <span className="text-[10px] text-gray-400 ml-4 block">{tx.subcategory}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-gray-500">{formatDate(tx.date)}</td>
                 <td className={`px-6 py-3 text-right font-semibold ${tx.type === 'income' ? 'text-xero-green' : 'text-gray-800'}`}>

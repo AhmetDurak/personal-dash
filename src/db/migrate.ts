@@ -270,6 +270,47 @@ ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS memory_palace TEXT;
 -- Folders for notes and mindmaps
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
 ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
+
+-- Extended category/subcategory system
+ALTER TABLE transactions        ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT NULL;
+ALTER TABLE recurring_templates ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT NULL;
+
+-- Migrate old category values to new German parent categories
+UPDATE transactions SET category = CASE category
+  WHEN 'Income'            THEN 'Einkommen'
+  WHEN 'Salary'            THEN 'Einkommen'
+  WHEN 'Freelance'         THEN 'Einkommen'
+  WHEN 'Investment Income' THEN 'Sparen und Anlagen'
+  WHEN 'Other Income'      THEN 'Einkommen'
+  WHEN 'Fixed'             THEN 'Wohnen'
+  WHEN 'Market'            THEN 'Lebenshaltung'
+  WHEN 'Health'            THEN 'Gesundheit'
+  WHEN 'Investment'        THEN 'Sparen und Anlagen'
+  WHEN 'Education'         THEN 'Beruf und Bildung'
+  WHEN 'Entertainment'     THEN 'Freizeit und Reise'
+  WHEN 'Others'            THEN 'Sonstige'
+  ELSE category
+END
+WHERE category IN ('Income','Salary','Freelance','Investment Income','Other Income',
+                   'Fixed','Market','Health','Investment','Education','Entertainment','Others');
+
+UPDATE recurring_templates SET category = CASE category
+  WHEN 'Income'            THEN 'Einkommen'
+  WHEN 'Salary'            THEN 'Einkommen'
+  WHEN 'Freelance'         THEN 'Einkommen'
+  WHEN 'Investment Income' THEN 'Sparen und Anlagen'
+  WHEN 'Other Income'      THEN 'Einkommen'
+  WHEN 'Fixed'             THEN 'Wohnen'
+  WHEN 'Market'            THEN 'Lebenshaltung'
+  WHEN 'Health'            THEN 'Gesundheit'
+  WHEN 'Investment'        THEN 'Sparen und Anlagen'
+  WHEN 'Education'         THEN 'Beruf und Bildung'
+  WHEN 'Entertainment'     THEN 'Freizeit und Reise'
+  WHEN 'Others'            THEN 'Sonstige'
+  ELSE category
+END
+WHERE category IN ('Income','Salary','Freelance','Investment Income','Other Income',
+                   'Fixed','Market','Health','Investment','Education','Entertainment','Others');
 `
 
 export async function migrate() {

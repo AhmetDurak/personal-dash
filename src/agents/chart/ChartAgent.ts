@@ -25,18 +25,18 @@ export interface StackedDataset {
 }
 
 export const CAT_COLORS: Record<Category, string> = {
-  Income:             '#1D9E75',
-  Salary:             '#00B087',
-  Freelance:          '#059669',
-  'Investment Income':'#0EA5E9',
-  'Other Income':     '#6EE7B7',
-  Fixed:              '#888780',
-  Market:             '#378ADD',
-  Health:             '#D85A30',
-  Investment:         '#534AB7',
-  Education:          '#BA7517',
-  Entertainment:      '#D4537E',
-  Others:             '#3B6D11',
+  Einkommen:            '#00B087',
+  Lebenshaltung:        '#378ADD',
+  Wohnen:               '#888780',
+  Mobilität:            '#E07B39',
+  'Freizeit und Reise': '#D4537E',
+  'Beruf und Bildung':  '#BA7517',
+  Gesundheit:           '#D85A30',
+  Kinder:               '#6EBF9E',
+  'Sparen und Anlagen': '#534AB7',
+  Versicherungen:       '#5B8DB8',
+  Kredite:              '#C05B5B',
+  Sonstige:             '#3B6D11',
 }
 
 const MONTH_LABELS: Record<string, string> = {
@@ -61,7 +61,7 @@ export class ChartAgent {
       labels: summaries.map(s => shortLabel(s.month)),
       balance: summaries.map(s => centsToEuros(s.endBalance)),
       investmentsYTD: summaries.map(s => {
-        cumInvest += s.byCategory.Investment ?? 0
+        cumInvest += s.byCategory['Sparen und Anlagen'] ?? 0
         return centsToEuros(cumInvest)
       }),
     }

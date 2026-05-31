@@ -11,7 +11,7 @@ export class CategoryAgent {
       if (pattern.test(tx.counterPartyName)) return cat
     }
 
-    return tx.amount > 0 ? 'Income' : 'Others'
+    return tx.amount > 0 ? 'Einkommen' : 'Sonstige'
   }
 
   classifyBatch(txs: RawTransaction[]): Transaction[] {

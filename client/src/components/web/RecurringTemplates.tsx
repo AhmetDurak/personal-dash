@@ -14,7 +14,7 @@ export function RecurringTemplates({ month }: Props) {
   const [adding, setAdding] = useState(false)
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [applying, setApplying] = useState<number | null>(null)
-  const [draft, setDraft] = useState({ name: '', amount: '', type: 'expense' as 'income' | 'expense', category: 'Fixed' as Category })
+  const [draft, setDraft] = useState({ name: '', amount: '', type: 'expense' as 'income' | 'expense', category: 'Wohnen' as Category })
 
   async function handleApply(t: { id: number; name: string; amount: number; type: string; category: string }) {
     setApplying(t.id)
@@ -34,7 +34,7 @@ export function RecurringTemplates({ month }: Props) {
     await createTemplate({ ...draft, amount: Math.round(parseFloat(draft.amount) * 100) })
     await mutate()
     setAdding(false)
-    setDraft({ name: '', amount: '', type: 'expense', category: 'Fixed' })
+    setDraft({ name: '', amount: '', type: 'expense', category: 'Wohnen' })
   }
 
   async function handleDelete(id: number) {
@@ -75,7 +75,7 @@ export function RecurringTemplates({ month }: Props) {
             />
             <select
               value={draft.type}
-              onChange={e => setDraft(d => ({ ...d, type: e.target.value as 'income' | 'expense', category: e.target.value === 'income' ? 'Income' : 'Fixed' }))}
+              onChange={e => setDraft(d => ({ ...d, type: e.target.value as 'income' | 'expense', category: e.target.value === 'income' ? 'Einkommen' : 'Wohnen' }))}
               className="text-sm border border-xero-border rounded-lg px-2 py-2"
             >
               <option value="expense">Expense</option>
