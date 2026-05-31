@@ -240,6 +240,17 @@ CREATE TABLE IF NOT EXISTS challenges (
   updated_at     TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_challenges_user ON challenges(user_id);
+
+CREATE TABLE IF NOT EXISTS body_weight (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER REFERENCES users(id),
+  date       DATE NOT NULL,
+  weight_kg  NUMERIC(5,2) NOT NULL,
+  note       TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, date)
+);
+CREATE INDEX IF NOT EXISTS idx_body_weight_user ON body_weight(user_id);
 `
 
 export async function migrate() {

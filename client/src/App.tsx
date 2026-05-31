@@ -82,7 +82,8 @@ export function App() {
         <AppTour />
         <div className="flex-1 overflow-hidden">
           <Routes>
-            <Route path="/today"       element={<TodayTab />} />
+            <Route path="/planner"     element={<TodayTab />} />
+            <Route path="/today"       element={<Navigate to="/planner" replace />} />
             <Route path="/life/*"      element={<LifeTab />} />
             <Route path="/learn/*"     element={<LearnSectionTab />} />
             <Route path="/news"        element={<NewsPage />} />
@@ -97,7 +98,7 @@ export function App() {
             <Route path="/workspace/vocab"   element={<Navigate to="/learn/language" replace />} />
             <Route path="/learn/vocab"       element={<Navigate to="/learn/language" replace />} />
             <Route path="/workspace/*"       element={<Navigate to="/learn/notes" replace />} />
-            <Route path="*"            element={<Navigate to="/today" replace />} />
+            <Route path="*"            element={<Navigate to="/planner" replace />} />
           </Routes>
         </div>
       </div>

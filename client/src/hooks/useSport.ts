@@ -183,3 +183,34 @@ export function useFitnessTargets() {
 
   return { targets: data ?? [], isLoading, addTarget, updateTarget, deleteTarget }
 }
+
+// ─── Body weight ──────────────────────────────────────────────────────────────
+
+export interface BodyWeightEntry {
+  id:         number
+  user_id:    number
+  date:       string
+  weight_kg:  number
+  note:       string | null
+  created_at: string
+}
+
+export function useBodyWeight() {
+  const { data, mutate, isLoading } = useSWR<BodyWeightEntry[]>('/api/sport/weight', fetcher)
+
+  async function addEntry(date: string, weight_kg: number, note?: string) {
+    await fetch('/api/sport/weight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, weight_kg, note }),
+    })
+    await mutate()
+  }
+
+  async function deleteEntry(id: number) {
+    await fetch(`/api/sport/weight/${id}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { entries: data ?? [], isLoading, addEntry, deleteEntry }
+}

@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { useExercises, useTemplates, useWorkoutLogs, useFitnessTargets } from '../hooks/useSport'
+import { useState, useMemo } from 'react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { useExercises, useTemplates, useWorkoutLogs, useFitnessTargets, useBodyWeight } from '../hooks/useSport'
 import type { ExerciseType, MuscleGroup, WorkoutSetGroup, SetEntry } from '../hooks/useSport'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChallengesView } from '../components/web/ChallengesView'
 import { useLanguage } from '../hooks/useLanguage'
+import { useDarkMode } from '../hooks/useDarkMode'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -69,24 +71,41 @@ function Dashboard() {
         ))}
       </div>
 
-      {/* Recent workouts */}
+      {/* Recent workouts — grouped by date */}
       {logs.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Recent workouts</p>
           <div className="space-y-2">
-            {logs.slice(0, 5).map(log => (
-              <div key={log.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-gray-800">
-                    {new Date(log.date.slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                  </p>
-                  {log.duration_min && <span className="text-xs text-gray-400">{log.duration_min} min</span>}
-                </div>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {log.sets.map(g => g.exercise_name).join(' · ')}
-                </p>
-              </div>
-            ))}
+            {Object.entries(
+              logs.reduce<Record<string, typeof logs>>((acc, log) => {
+                const d = log.date.slice(0, 10)
+                ;(acc[d] ??= []).push(log)
+                return acc
+              }, {})
+            )
+              .sort(([a], [b]) => b.localeCompare(a))
+              .slice(0, 5)
+              .map(([date, dayLogs]) => {
+                const allExercises = dayLogs.flatMap(l => l.sets.map(g => g.exercise_name))
+                const uniqueExercises = [...new Set(allExercises)]
+                const totalDuration = dayLogs.reduce((s, l) => s + (l.duration_min ?? 0), 0)
+                const totalSets = dayLogs.reduce((s, l) => s + l.sets.reduce((ss, g) => ss + g.sets.length, 0), 0)
+                return (
+                  <div key={date} className="bg-white rounded-xl border border-gray-100 px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-800">
+                        {new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        {totalDuration > 0 && <span className="text-xs text-gray-400">{totalDuration} min</span>}
+                        <span className="text-xs text-gray-400">{totalSets} sets</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">{uniqueExercises.join(' · ')}</p>
+                  </div>
+                )
+              })
+            }
           </div>
         </div>
       )}
@@ -385,6 +404,13 @@ function LogWorkout() {
     }))
   }
 
+  function removeSet(groupIdx: number, setIdx: number) {
+    setSets(prev => prev.map((g, gi) => gi !== groupIdx ? g : {
+      ...g,
+      sets: g.sets.filter((_, si) => si !== setIdx),
+    }))
+  }
+
   async function handleSave() {
     const payload = {
       template_id: templateId ?? undefined,
@@ -442,16 +468,18 @@ function LogWorkout() {
               className="text-gray-300 hover:text-red-400 transition-colors">×</button>
           </div>
           <div className="p-4 space-y-2">
-            <div className="grid grid-cols-3 gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-              <span>Set</span><span>Reps</span><span>Weight (kg)</span>
+            <div className="grid grid-cols-[2rem_1fr_1fr_1.5rem] gap-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+              <span>Set</span><span>Reps</span><span>Weight (kg)</span><span />
             </div>
             {group.sets.map((s, si) => (
-              <div key={si} className="grid grid-cols-3 gap-2 items-center">
+              <div key={si} className="grid grid-cols-[2rem_1fr_1fr_1.5rem] gap-2 items-center">
                 <span className="text-xs text-gray-400">#{si + 1}</span>
                 <input type="number" value={s.reps} onChange={e => updateSet(gi, si, 'reps', e.target.value)} min={1}
                   className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-1 focus:ring-xero-green" />
                 <input type="number" value={s.weight_kg ?? ''} onChange={e => updateSet(gi, si, 'weight_kg', e.target.value)} placeholder="—"
                   className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-1 focus:ring-xero-green" />
+                <button onClick={() => removeSet(gi, si)}
+                  className="text-gray-300 hover:text-red-400 transition-colors text-base leading-none justify-self-center">×</button>
               </div>
             ))}
             <button onClick={() => addSet(gi)} className="text-xs text-xero-green hover:underline mt-1">+ Add set</button>
@@ -492,37 +520,56 @@ function LogWorkout() {
         {saved && <span className="text-sm text-xero-green font-medium">Saved!</span>}
       </div>
 
-      {/* History */}
+      {/* History — grouped by date */}
       {logs.length > 0 && (
         <div className="border-t border-gray-100 pt-5">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">This month</p>
-          <div className="space-y-2">
-            {logs.map(log => (
-              <div key={log.id} className={`bg-white rounded-xl border px-4 py-3 group relative ${editingLogId === log.id ? 'border-xero-green/50 ring-1 ring-xero-green/30' : 'border-gray-100'}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-semibold text-gray-800">
-                    {new Date(log.date.slice(0, 10) + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
-                    {editingLogId === log.id && <span className="ml-2 text-[10px] text-xero-green font-medium">editing</span>}
+          <div className="space-y-4">
+            {Object.entries(
+              logs.reduce<Record<string, typeof logs>>((acc, log) => {
+                const d = log.date.slice(0, 10)
+                ;(acc[d] ??= []).push(log)
+                return acc
+              }, {})
+            )
+              .sort(([a], [b]) => b.localeCompare(a))
+              .map(([date, dayLogs]) => (
+                <div key={date}>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5 pl-1">
+                    {new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
                   </p>
-                  <div className="flex items-center gap-2">
-                    {log.duration_min && <span className="text-xs text-gray-400">{log.duration_min} min</span>}
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => loadLogForEdit(log)} className="text-gray-300 hover:text-blue-400 transition-colors text-sm px-1" title="Edit">✎</button>
-                      <button onClick={() => setConfirmDeleteId(log.id)} className="text-gray-300 hover:text-red-400 transition-colors leading-none text-base" title="Delete">×</button>
-                    </div>
+                  <div className="space-y-2">
+                    {dayLogs.map(log => (
+                      <div key={log.id} className={`bg-white rounded-xl border px-4 py-3 group relative ${editingLogId === log.id ? 'border-xero-green/50 ring-1 ring-xero-green/30' : 'border-gray-100'}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-semibold text-gray-800">
+                            {log.sets.map(g => g.exercise_name).slice(0, 2).join(', ')}
+                            {log.sets.length > 2 && ` +${log.sets.length - 2}`}
+                            {editingLogId === log.id && <span className="ml-2 text-[10px] text-xero-green font-medium">editing</span>}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            {log.duration_min && <span className="text-xs text-gray-400">{log.duration_min} min</span>}
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                              <button onClick={() => loadLogForEdit(log)} className="text-gray-300 hover:text-blue-400 transition-colors text-sm px-1" title="Edit">✎</button>
+                              <button onClick={() => setConfirmDeleteId(log.id)} className="text-gray-300 hover:text-red-400 transition-colors leading-none text-base" title="Delete">×</button>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-400">{log.sets.map(g => `${g.exercise_name} ×${g.sets.length}`).join(' · ')}</p>
+                        {confirmDeleteId === log.id && (
+                          <ConfirmDialog
+                            message="This workout log will be deleted."
+                            confirmLabel="Delete"
+                            onConfirm={() => { deleteLog(log.id); setConfirmDeleteId(null); if (editingLogId === log.id) cancelEdit() }}
+                            onCancel={() => setConfirmDeleteId(null)}
+                          />
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <p className="text-xs text-gray-400">{log.sets.map(g => `${g.exercise_name} ×${g.sets.length}`).join(' · ')}</p>
-                {confirmDeleteId === log.id && (
-                  <ConfirmDialog
-                    message="This workout log will be deleted."
-                    confirmLabel="Delete"
-                    onConfirm={() => { deleteLog(log.id); setConfirmDeleteId(null); if (editingLogId === log.id) cancelEdit() }}
-                    onCancel={() => setConfirmDeleteId(null)}
-                  />
-                )}
-              </div>
-            ))}
+              ))
+            }
           </div>
         </div>
       )}
@@ -628,9 +675,160 @@ function TargetsView() {
   )
 }
 
+// ─── Weight tracker ───────────────────────────────────────────────────────────
+
+function WeightView() {
+  const { entries, isLoading, addEntry, deleteEntry } = useBodyWeight()
+  const { dark } = useDarkMode()
+  const today = todayStr()
+  const [date, setDate] = useState(today)
+  const [weight, setWeight] = useState('')
+  const [note, setNote] = useState('')
+  const [confirmId, setConfirmId] = useState<number | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    const kg = parseFloat(weight)
+    if (!date || isNaN(kg) || kg <= 0) return
+    await addEntry(date, kg, note.trim() || undefined)
+    setWeight('')
+    setNote('')
+    setDate(today)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const chartData = useMemo(() => entries.map(e => ({
+    date:  new Date(e.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+    dateRaw: e.date,
+    kg:    Number(e.weight_kg),
+  })), [entries])
+
+  const latest   = entries.at(-1)
+  const prev     = entries.at(-2)
+  const diff     = latest && prev ? Number(latest.weight_kg) - Number(prev.weight_kg) : null
+  const minKg    = entries.length ? Math.min(...entries.map(e => Number(e.weight_kg))) - 1 : 50
+  const maxKg    = entries.length ? Math.max(...entries.map(e => Number(e.weight_kg))) + 1 : 100
+
+  const axisColor  = dark ? '#64748B' : '#94A3B8'
+  const gridColor  = dark ? '#1E293B' : '#F1F5F9'
+  const tooltipBg  = dark ? '#1E293B' : '#ffffff'
+  const tooltipClr = dark ? '#F1F5F9' : '#111827'
+
+  return (
+    <div className="p-4 md:p-6 space-y-6 max-w-2xl mx-auto">
+
+      {/* Stats row */}
+      {latest && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{Number(latest.weight_kg).toFixed(1)}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">kg · latest</p>
+          </div>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-4 text-center">
+            <p className={`text-2xl font-bold ${diff === null ? 'text-gray-400' : diff > 0 ? 'text-red-500' : diff < 0 ? 'text-xero-green' : 'text-gray-400'}`}>
+              {diff === null ? '—' : `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`}
+            </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">kg change</p>
+          </div>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-4 text-center">
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{entries.length}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">entries</p>
+          </div>
+        </div>
+      )}
+
+      {/* Chart */}
+      {entries.length >= 2 && (
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-4">
+          <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-4">Weight over time</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+              <CartesianGrid stroke={gridColor} strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: axisColor }} tickLine={false} axisLine={false} />
+              <YAxis domain={[minKg, maxKg]} tick={{ fontSize: 10, fill: axisColor }} tickLine={false} axisLine={false}
+                tickFormatter={v => `${v}kg`} />
+              <Tooltip
+                contentStyle={{ backgroundColor: tooltipBg, border: `1px solid ${dark ? '#334155' : '#E8EBF0'}`, borderRadius: 10, color: tooltipClr, fontSize: 12 }}
+                itemStyle={{ color: tooltipClr }}
+                formatter={(v: number) => [`${v.toFixed(1)} kg`, 'Weight']}
+              />
+              {latest && (
+                <ReferenceLine y={Number(latest.weight_kg)} stroke="#00B08744" strokeDasharray="4 4" />
+              )}
+              <Line type="monotone" dataKey="kg" stroke="#00B087" strokeWidth={2.5}
+                dot={{ r: 3, fill: '#00B087', strokeWidth: 0 }}
+                activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Add entry form */}
+      <form onSubmit={handleAdd} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-4 space-y-3">
+        <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Log weight</p>
+        <div className="flex flex-wrap gap-3">
+          <input type="date" value={date} onChange={e => setDate(e.target.value)}
+            className="text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+          <div className="flex items-center gap-1.5 border border-gray-200 dark:border-slate-600 rounded-xl px-3 focus-within:ring-1 focus-within:ring-xero-green bg-white dark:bg-slate-700">
+            <input type="number" value={weight} onChange={e => setWeight(e.target.value)}
+              placeholder="0.0" step="0.1" min="20" max="300"
+              className="text-sm py-2 w-20 focus:outline-none bg-transparent text-gray-900 dark:text-slate-100" />
+            <span className="text-sm text-gray-400">kg</span>
+          </div>
+          <input value={note} onChange={e => setNote(e.target.value)}
+            placeholder="Note (optional)"
+            className="text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 flex-1 min-w-[140px] focus:outline-none focus:ring-1 focus:ring-xero-green bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+        </div>
+        <div className="flex items-center gap-3">
+          <button type="submit" disabled={!weight || !date}
+            className="text-sm bg-xero-green text-white px-5 py-2 rounded-xl font-medium hover:bg-xero-green-dark transition-colors disabled:opacity-40">
+            Save
+          </button>
+          {saved && <span className="text-sm text-xero-green font-medium">Saved!</span>}
+        </div>
+      </form>
+
+      {/* History list */}
+      {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
+      {entries.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-3">History</p>
+          <div className="space-y-2">
+            {[...entries].reverse().map(e => (
+              <div key={e.id} className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 px-4 py-3 group">
+                <p className="text-sm text-gray-500 dark:text-slate-400 w-24 flex-shrink-0">
+                  {new Date(e.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+                <p className="text-sm font-bold text-gray-900 dark:text-slate-100">{Number(e.weight_kg).toFixed(1)} kg</p>
+                {e.note && <p className="text-xs text-gray-400 dark:text-slate-500 flex-1 truncate">{e.note}</p>}
+                <button onClick={() => setConfirmId(e.id)}
+                  className="text-gray-300 dark:text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 leading-none ml-auto flex-shrink-0">×</button>
+                {confirmId === e.id && (
+                  <ConfirmDialog
+                    message={`Delete entry for ${e.date}?`}
+                    confirmLabel="Delete"
+                    onConfirm={() => { deleteEntry(e.id); setConfirmId(null) }}
+                    onCancel={() => setConfirmId(null)}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {entries.length === 0 && !isLoading && (
+        <p className="text-sm text-gray-400 text-center py-12">No weight entries yet. Log your first measurement!</p>
+      )}
+    </div>
+  )
+}
+
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
-type View = 'dashboard' | 'exercises' | 'log' | 'targets' | 'challenges'
+type View = 'dashboard' | 'exercises' | 'log' | 'targets' | 'challenges' | 'weight'
 
 export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const { t } = useLanguage()
@@ -641,6 +839,7 @@ export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
     { id: 'log',        label: t.logWorkout },
     { id: 'targets',    label: t.targets },
     { id: 'challenges', label: '🏆 Challenges' },
+    { id: 'weight',     label: '⚖️ Weight' },
   ]
 
   return (
@@ -672,6 +871,7 @@ export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
         {view === 'log'        && <LogWorkout />}
         {view === 'targets'    && <TargetsView />}
         {view === 'challenges' && <ChallengesView scope="sport" />}
+        {view === 'weight'     && <WeightView />}
       </div>
     </div>
   )

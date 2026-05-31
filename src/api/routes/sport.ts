@@ -212,5 +212,35 @@ export function sportRouter(pool: Pool): Router {
     res.json({ ok: true })
   })
 
+  // ─── Body weight ──────────────────────────────────────────────────────────
+
+  router.get('/weight', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      'SELECT * FROM body_weight WHERE user_id=$1 ORDER BY date ASC',
+      [uid]
+    )
+    res.json(rows)
+  })
+
+  router.post('/weight', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { date, weight_kg, note } = req.body
+    const { rows } = await pool.query(
+      `INSERT INTO body_weight (user_id, date, weight_kg, note)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (user_id, date) DO UPDATE SET weight_kg=$3, note=$4
+       RETURNING *`,
+      [uid, date, weight_kg, note ?? null]
+    )
+    res.json(rows[0])
+  })
+
+  router.delete('/weight/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    await pool.query('DELETE FROM body_weight WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
+  })
+
   return router
 }
