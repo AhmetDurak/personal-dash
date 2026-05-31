@@ -47,7 +47,7 @@ export class LedgerAgent {
     const [txs, endBalance, investmentsYTD] = await Promise.all([
       this.repo.findByMonth(month),
       this.repo.aggregateNetUpToMonth(month),
-      this.repo.aggregateCategoryInRange('Investment', `${month.slice(0, 4)}-01`, month),
+      this.repo.aggregateCategoryInRange('Sparen und Anlagen', `${month.slice(0, 4)}-01`, month),
     ])
     const summary = computeSummary(month, txs)
     return { ...summary, endBalance, investmentsYTD }
