@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
-import { IconClose } from '../lib/icons'
+import { IconClose, IconFolder } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
@@ -184,7 +184,7 @@ function NotesView() {
                 + {t.newNote}
               </button>
               <button onClick={() => setNewFolderInput(true)} className="text-xs bg-gray-200 text-gray-600 hover:bg-gray-300 rounded-lg px-2.5 py-1.5 font-medium transition-colors" title="New folder">
-                📁
+                <IconFolder className="w-3.5 h-3.5" strokeWidth={2} />
               </button>
             </div>
           )}
@@ -241,7 +241,7 @@ function NotesView() {
                     onClick={() => setFolderPickerOpen(p => !p)}
                     className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors flex items-center gap-1"
                   >
-                    📁 {selectedNote?.folder ?? 'No folder'}
+                    <IconFolder className="w-3 h-3" strokeWidth={2} /> {selectedNote?.folder ?? 'No folder'}
                   </button>
                   {folderPickerOpen && (
                     <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[140px]">
@@ -1066,7 +1066,7 @@ function MindmapView() {
           ) : (
             <div className="flex gap-1">
               <button onClick={handleNew} className="flex-1 text-[10px] text-gray-300 hover:text-white transition-colors text-left px-1">+ New map</button>
-              <button onClick={() => setNewFolderInput(true)} className="text-gray-400 hover:text-white transition-colors text-xs px-1" title="New folder">📁</button>
+              <button onClick={() => setNewFolderInput(true)} className="text-gray-400 hover:text-white transition-colors p-1 rounded" title="New folder"><IconFolder className="w-3.5 h-3.5" strokeWidth={2} /></button>
             </div>
           )}
         </div>
@@ -1080,7 +1080,7 @@ function MindmapView() {
                 {/* Folder picker for this map */}
                 <div className="relative">
                   <button onClick={e => { e.stopPropagation(); setFolderPickerId(folderPickerId === m.id ? null : m.id) }}
-                    className="text-gray-500 hover:text-gray-300 p-0.5 rounded text-[10px]" title="Move to folder">📁</button>
+                    className="text-gray-500 hover:text-gray-300 p-0.5 rounded" title="Move to folder"><IconFolder className="w-3 h-3" strokeWidth={2} /></button>
                   {folderPickerId === m.id && (
                     <div className="absolute left-0 top-full mt-0.5 z-30 bg-xero-navy border border-xero-navy-light rounded-lg shadow-xl py-1 min-w-[130px]" onClick={e => e.stopPropagation()}>
                       <button onClick={() => { moveMindmapToFolder(m.id, null); setFolderPickerId(null) }} className="w-full text-left text-[10px] px-3 py-1.5 text-gray-400 hover:bg-xero-navy-light hover:text-gray-200">No folder</button>
