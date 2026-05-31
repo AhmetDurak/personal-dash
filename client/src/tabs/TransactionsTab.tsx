@@ -7,11 +7,14 @@ import { AddEntryModal } from '../components/web/AddEntryModal'
 import { formatEur } from '../utils/format'
 import { MonthSelector } from '../components/web/MonthSelector'
 import { PdfImportModal } from '../components/web/PdfImportModal'
+import { CsvImportModal } from '../components/web/CsvImportModal'
+import { HelpTooltip } from '../components/web/HelpTooltip'
 import { RecurringTemplates } from '../components/web/RecurringTemplates'
 import { BudgetBars } from '../components/web/BudgetBars'
 import { CAT_COLORS } from '../constants/categories'
 import { EXPENSE_CATS, INCOME_CATS } from '../types'
 import type { Transaction, Category, PdfPreview } from '../types'
+import type { ColumnMapping } from '../components/web/CsvImportModal'
 
 type SortField = 'date' | 'amount' | 'name' | 'category'
 type SortDir = 'asc' | 'desc'
@@ -30,6 +33,7 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
   const [importing, setImporting]       = useState(false)
   const [importResult, setImportResult] = useState<{ imported: number; overridden: number; skipped?: number } | null>(null)
   const [pdfPreview, setPdfPreview]     = useState<PdfPreview | null>(null)
+  const [csvPreview, setCsvPreview]     = useState<{ file: File; data: Parameters<typeof CsvImportModal>[0]['preview'] } | null>(null)
   const [showImportMenu, setShowImportMenu] = useState(false)
   const fileInputRef    = useRef<HTMLInputElement>(null)
   const csvInputRef     = useRef<HTMLInputElement>(null)
@@ -144,7 +148,26 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
     try {
       const form = new FormData()
       form.append('csv', file)
-      const res = await fetch('/api/import/csv', { method: 'POST', body: form })
+      const res  = await fetch('/api/import/csv/preview', { method: 'POST', body: form })
+      const data = await res.json() as Parameters<typeof CsvImportModal>[0]['preview'] & { error?: string }
+      if (data.error) { setImportResult({ imported: 0, overridden: -1 }); return }
+      setCsvPreview({ file, data })
+    } catch {
+      setImportResult({ imported: 0, overridden: -1 })
+    } finally {
+      setImporting(false)
+      if (csvInputRef.current) csvInputRef.current.value = ''
+    }
+  }
+
+  async function handleCsvConfirm(file: File, mapping: ColumnMapping) {
+    setCsvPreview(null)
+    setImporting(true)
+    try {
+      const form = new FormData()
+      form.append('csv', file)
+      form.append('mapping', JSON.stringify(mapping))
+      const res  = await fetch('/api/import/csv/confirm', { method: 'POST', body: form })
       const data = await res.json() as { imported: number; skipped: number; errors?: string[] }
       setImportResult({ imported: data.imported, overridden: 0, skipped: data.skipped })
       refresh()
@@ -152,7 +175,6 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
       setImportResult({ imported: 0, overridden: -1 })
     } finally {
       setImporting(false)
-      if (csvInputRef.current) csvInputRef.current.value = ''
     }
   }
 
@@ -200,33 +222,49 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
               : `✓ ${importResult.imported} imported${importResult.overridden > 0 ? `, ${importResult.overridden} overridden` : ''}${importResult.skipped ? `, ${importResult.skipped} skipped` : ''}`}
           </span>
         )}
-        <div className="relative" ref={importMenuRef}>
-          <button
-            onClick={() => setShowImportMenu(v => !v)}
-            disabled={importing}
-            className="text-sm border border-xero-border text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
-          >
-            {importing ? 'Importing…' : '↑ Import'}
-            <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {showImportMenu && (
-            <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-xero-border rounded-xl shadow-lg z-20 overflow-hidden">
-              <button
-                onClick={() => { setShowImportMenu(false); fileInputRef.current?.click() }}
-                className="w-full text-left text-sm text-gray-600 px-4 py-2.5 hover:bg-gray-50 transition-colors"
-              >
-                📄 PDF
-              </button>
-              <button
-                onClick={() => { setShowImportMenu(false); csvInputRef.current?.click() }}
-                className="w-full text-left text-sm text-gray-600 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-xero-border"
-              >
-                📊 CSV
-              </button>
-            </div>
-          )}
+        <div className="flex items-center gap-1.5">
+          <div className="relative" ref={importMenuRef}>
+            <button
+              onClick={() => setShowImportMenu(v => !v)}
+              disabled={importing}
+              className="text-sm border border-xero-border text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {importing ? 'Importing…' : '↑ Import'}
+              <svg className="w-3.5 h-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showImportMenu && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-xero-border rounded-xl shadow-lg z-20 overflow-hidden">
+                <button
+                  onClick={() => { setShowImportMenu(false); csvInputRef.current?.click() }}
+                  className="w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                >
+                  <span>📊</span>
+                  <div>
+                    <p className="font-medium">CSV</p>
+                    <p className="text-[10px] text-gray-400">Any bank — auto-detected</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setShowImportMenu(false); fileInputRef.current?.click() }}
+                  className="w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-xero-border flex items-center gap-2"
+                >
+                  <span>📄</span>
+                  <div>
+                    <p className="font-medium">PDF</p>
+                    <p className="text-[10px] text-amber-500">Deutsche Bank only</p>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+          <HelpTooltip id="import-format" title="Import formats" side="bottom">
+            <p><strong>CSV (recommended):</strong> Upload any bank CSV export. Columns are auto-detected by name. If detection fails, a mapping step lets you assign columns manually.</p>
+            <p><strong>Supported date formats:</strong> DD.MM.YYYY, YYYY-MM-DD, MM/DD/YYYY.</p>
+            <p><strong>Amount:</strong> Both 1.234,56 (German) and 1,234.56 (US) work. Negative = expense.</p>
+            <p><strong>PDF:</strong> Experimental, tuned for Deutsche Bank statements only.</p>
+          </HelpTooltip>
         </div>
         <a
           href={`/api/entries/export?month=${month}`}
@@ -341,6 +379,7 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
       {addModal && <AddEntryModal month={month} onClose={() => setAddModal(false)} onSaved={refresh} />}
       {editTx && <AddEntryModal month={month} transaction={editTx} onClose={() => setEditTx(null)} onSaved={refresh} />}
       {pdfPreview && <PdfImportModal preview={pdfPreview} onClose={() => setPdfPreview(null)} onImported={handlePdfImported} />}
+      {csvPreview && <CsvImportModal file={csvPreview.file} preview={csvPreview.data} onConfirm={handleCsvConfirm} onClose={() => setCsvPreview(null)} />}
     </div>
   )
 }

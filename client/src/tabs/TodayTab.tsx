@@ -366,10 +366,114 @@ function JournalPanel() {
   )
 }
 
+// ─── Month calendar ───────────────────────────────────────────────────────────
+
+function getMonthDays(year: number, month: number): (string | null)[] {
+  const firstDow = new Date(year, month, 1).getDay() // 0=Sun
+  const startOffset = (firstDow + 6) % 7             // Mon=0
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells: (string | null)[] = Array(startOffset).fill(null)
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(`${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`)
+  }
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+}
+
+function MonthGrid({
+  year, month, today, selected, onSelect,
+}: { year: number; month: number; today: string; selected: string | null; onSelect: (d: string) => void }) {
+  const cells = getMonthDays(year, month)
+  const DOW = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+  return (
+    <div>
+      <div className="grid grid-cols-7 mb-1">
+        {DOW.map(d => (
+          <div key={d} className="text-center text-[10px] font-semibold text-gray-400 dark:text-slate-500 py-1">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-px">
+        {cells.map((dateStr, i) => {
+          if (!dateStr) return <div key={i} />
+          const isToday    = dateStr === today
+          const isSelected = dateStr === selected
+          const isPast     = dateStr < today
+          return (
+            <button
+              key={dateStr}
+              onClick={() => onSelect(dateStr)}
+              className={`rounded-lg text-xs py-1.5 font-medium transition-colors ${
+                isSelected
+                  ? 'bg-xero-green text-white'
+                  : isToday
+                  ? 'bg-xero-green/10 text-xero-green ring-1 ring-xero-green/30'
+                  : isPast
+                  ? 'text-gray-300 dark:text-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'
+                  : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+              }`}
+            >
+              {Number(dateStr.slice(8))}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function MonthCalendarView({ selected, onSelect }: { selected: string | null; onSelect: (d: string) => void }) {
+  const today = todayStr()
+  const initYear  = today.slice(0, 4)
+  const initMonth = today.slice(5, 7)
+  const [year, setYear]   = useState(Number(initYear))
+  const [month, setMonth] = useState(Number(initMonth) - 1)
+
+  const MONTH_NAMES = ['January','February','March','April','May','June',
+                       'July','August','September','October','November','December']
+
+  function prev() { if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1) }
+  function next() { if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1) }
+
+  return (
+    <div className="p-4 md:p-6 max-w-sm mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={prev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">‹</button>
+        <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">{MONTH_NAMES[month]} {year}</p>
+        <button onClick={next} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">›</button>
+      </div>
+      <MonthGrid year={year} month={month} today={today} selected={selected} onSelect={onSelect} />
+    </div>
+  )
+}
+
+function YearCalendarView({ selected, onSelect }: { selected: string | null; onSelect: (d: string) => void }) {
+  const today = todayStr()
+  const [year, setYear] = useState(Number(today.slice(0, 4)))
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+  return (
+    <div className="p-4 md:p-6">
+      <div className="flex items-center justify-center gap-4 mb-6">
+        <button onClick={() => setYear(y => y - 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">‹</button>
+        <p className="text-base font-bold text-gray-800 dark:text-slate-100">{year}</p>
+        <button onClick={() => setYear(y => y + 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">›</button>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+        {MONTH_NAMES.map((name, mi) => (
+          <div key={mi} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-3">
+            <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2 uppercase tracking-wide">{name}</p>
+            <MonthGrid year={year} month={mi} today={today} selected={selected} onSelect={onSelect} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
 type TodayMode = 'plan' | 'challenges'
-type PlanScope = 'today' | 'tomorrow' | 'week'
+type PlanScope = 'today' | 'tomorrow' | 'week' | 'month' | 'year'
 type Panel     = 'plan' | 'journal'
 
 export function TodayTab() {
@@ -377,44 +481,91 @@ export function TodayTab() {
   const [mode, setMode]               = useState<TodayMode>('plan')
   const [scope, setScope]             = useState<PlanScope>('today')
   const [mobilePanel, setMobilePanel] = useState<Panel>('plan')
+  // When user picks a specific date from the month/year calendar
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
-  const planDate = scope === 'tomorrow' ? tomorrowStr() : todayStr()
+  const today = todayStr()
+
+  // Which date drives the day plan panel
+  const planDate =
+    selectedDate       ? selectedDate :
+    scope === 'tomorrow' ? tomorrowStr() :
+    today
+
+  const isCalendarScope = scope === 'month' || scope === 'year'
+  // In calendar scopes, if a date is selected, show the plan for it
+  const showSelectedDayPlan = isCalendarScope && selectedDate !== null
 
   const headerSub =
-    scope === 'week'     ? t.thisWeek :
+    selectedDate       ? fmtFull(selectedDate) :
+    scope === 'week'   ? t.thisWeek :
     scope === 'tomorrow' ? fmtFull(tomorrowStr()) :
-    fmtFull(todayStr())
+    scope === 'month'  ? new Date(today + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) :
+    scope === 'year'   ? String(new Date().getFullYear()) :
+    fmtFull(today)
 
   const SCOPES: { key: PlanScope; label: string }[] = [
     { key: 'today',    label: t.todayLabel },
     { key: 'tomorrow', label: t.tomorrow   },
     { key: 'week',     label: t.thisWeek   },
+    { key: 'month',    label: 'Month' },
+    { key: 'year',     label: 'Year' },
   ]
 
-  function PlanContent() {
-    if (scope === 'week') return <WeekPlanView />
+  function handleScopeChange(s: PlanScope) {
+    setScope(s)
+    setSelectedDate(null)  // clear date selection when switching scope
+  }
+
+  function handleCalendarSelect(date: string) {
+    setSelectedDate(date)
+  }
+
+  function backToCalendar() {
+    setSelectedDate(null)
+  }
+
+  function renderPlanContent() {
+    if (scope === 'week' && !selectedDate) return <WeekPlanView />
     return <PlanPanel key={planDate} date={planDate} />
+  }
+
+  function renderCalendarContent() {
+    if (scope === 'month') return <MonthCalendarView selected={selectedDate} onSelect={handleCalendarSelect} />
+    return <YearCalendarView selected={selectedDate} onSelect={handleCalendarSelect} />
   }
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-xero-bg">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 md:px-6 py-3 bg-white border-b border-xero-border flex-shrink-0 gap-3 flex-wrap">
-        <div className="min-w-0">
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
-            {mode === 'challenges' ? 'Challenges' : t.planner}
-          </p>
-          <h1 className="text-base font-semibold text-gray-900 truncate">
-            {mode === 'challenges' ? '🏆 My Challenges' : headerSub}
-          </h1>
+      <header className="flex items-center justify-between px-4 md:px-6 py-3 bg-white border-b border-xero-border flex-shrink-0 gap-2 flex-wrap">
+        <div className="min-w-0 flex items-center gap-2">
+          {/* Back button when viewing a specific day from calendar */}
+          {showSelectedDayPlan && (
+            <button
+              onClick={backToCalendar}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors flex-shrink-0"
+            >
+              ‹ {scope === 'month' ? 'Month' : 'Year'}
+            </button>
+          )}
+          <div className="min-w-0">
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+              {mode === 'challenges' ? 'Challenges' : t.planner}
+            </p>
+            <h1 className="text-base font-semibold text-gray-900 dark:text-slate-100 truncate">
+              {mode === 'challenges' ? '🏆 My Challenges' : headerSub}
+            </h1>
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+
+        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
           {/* Mode switcher */}
-          <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1">
+          <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1">
             <button
               onClick={() => setMode('plan')}
               className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                mode === 'plan' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                mode === 'plan' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
             >
               {t.planLabel}
@@ -422,22 +573,22 @@ export function TodayTab() {
             <button
               onClick={() => setMode('challenges')}
               className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                mode === 'challenges' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                mode === 'challenges' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
             >
               🏆 Challenges
             </button>
           </div>
 
-          {/* Scope switcher — only when in plan mode */}
-          {mode === 'plan' && (
-            <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1">
+          {/* Scope switcher — only in plan mode, only when no specific date selected */}
+          {mode === 'plan' && !showSelectedDayPlan && (
+            <div className="flex overflow-x-auto gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1" style={{ scrollbarWidth: 'none' }}>
               {SCOPES.map(s => (
                 <button
                   key={s.key}
-                  onClick={() => setScope(s.key)}
+                  onClick={() => handleScopeChange(s.key)}
                   className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                    scope === s.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    scope === s.key ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
                   }`}
                 >
                   {s.label}
@@ -446,15 +597,15 @@ export function TodayTab() {
             </div>
           )}
 
-          {/* Mobile plan / journal switcher — only in plan mode */}
-          {mode === 'plan' && (
-            <div className="flex md:hidden gap-0.5 bg-gray-100 rounded-xl p-1">
+          {/* Mobile plan/journal switcher — only in day/week plan views */}
+          {mode === 'plan' && !isCalendarScope && (
+            <div className="flex md:hidden gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1">
               {(['plan', 'journal'] as Panel[]).map(p => (
                 <button
                   key={p}
                   onClick={() => setMobilePanel(p)}
                   className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
-                    mobilePanel === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    mobilePanel === p ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
                   }`}
                 >
                   {p === 'plan' ? t.planLabel : t.todayLog}
@@ -469,20 +620,27 @@ export function TodayTab() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {mode === 'challenges' ? (
           <ChallengesView scope="general" />
+        ) : isCalendarScope && !showSelectedDayPlan ? (
+          /* Calendar view (month or year) */
+          renderCalendarContent()
+        ) : isCalendarScope && showSelectedDayPlan ? (
+          /* Selected day from calendar — show plan only (no journal split) */
+          <div className="h-full bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
+            {renderPlanContent()}
+          </div>
         ) : (
+          /* Normal day/tomorrow/week plan + journal */
           <>
-            {/* Desktop: side-by-side */}
             <div className="hidden md:flex h-full">
-              <div className="flex-1 border-r border-xero-border bg-white overflow-hidden flex flex-col">
-                <PlanContent />
+              <div className="flex-1 border-r border-xero-border bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
+                {renderPlanContent()}
               </div>
-              <div className="flex-1 bg-white overflow-hidden">
+              <div className="flex-1 bg-white dark:bg-slate-900 overflow-hidden">
                 <JournalPanel />
               </div>
             </div>
-            {/* Mobile: single panel */}
-            <div className="md:hidden h-full bg-white overflow-hidden flex flex-col">
-              {mobilePanel === 'plan' ? <PlanContent /> : <JournalPanel />}
+            <div className="md:hidden h-full bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
+              {mobilePanel === 'plan' ? renderPlanContent() : <JournalPanel />}
             </div>
           </>
         )}
