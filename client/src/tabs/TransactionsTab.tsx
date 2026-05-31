@@ -317,9 +317,8 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
         </div>
       )}
 
-      {/* Bulk action bar */}
-      {hasSelection && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-xero-green/8 border border-xero-green/20 rounded-xl text-sm">
+      {/* Bulk action bar — always in DOM so it doesn't cause layout shift on selection */}
+      <div className={`flex items-center gap-3 px-4 py-2.5 bg-xero-green/8 border border-xero-green/20 rounded-xl text-sm transition-opacity duration-150 ${hasSelection ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           <span className="font-medium text-xero-green min-w-[80px]">{selectedIds.size} selected</span>
           <div className="flex-1 flex items-center gap-2 flex-wrap">
             {/* Change category */}
@@ -360,7 +359,6 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
             title="Clear selection"
           >×</button>
         </div>
-      )}
 
       {/* List */}
       {isLoading || !txs
