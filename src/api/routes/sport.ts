@@ -161,5 +161,56 @@ export function sportRouter(pool: Pool): Router {
     res.json({ ok: true })
   })
 
+  // ─── Challenges ───────────────────────────────────────────────────────────
+
+  router.get('/challenges', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const scope = req.query.scope as string | undefined
+    const { rows } = await pool.query(
+      `SELECT * FROM challenges WHERE user_id=$1 ${scope ? 'AND scope=$2' : ''} ORDER BY created_at DESC`,
+      scope ? [uid, scope] : [uid]
+    )
+    res.json(rows)
+  })
+
+  router.post('/challenges', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { scope = 'general', title, description, target_value, target_unit,
+            start_date, end_date, repeat_cycle = 'none', checkpoints = [] } = req.body
+    const { rows } = await pool.query(
+      `INSERT INTO challenges
+        (user_id, scope, title, description, target_value, target_unit,
+         start_date, end_date, repeat_cycle, checkpoints)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [uid, scope, title, description ?? null, target_value ?? null, target_unit ?? null,
+       start_date ?? new Date().toISOString().slice(0, 10),
+       end_date ?? null, repeat_cycle, JSON.stringify(checkpoints)]
+    )
+    res.json(rows[0])
+  })
+
+  router.put('/challenges/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { title, description, target_value, target_unit, start_date, end_date,
+            repeat_cycle, status, checkpoints } = req.body
+    const { rows } = await pool.query(
+      `UPDATE challenges SET
+        title=$1, description=$2, target_value=$3, target_unit=$4,
+        start_date=$5, end_date=$6, repeat_cycle=$7, status=$8,
+        checkpoints=$9, updated_at=now()
+       WHERE id=$10 AND user_id=$11 RETURNING *`,
+      [title, description ?? null, target_value ?? null, target_unit ?? null,
+       start_date, end_date ?? null, repeat_cycle, status,
+       JSON.stringify(checkpoints), req.params.id, uid]
+    )
+    res.json(rows[0])
+  })
+
+  router.delete('/challenges/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    await pool.query('DELETE FROM challenges WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
+  })
+
   return router
 }

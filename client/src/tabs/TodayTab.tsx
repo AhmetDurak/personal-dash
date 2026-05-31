@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useJournalEntry } from '../hooks/useJournal'
 import { useDailyPlan, PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
+import { ChallengesView } from '../components/web/ChallengesView'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -367,12 +368,14 @@ function JournalPanel() {
 
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
+type TodayMode = 'plan' | 'challenges'
 type PlanScope = 'today' | 'tomorrow' | 'week'
-type Panel = 'plan' | 'journal'
+type Panel     = 'plan' | 'journal'
 
 export function TodayTab() {
   const { t } = useLanguage()
-  const [scope, setScope]           = useState<PlanScope>('today')
+  const [mode, setMode]               = useState<TodayMode>('plan')
+  const [scope, setScope]             = useState<PlanScope>('today')
   const [mobilePanel, setMobilePanel] = useState<Panel>('plan')
 
   const planDate = scope === 'tomorrow' ? tomorrowStr() : todayStr()
@@ -396,58 +399,93 @@ export function TodayTab() {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-xero-bg">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-xero-border flex-shrink-0 gap-3 flex-wrap">
+      <header className="flex items-center justify-between px-4 md:px-6 py-3 bg-white border-b border-xero-border flex-shrink-0 gap-3 flex-wrap">
         <div className="min-w-0">
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{t.planner}</p>
-          <h1 className="text-base font-semibold text-gray-900 truncate">{headerSub}</h1>
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+            {mode === 'challenges' ? 'Challenges' : t.planner}
+          </p>
+          <h1 className="text-base font-semibold text-gray-900 truncate">
+            {mode === 'challenges' ? '🏆 My Challenges' : headerSub}
+          </h1>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Scope switcher */}
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+          {/* Mode switcher */}
           <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1">
-            {SCOPES.map(s => (
-              <button
-                key={s.key}
-                onClick={() => setScope(s.key)}
-                className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
-                  scope === s.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
+            <button
+              onClick={() => setMode('plan')}
+              className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                mode === 'plan' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.planLabel}
+            </button>
+            <button
+              onClick={() => setMode('challenges')}
+              className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                mode === 'challenges' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🏆 Challenges
+            </button>
           </div>
-          {/* Mobile plan / journal switcher */}
-          <div className="flex md:hidden gap-0.5 bg-gray-100 rounded-xl p-1">
-            {(['plan', 'journal'] as Panel[]).map(p => (
-              <button
-                key={p}
-                onClick={() => setMobilePanel(p)}
-                className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
-                  mobilePanel === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {p === 'plan' ? t.planLabel : t.todayLog}
-              </button>
-            ))}
-          </div>
+
+          {/* Scope switcher — only when in plan mode */}
+          {mode === 'plan' && (
+            <div className="flex gap-0.5 bg-gray-100 rounded-xl p-1">
+              {SCOPES.map(s => (
+                <button
+                  key={s.key}
+                  onClick={() => setScope(s.key)}
+                  className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                    scope === s.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Mobile plan / journal switcher — only in plan mode */}
+          {mode === 'plan' && (
+            <div className="flex md:hidden gap-0.5 bg-gray-100 rounded-xl p-1">
+              {(['plan', 'journal'] as Panel[]).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setMobilePanel(p)}
+                  className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
+                    mobilePanel === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {p === 'plan' ? t.planLabel : t.todayLog}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
-        {/* Desktop: side-by-side */}
-        <div className="hidden md:flex h-full">
-          <div className="flex-1 border-r border-xero-border bg-white overflow-hidden flex flex-col">
-            <PlanContent />
-          </div>
-          <div className="flex-1 bg-white overflow-hidden">
-            <JournalPanel />
-          </div>
-        </div>
-        {/* Mobile: single panel */}
-        <div className="md:hidden h-full bg-white overflow-hidden flex flex-col">
-          {mobilePanel === 'plan' ? <PlanContent /> : <JournalPanel />}
-        </div>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        {mode === 'challenges' ? (
+          <ChallengesView scope="general" />
+        ) : (
+          <>
+            {/* Desktop: side-by-side */}
+            <div className="hidden md:flex h-full">
+              <div className="flex-1 border-r border-xero-border bg-white overflow-hidden flex flex-col">
+                <PlanContent />
+              </div>
+              <div className="flex-1 bg-white overflow-hidden">
+                <JournalPanel />
+              </div>
+            </div>
+            {/* Mobile: single panel */}
+            <div className="md:hidden h-full bg-white overflow-hidden flex flex-col">
+              {mobilePanel === 'plan' ? <PlanContent /> : <JournalPanel />}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

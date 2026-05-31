@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Reminder } from './useNotifications'
+import { fetchMissedCheckpoints } from './useChallenges'
 
 const FIRED_KEY = 'fd:notified'
 const INTERVAL_MS = 60_000
@@ -48,6 +49,24 @@ function fireNotifications(reminders: Reminder[]) {
   }
 }
 
+async function checkChallengeNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  const missed = await fetchMissedCheckpoints()
+  if (!missed.length) return
+  const fired = getFired()
+  const today = new Date().toISOString().slice(0, 10)
+  for (const { title, checkpoint } of missed) {
+    const key = `challenge:${checkpoint.id}:${today}`
+    if (fired.has(key)) continue
+    new Notification(`Challenge checkpoint overdue: ${title}`, {
+      body: `"${checkpoint.label}" was due ${checkpoint.target_date}.`,
+      icon: '/favicon.ico',
+      tag: `challenge-${checkpoint.id}`,
+    })
+    addFired(key)
+  }
+}
+
 const VOCAB_DAY_KEY = () => `vocab:${new Date().toISOString().slice(0, 10)}`
 
 async function checkVocabNotifications() {
@@ -76,6 +95,7 @@ export function useReminderNotifications() {
   async function check() {
     fireNotifications(await fetchDueReminders())
     await checkVocabNotifications()
+    await checkChallengeNotifications()
   }
 
   useEffect(() => {

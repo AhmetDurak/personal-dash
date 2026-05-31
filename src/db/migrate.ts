@@ -222,6 +222,24 @@ CREATE TABLE IF NOT EXISTS language_scenarios (
   updated_at   TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_lang_scenarios_user ON language_scenarios(user_id);
+
+CREATE TABLE IF NOT EXISTS challenges (
+  id             SERIAL PRIMARY KEY,
+  user_id        INTEGER REFERENCES users(id),
+  scope          TEXT NOT NULL DEFAULT 'general',
+  title          TEXT NOT NULL,
+  description    TEXT,
+  target_value   NUMERIC,
+  target_unit    TEXT,
+  start_date     DATE NOT NULL DEFAULT CURRENT_DATE,
+  end_date       DATE,
+  repeat_cycle   TEXT NOT NULL DEFAULT 'none',
+  status         TEXT NOT NULL DEFAULT 'active',
+  checkpoints    JSONB NOT NULL DEFAULT '[]',
+  created_at     TIMESTAMPTZ DEFAULT now(),
+  updated_at     TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_challenges_user ON challenges(user_id);
 `
 
 export async function migrate() {
