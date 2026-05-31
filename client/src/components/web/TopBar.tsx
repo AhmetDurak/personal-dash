@@ -49,7 +49,7 @@ export function TopBar() {
   }, [userMenuOpen])
 
   const APPS = [
-    { to: () => '/today',                                                               label: t.todayLabel, isActive: (p: string) => p.startsWith('/today') },
+    { to: () => '/today',                                                               label: t.planner,    isActive: (p: string) => p.startsWith('/today') },
     { to: () => '/finance/overview',                                                    label: t.finance,    isActive: (p: string) => p.startsWith('/finance') },
     { to: () => localStorage.getItem('life:lastPath') ?? '/life/log',                  label: t.life,       isActive: (p: string) => p.startsWith('/life') },
     { to: () => localStorage.getItem('learn:lastPath') ?? '/learn/notes',              label: t.learn,      isActive: (p: string) => p.startsWith('/learn') },
