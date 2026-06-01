@@ -53,6 +53,8 @@ html, body {
 .dark .text-gray-700 { color: #CBD5E1; }
 .dark .text-gray-600 { color: #94A3B8; }
 .dark .text-gray-500 { color: #64748B; }
+.dark .text-gray-400 { color: #94A3B8; }
+.dark .text-gray-300 { color: #CBD5E1; }
 
 /* Hover states */
 .dark .hover\:bg-gray-50:hover  { background-color: #1E2A3E; }
@@ -83,6 +85,11 @@ html, body {
 .dark .recharts-tooltip-wrapper .recharts-tooltip-item-separator {
   color: #F1F5F9 !important;
 }
+
+/* Opacity-variant bg classes generate different CSS classes — override explicitly */
+.dark .bg-emerald-50\/60 { background-color: rgba(16, 185, 129, 0.07); }
+.dark .bg-amber-50\/40  { background-color: rgba(245, 158, 11, 0.07); }
+.dark .bg-amber-50\/50  { background-color: rgba(245, 158, 11, 0.09); }
 
 /* Colored accent backgrounds used in LearnTab golden rules */
 .dark .bg-emerald-50  { background-color: rgba(16, 185, 129, 0.1); }
@@ -189,6 +196,8 @@ html, body {
 [data-theme="nord"] .text-gray-700 { color: #D8DEE9; }
 [data-theme="nord"] .text-gray-600 { color: #B0B8C8; }
 [data-theme="nord"] .text-gray-500 { color: #8892A4; }
+[data-theme="nord"] .text-gray-400 { color: #8892A4; }
+[data-theme="nord"] .text-gray-300 { color: #B0B8C8; }
 [data-theme="nord"] .hover\:bg-gray-50:hover  { background-color: #434C5E; }
 [data-theme="nord"] .hover\:bg-gray-100:hover { background-color: #4C566A; }
 [data-theme="nord"] .divide-gray-50 > * + *   { border-color: #3B4252; }
@@ -222,6 +231,8 @@ html, body {
 [data-theme="dracula"] .text-gray-700 { color: #E0DEFA; }
 [data-theme="dracula"] .text-gray-600 { color: #B0ADCC; }
 [data-theme="dracula"] .text-gray-500 { color: #6272A4; }
+[data-theme="dracula"] .text-gray-400 { color: #8E95B8; }
+[data-theme="dracula"] .text-gray-300 { color: #B0ADCC; }
 [data-theme="dracula"] .hover\:bg-gray-50:hover  { background-color: #383A4A; }
 [data-theme="dracula"] .hover\:bg-gray-100:hover { background-color: #44475A; }
 [data-theme="dracula"] .divide-gray-50 > * + *   { border-color: #383A4A; }
@@ -299,6 +310,8 @@ html, body {
 [data-theme="tokyo"] .text-gray-700 { color: #9AA5CE; }
 [data-theme="tokyo"] .text-gray-600 { color: #7982A9; }
 [data-theme="tokyo"] .text-gray-500 { color: #565F89; }
+[data-theme="tokyo"] .text-gray-400 { color: #7982A9; }
+[data-theme="tokyo"] .text-gray-300 { color: #9AA5CE; }
 [data-theme="tokyo"] .hover\:bg-gray-50:hover  { background-color: #24283B; }
 [data-theme="tokyo"] .hover\:bg-gray-100:hover { background-color: #292E42; }
 [data-theme="tokyo"] .divide-gray-50 > * + *   { border-color: #1F2335; }
@@ -332,6 +345,8 @@ html, body {
 [data-theme="catppuccin"] .text-gray-700 { color: #A6ADC8; }
 [data-theme="catppuccin"] .text-gray-600 { color: #7F849C; }
 [data-theme="catppuccin"] .text-gray-500 { color: #6C7086; }
+[data-theme="catppuccin"] .text-gray-400 { color: #7F849C; }
+[data-theme="catppuccin"] .text-gray-300 { color: #A6ADC8; }
 [data-theme="catppuccin"] .hover\:bg-gray-50:hover  { background-color: #24273A; }
 [data-theme="catppuccin"] .hover\:bg-gray-100:hover { background-color: #363749; }
 [data-theme="catppuccin"] .divide-gray-50 > * + *   { border-color: #24273A; }
