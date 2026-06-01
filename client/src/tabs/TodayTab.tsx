@@ -12,7 +12,7 @@ function todayStr() {
 function offsetDay(base: string, delta: number): string {
   const d = new Date(base + 'T00:00:00')
   d.setDate(d.getDate() + delta)
-  return d.toISOString().slice(0, 10)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function dayLabel(date: string, today: string): string {
