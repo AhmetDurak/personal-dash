@@ -9,10 +9,17 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function tomorrowStr() {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
+function offsetDay(base: string, delta: number): string {
+  const d = new Date(base + 'T00:00:00')
+  d.setDate(d.getDate() + delta)
   return d.toISOString().slice(0, 10)
+}
+
+function dayLabel(date: string, today: string): string {
+  if (date === today) return 'Today'
+  if (date === offsetDay(today, -1)) return 'Yesterday'
+  if (date === offsetDay(today,  1)) return 'Tomorrow'
+  return new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })
 }
 
 function getWeekDays(): string[] {
@@ -474,48 +481,54 @@ function YearCalendarView({ selected, onSelect }: { selected: string | null; onS
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
 type TodayMode = 'plan' | 'challenges'
-type PlanScope = 'today' | 'tomorrow' | 'week' | 'month' | 'year'
+type PlanScope = 'day' | 'week' | 'month' | 'year'
 type Panel     = 'plan' | 'journal'
 
 export function TodayTab() {
   const { t } = useLanguage()
   const [mode, setMode]               = useState<TodayMode>('plan')
-  const [scope, setScope]             = useState<PlanScope>('today')
+  const [scope, setScope]             = useState<PlanScope>('day')
   const [mobilePanel, setMobilePanel] = useState<Panel>('plan')
+  const [dayDate, setDayDate]         = useState<string>(todayStr())
   // When user picks a specific date from the month/year calendar
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const today = todayStr()
 
   // Which date drives the day plan panel
-  const planDate =
-    selectedDate       ? selectedDate :
-    scope === 'tomorrow' ? tomorrowStr() :
-    today
+  const planDate = selectedDate ?? dayDate
 
   const isCalendarScope = scope === 'month' || scope === 'year'
-  // In calendar scopes, if a date is selected, show the plan for it
   const showSelectedDayPlan = isCalendarScope && selectedDate !== null
 
   const headerSub =
-    selectedDate       ? fmtFull(selectedDate) :
-    scope === 'week'   ? t.thisWeek :
-    scope === 'tomorrow' ? fmtFull(tomorrowStr()) :
-    scope === 'month'  ? new Date(today + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) :
-    scope === 'year'   ? String(new Date().getFullYear()) :
-    fmtFull(today)
+    selectedDate      ? fmtFull(selectedDate) :
+    scope === 'week'  ? t.thisWeek :
+    scope === 'month' ? new Date(today + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) :
+    scope === 'year'  ? String(new Date().getFullYear()) :
+    fmtFull(dayDate)
 
   const SCOPES: { key: PlanScope; label: string }[] = [
-    { key: 'today',    label: t.todayLabel },
-    { key: 'tomorrow', label: t.tomorrow   },
-    { key: 'week',     label: t.thisWeek   },
-    { key: 'month',    label: 'Month' },
-    { key: 'year',     label: 'Year' },
+    { key: 'week',  label: t.thisWeek },
+    { key: 'month', label: 'Month'    },
+    { key: 'year',  label: 'Year'     },
   ]
 
   function handleScopeChange(s: PlanScope) {
     setScope(s)
-    setSelectedDate(null)  // clear date selection when switching scope
+    setSelectedDate(null)
+  }
+
+  function prevDay() {
+    setDayDate(d => offsetDay(d, -1))
+    setScope('day')
+    setSelectedDate(null)
+  }
+
+  function nextDay() {
+    setDayDate(d => offsetDay(d, 1))
+    setScope('day')
+    setSelectedDate(null)
   }
 
   function handleCalendarSelect(date: string) {
@@ -528,7 +541,7 @@ export function TodayTab() {
 
   function renderPlanContent() {
     if (scope === 'week' && !selectedDate) return <WeekPlanView />
-    return <PlanPanel key={planDate} date={planDate} />
+    return <PlanPanel key={planDate} date={scope === 'day' ? dayDate : planDate} />
   }
 
   function renderCalendarContent() {
@@ -578,7 +591,27 @@ export function TodayTab() {
             >🏆 Challenges</button>
           </div>
 
-          {/* Scope switcher */}
+          {/* Day navigator — ‹ date › */}
+          {mode === 'plan' && !showSelectedDayPlan && (
+            <div className={`flex items-center gap-0.5 rounded-xl p-1 flex-shrink-0 ${scope === 'day' ? 'bg-gray-100 dark:bg-slate-700' : 'bg-gray-100/50 dark:bg-slate-700/50'}`}>
+              <button
+                onClick={prevDay}
+                className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors"
+              ><IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} /></button>
+              <button
+                onClick={() => { setScope('day'); setSelectedDate(null) }}
+                className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors whitespace-nowrap min-w-[72px] text-center ${
+                  scope === 'day' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
+                }`}
+              >{dayLabel(dayDate, today)}</button>
+              <button
+                onClick={nextDay}
+                className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors"
+              ><IconChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} /></button>
+            </div>
+          )}
+
+          {/* Week / Month / Year scope pills */}
           {mode === 'plan' && !showSelectedDayPlan && (
             <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
               {SCOPES.map(s => (
