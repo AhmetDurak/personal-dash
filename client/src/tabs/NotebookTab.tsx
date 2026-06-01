@@ -370,7 +370,8 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   const [connectLine, setConnectLine] = useState<{ sourceId: string; x: number; y: number; targetId: string | null; fromLeft?: boolean } | null>(null)
   const [flippedNodes, setFlippedNodes] = useState<Set<string>>(new Set())
   const [editingBack, setEditingBack] = useState(false)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressOpened  = useRef(false)  // flag: context menu opened by long-press, suppress pointerUp dismissal
   const [pan, setPan] = useState<{ x: number; y: number }>(() => {
     try {
       const raw = localStorage.getItem(`mindmap:pan:${mapId}`)
@@ -535,9 +536,11 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     // Long-press → context menu (touch substitute for right-click)
     if (e.pointerType === 'touch') {
       if (longPressTimer.current) clearTimeout(longPressTimer.current)
+      longPressOpened.current = false
       longPressTimer.current = setTimeout(() => {
         if (dragRef.current && !dragRef.current.moved) {
           dragRef.current = null
+          longPressOpened.current = true   // tell pointerUp to NOT dismiss the menu
           setCtxMenu({ nodeId: id, screenX: e.clientX, screenY: e.clientY })
         }
       }, 500)
@@ -638,6 +641,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       }
       return
     }
+    // Long-press just opened the context menu — don't dismiss it on finger lift
+    if (longPressOpened.current) { longPressOpened.current = false; return }
     // Tapped SVG background with nothing active → deselect
     setSelectedForConnect(null)
     setCtxMenu(null)
@@ -927,20 +932,25 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       {/* Context menu — smart positioning, proper icons */}
       {ctxMenu && ctxNode && (() => {
         const ctxIsFlipped = flippedNodes.has(ctxNode.id)
-        // Show above click point unless too near top; clamp X so menu stays on screen
-        const menuW = 160
-        const showAbove = ctxMenu.screenY > (typeof window !== 'undefined' ? window.innerHeight * 0.45 : 300)
-        const clampedX = typeof window !== 'undefined'
-          ? Math.min(Math.max(ctxMenu.screenX, menuW / 2 + 8), window.innerWidth - menuW / 2 - 8)
-          : ctxMenu.screenX
+        const vw = typeof window !== 'undefined' ? window.innerWidth  : 400
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 700
+        // On narrow screens use more width; desktop cap at 180px
+        const menuW = Math.min(180, vw - 24)
+        const showAbove = ctxMenu.screenY > vh * 0.5
+        // Clamp left edge so menu never bleeds off either side
+        const rawLeft = ctxMenu.screenX - menuW / 2
+        const clampedLeft = Math.max(8, Math.min(rawLeft, vw - menuW - 8))
+        const maxMenuH = showAbove ? ctxMenu.screenY - 12 : vh - ctxMenu.screenY - 12
         return (
         <div
-          className="fixed z-40 bg-white dark:bg-slate-800 border border-xero-border dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+          className="fixed z-40 bg-white dark:bg-slate-800 border border-xero-border dark:border-slate-700 rounded-2xl shadow-2xl flex flex-col"
           style={{
-            left: clampedX,
+            left: clampedLeft,
             top: ctxMenu.screenY,
             width: menuW,
-            transform: showAbove ? 'translate(-50%, calc(-100% - 8px))' : 'translate(-50%, 8px)',
+            maxHeight: Math.max(180, maxMenuH),
+            overflowY: 'auto',
+            transform: showAbove ? 'translateY(calc(-100% - 8px))' : 'translateY(8px)',
           }}
           onClick={e => e.stopPropagation()}
           onContextMenu={e => e.preventDefault()}
