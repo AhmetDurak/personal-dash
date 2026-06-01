@@ -199,8 +199,8 @@ function NotesView() {
             <button
               key={n.id}
               onClick={() => setSelectedId(n.id)}
-              className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-white transition-colors ${
-                selectedId === n.id ? 'bg-white border-l-2 border-l-xero-green' : ''
+              className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-100 transition-colors ${
+                selectedId === n.id ? 'bg-gray-100 border-l-2 border-l-xero-green' : ''
               }`}
             >
               <p className="text-sm font-medium text-gray-800 truncate">{n.title || t.untitled}</p>
