@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
-import { IconClose, IconFolder } from '../lib/icons'
+import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
@@ -525,23 +525,38 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
 
   function handleNodePointerDown(e: React.PointerEvent, id: string) {
     e.stopPropagation()
+    // Right-click is handled by onContextMenu — skip all drag/flip logic
+    if (e.button === 2) return
     const node = nodesRef.current.find(n => n.id === id)
     if (!node) return
     const { x, y } = clientToSvg(e.clientX, e.clientY)
     dragRef.current = { id, offsetX: x - (node.x ?? 0), offsetY: y - (node.y ?? 0), startSvgX: x, startSvgY: y, moved: false, pointerType: e.pointerType }
     setCtxMenu(null)
-    // Long-press → context menu (mobile substitute for right-click)
-    if (longPressTimer.current) clearTimeout(longPressTimer.current)
-    longPressTimer.current = setTimeout(() => {
-      if (dragRef.current && !dragRef.current.moved) {
-        dragRef.current = null
-        setCtxMenu({ nodeId: id, screenX: e.clientX, screenY: e.clientY })
-      }
-    }, 600)
+    // Long-press → context menu (touch substitute for right-click)
+    if (e.pointerType === 'touch') {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current)
+      longPressTimer.current = setTimeout(() => {
+        if (dragRef.current && !dragRef.current.moved) {
+          dragRef.current = null
+          setCtxMenu({ nodeId: id, screenX: e.clientX, screenY: e.clientY })
+        }
+      }, 500)
+    }
   }
 
   function handleSvgPointerMove(e: React.PointerEvent) {
-    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+    // Only cancel long-press if finger moved beyond drag threshold — timer's own check handles the rest
+    if (longPressTimer.current) {
+      const d = dragRef.current
+      if (d) {
+        const { x, y } = clientToSvg(e.clientX, e.clientY)
+        if (Math.hypot(x - d.startSvgX, y - d.startSvgY) > 8) {
+          clearTimeout(longPressTimer.current); longPressTimer.current = null
+        }
+      } else {
+        clearTimeout(longPressTimer.current); longPressTimer.current = null
+      }
+    }
     const p = panRef.current
     if (p) {
       const nx = p.tx + (e.clientX - p.startX)
@@ -569,7 +584,9 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     }
   }
 
-  function handleSvgPointerUp(_e: React.PointerEvent) {
+  function handleSvgPointerUp(e: React.PointerEvent) {
+    // Right-click is handled by onContextMenu — skip flip/select logic
+    if (e.button === 2) { dragRef.current = null; return }
     if (panRef.current) {
       panRef.current = null
       setIsPanning(false)
@@ -907,78 +924,60 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
         />
       </div>
 
-      {/* Context menu */}
+      {/* Context menu — smart positioning, proper icons */}
       {ctxMenu && ctxNode && (() => {
         const ctxIsFlipped = flippedNodes.has(ctxNode.id)
+        // Show above click point unless too near top; clamp X so menu stays on screen
+        const menuW = 160
+        const showAbove = ctxMenu.screenY > (typeof window !== 'undefined' ? window.innerHeight * 0.45 : 300)
+        const clampedX = typeof window !== 'undefined'
+          ? Math.min(Math.max(ctxMenu.screenX, menuW / 2 + 8), window.innerWidth - menuW / 2 - 8)
+          : ctxMenu.screenX
         return (
         <div
-          className="fixed z-40 bg-white border border-xero-border rounded-2xl shadow-2xl overflow-hidden min-w-[140px]"
-          style={{ left: ctxMenu.screenX, top: ctxMenu.screenY, transform: 'translate(-50%, calc(-100% - 8px))' }}
+          className="fixed z-40 bg-white dark:bg-slate-800 border border-xero-border dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+          style={{
+            left: clampedX,
+            top: ctxMenu.screenY,
+            width: menuW,
+            transform: showAbove ? 'translate(-50%, calc(-100% - 8px))' : 'translate(-50%, 8px)',
+          }}
           onClick={e => e.stopPropagation()}
+          onContextMenu={e => e.preventDefault()}
         >
-          <div className="px-4 py-2 border-b border-gray-50">
-            <p className="text-xs font-semibold text-gray-500 truncate max-w-[120px]">{ctxIsFlipped ? (ctxNode.back ?? '(back)') : ctxNode.label}</p>
-            <p className="text-[10px] text-gray-400">{ctxIsFlipped ? t.backFace : t.frontFace}</p>
+          <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700">
+            <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 truncate">{ctxIsFlipped ? (ctxNode.back ?? '(back)') : ctxNode.label}</p>
+            <p className="text-[10px] text-gray-400 dark:text-slate-500">{ctxIsFlipped ? t.backFace : t.frontFace}</p>
           </div>
-          <button
-            onClick={() => {
-              setEditingBack(false)
-              setRenaming({ id: ctxNode.id, label: ctxNode.label })
+          {[
+            { icon: <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />, label: t.editFront, onClick: () => { setEditingBack(false); setRenaming({ id: ctxNode.id, label: ctxNode.label }); setCtxMenu(null) } },
+            { icon: <IconEdit className="w-3.5 h-3.5 opacity-60" strokeWidth={2} />, label: t.editBack, onClick: () => { setEditingBack(true); setRenaming({ id: ctxNode.id, label: ctxNode.back ?? '' }); setCtxMenu(null) } },
+            { icon: <IconAdd className="w-3.5 h-3.5" strokeWidth={2} />, label: t.addChild, onClick: handleAddChild },
+            { icon: <IconLink className="w-3.5 h-3.5" strokeWidth={2} />, label: t.connect, onClick: () => {
+              const node = nodesRef.current.find(n => n.id === ctxMenu.nodeId)
+              if (!node) return
               setCtxMenu(null)
-            }}
-            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors"
-          >
-            <span className="text-base">✏️</span> {t.editFront}
-          </button>
-          <button
-            onClick={() => {
-              setEditingBack(true)
-              setRenaming({ id: ctxNode.id, label: ctxNode.back ?? '' })
-              setCtxMenu(null)
-            }}
-            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
-          >
-            <span className="text-base">↩</span> {t.editBack}
-          </button>
-          <button
-            onClick={handleAddChild}
-            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
-          >
-            <span className="text-base">➕</span> {t.addChild}
-          </button>
-          <button
-            onClick={() => {
-              const id = ctxMenu?.nodeId
-              const node = nodesRef.current.find(n => n.id === id)
-              if (!id || !node) return
-              setCtxMenu(null)
-              connectRef.current = { sourceId: id, x: (node.x ?? 0) + NODE_W, y: (node.y ?? 0) + NODE_H / 2, targetId: null }
+              connectRef.current = { sourceId: ctxMenu.nodeId, x: (node.x ?? 0) + NODE_W, y: (node.y ?? 0) + NODE_H / 2, targetId: null }
               setConnectLine(connectRef.current)
-            }}
-            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
-          >
-            <span className="text-base">🔗</span> {t.connect}
-          </button>
-          <button
-            onClick={() => {
-              const id = ctxMenu?.nodeId
-              if (!id) return
+            }},
+            { icon: <IconCut className="w-3.5 h-3.5" strokeWidth={2} />, label: t.clearConnections, onClick: () => {
+              const id = ctxMenu.nodeId
               setCtxMenu(null)
-              persist(
-                nodesRef.current.map(n => n.id === id ? { ...n, parentId: null } : n),
-                edgesRef.current.filter(e => e.from !== id && e.to !== id)
-              )
-            }}
-            className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 px-4 py-2.5 hover:bg-gray-50 transition-colors border-t border-gray-50"
-          >
-            <span className="text-base">✂️</span> {t.clearConnections}
-          </button>
+              persist(nodesRef.current.map(n => n.id === id ? { ...n, parentId: null } : n), edgesRef.current.filter(e => e.from !== id && e.to !== id))
+            }},
+          ].map(item => (
+            <button key={item.label} onClick={item.onClick}
+              className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 dark:text-slate-300 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors border-t border-gray-50 dark:border-slate-700/50">
+              <span className="text-gray-400 dark:text-slate-500 flex-shrink-0">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
           {ctxNode.parentId !== null && (
             <button
               onClick={() => { setConfirmDelete(ctxNode.id); setCtxMenu(null) }}
-              className="flex items-center gap-2.5 w-full text-left text-sm text-red-500 px-4 py-2.5 hover:bg-red-50 transition-colors border-t border-gray-50"
+              className="flex items-center gap-2.5 w-full text-left text-sm text-red-500 px-3 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-t border-gray-100 dark:border-slate-700"
             >
-              <span className="text-base">🗑</span> Delete
+              <IconDelete className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2} /> Delete
             </button>
           )}
         </div>
