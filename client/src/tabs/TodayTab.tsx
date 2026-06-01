@@ -161,7 +161,7 @@ function PlanPanel({ date }: { date: string }) {
 function DayRow({ date }: { date: string }) {
   const { t } = useLanguage()
   const today     = date === todayStr()
-  const tomorrow  = date === tomorrowStr()
+  const tomorrow  = date === offsetDay(todayStr(), 1)
   const [expanded, setExpanded] = useState(today)
   const [input, setInput]       = useState('')
   const [saving, setSaving]     = useState(false)

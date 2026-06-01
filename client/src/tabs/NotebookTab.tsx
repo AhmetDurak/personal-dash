@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 're
 import { IconClose, IconFolder } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
@@ -70,7 +70,11 @@ function parseMarkdown(src: string): string {
 function NotesView() {
   const { t } = useLanguage()
   const { notes, isLoading, createNote, saveNote, moveNoteToFolder, deleteNote } = useNotes()
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [noteParams, setNoteParams] = useSearchParams()
+  const selectedId = noteParams.get('note') ? Number(noteParams.get('note')) : null
+  function setSelectedId(id: number | null) {
+    setNoteParams(p => { id !== null ? p.set('note', String(id)) : p.delete('note'); return p })
+  }
   const [localTitle, setLocalTitle] = useState('')
   const [localContent, setLocalContent] = useState('')
   const [saving, setSaving] = useState(false)
@@ -997,10 +1001,11 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
 
 function MindmapView() {
   const { mindmaps, isLoading, createMindmap, moveMindmapToFolder, deleteMindmap } = useMindmapList()
-  const [selectedId, setSelectedId] = useState<number | null>(() => {
-    const s = localStorage.getItem('mindmap:selectedId')
-    return s ? Number(s) : null
-  })
+  const [mapParams, setMapParams] = useSearchParams()
+  const selectedId = mapParams.get('map') ? Number(mapParams.get('map')) : null
+  function setSelectedId(id: number | null) {
+    setMapParams(p => { id !== null ? p.set('map', String(id)) : p.delete('map'); return p })
+  }
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeFolder, setActiveFolder] = useState<string | null>(null)
@@ -1016,10 +1021,6 @@ function MindmapView() {
       setSelectedId(mindmaps[0].id)
     }
   }, [mindmaps, selectedId])
-
-  useEffect(() => {
-    if (selectedId !== null) localStorage.setItem('mindmap:selectedId', String(selectedId))
-  }, [selectedId])
 
   async function handleNew() {
     const m = await createMindmap('New Map', activeFolder)
