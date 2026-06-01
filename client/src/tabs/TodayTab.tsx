@@ -539,9 +539,9 @@ export function TodayTab() {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-xero-bg">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 md:px-6 py-3 bg-white border-b border-xero-border flex-shrink-0 gap-2 flex-wrap">
-        <div className="min-w-0 flex items-center gap-2">
-          {/* Back button when viewing a specific day from calendar */}
+      <header className="flex flex-col px-4 md:px-6 py-2.5 bg-white border-b border-xero-border flex-shrink-0 gap-1.5 overflow-hidden">
+        {/* Title + back button */}
+        <div className="flex items-center gap-2 min-w-0">
           {showSelectedDayPlan && (
             <button
               onClick={backToCalendar}
@@ -551,66 +551,59 @@ export function TodayTab() {
             </button>
           )}
           <div className="min-w-0">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide leading-none mb-0.5">
               {mode === 'challenges' ? 'Challenges' : t.planner}
             </p>
-            <h1 className="text-base font-semibold text-gray-900 dark:text-slate-100 truncate">
+            <h1 className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">
               {mode === 'challenges' ? '🏆 My Challenges' : headerSub}
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
+        {/* All controls in one horizontally scrollable row */}
+        <div className="flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {/* Mode switcher */}
-          <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1">
+          <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
             <button
               onClick={() => setMode('plan')}
-              className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                 mode === 'plan' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
-            >
-              {t.planLabel}
-            </button>
+            >{t.planLabel}</button>
             <button
               onClick={() => setMode('challenges')}
-              className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                 mode === 'challenges' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
-            >
-              🏆 Challenges
-            </button>
+            >🏆 Challenges</button>
           </div>
 
-          {/* Scope switcher — only in plan mode, only when no specific date selected */}
+          {/* Scope switcher */}
           {mode === 'plan' && !showSelectedDayPlan && (
-            <div className="flex overflow-x-auto gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1" style={{ scrollbarWidth: 'none' }}>
+            <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
               {SCOPES.map(s => (
                 <button
                   key={s.key}
                   onClick={() => handleScopeChange(s.key)}
-                  className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                  className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                     scope === s.key ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
                   }`}
-                >
-                  {s.label}
-                </button>
+                >{s.label}</button>
               ))}
             </div>
           )}
 
-          {/* Mobile plan/journal switcher — only in day/week plan views */}
+          {/* Mobile plan/journal switcher */}
           {mode === 'plan' && !isCalendarScope && (
-            <div className="flex md:hidden gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1">
+            <div className="flex md:hidden gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
               {(['plan', 'journal'] as Panel[]).map(p => (
                 <button
                   key={p}
                   onClick={() => setMobilePanel(p)}
-                  className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
+                  className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                     mobilePanel === p ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
                   }`}
-                >
-                  {p === 'plan' ? t.planLabel : t.todayLog}
-                </button>
+                >{p === 'plan' ? t.planLabel : t.todayLog}</button>
               ))}
             </div>
           )}
