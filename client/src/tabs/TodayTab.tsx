@@ -526,7 +526,6 @@ export function TodayTab() {
   function handleCalendarSelect(date: string) { up({ selected: date }) }
   function backToCalendar() { up({ selected: null }) }
 
-  function handleCalendarSelect(date: string) {
   function renderPlanContent() {
     if (scope === 'week' && !selectedDate) return <WeekPlanView />
     return <PlanPanel key={planDate} date={scope === 'day' ? dayDate : planDate} />
