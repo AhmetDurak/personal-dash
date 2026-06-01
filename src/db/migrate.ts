@@ -311,6 +311,24 @@ UPDATE recurring_templates SET category = CASE category
 END
 WHERE category IN ('Income','Salary','Freelance','Investment Income','Other Income',
                    'Fixed','Market','Health','Investment','Education','Entertainment','Others');
+
+UPDATE budgets SET category = CASE category
+  WHEN 'Income'            THEN 'Einkommen'
+  WHEN 'Salary'            THEN 'Einkommen'
+  WHEN 'Freelance'         THEN 'Einkommen'
+  WHEN 'Investment Income' THEN 'Sparen und Anlagen'
+  WHEN 'Other Income'      THEN 'Einkommen'
+  WHEN 'Fixed'             THEN 'Wohnen'
+  WHEN 'Market'            THEN 'Lebenshaltung'
+  WHEN 'Health'            THEN 'Gesundheit'
+  WHEN 'Investment'        THEN 'Sparen und Anlagen'
+  WHEN 'Education'         THEN 'Beruf und Bildung'
+  WHEN 'Entertainment'     THEN 'Freizeit und Reise'
+  WHEN 'Others'            THEN 'Sonstige'
+  ELSE category
+END
+WHERE category IN ('Income','Salary','Freelance','Investment Income','Other Income',
+                   'Fixed','Market','Health','Investment','Education','Entertainment','Others');
 `
 
 export async function migrate() {
