@@ -472,17 +472,13 @@ export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const view = (searchParams.get('view') as View) ?? 'today'
   const selectedDate = searchParams.get('date')
-  function setView(v: View) { setSearchParams(p => { p.set('view', v); p.delete('date'); return p }) }
-  function setSelectedDate(d: string | null) {
-    setSearchParams(p => { if (d) p.set('date', d); else p.delete('date'); return p })
-  }
 
-  function handleSelectDate(d: string) {
-    setSelectedDate(d)
-  }
-
-  function handleBack() {
-    setSelectedDate(null)
+  function nav(updates: { view?: View; date?: string | null }) {
+    setSearchParams(p => {
+      if (updates.view !== undefined) p.set('view', updates.view)
+      if (updates.date !== undefined) updates.date ? p.set('date', updates.date) : p.delete('date')
+      return p
+    })
   }
 
   const VIEWS: { id: View; label: string }[] = [
@@ -505,7 +501,7 @@ export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
           {VIEWS.map(v => (
             <button
               key={v.id}
-              onClick={() => { setView(v.id); setSelectedDate(null) }}
+              onClick={() => nav({ view: v.id, date: null })}
               className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 view === v.id && !selectedDate ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
               }`}
@@ -518,15 +514,15 @@ export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
 
       <div className="flex-1 overflow-y-auto">
         {selectedDate && selectedDate !== todayStr() ? (
-          <EntryView date={selectedDate} onBack={handleBack} />
+          <EntryView date={selectedDate} onBack={() => nav({ date: null })} />
         ) : view === 'today' || (selectedDate === todayStr()) ? (
           <TodayView />
         ) : view === 'plan' ? (
           <PlanView />
         ) : view === 'calendar' ? (
-          <CalendarView onSelectDate={d => { handleSelectDate(d); setView('today') }} />
+          <CalendarView onSelectDate={d => nav({ view: 'today', date: d })} />
         ) : (
-          <HistoryView onSelectDate={d => { handleSelectDate(d) }} />
+          <HistoryView onSelectDate={d => nav({ date: d })} />
         )}
       </div>
     </div>
