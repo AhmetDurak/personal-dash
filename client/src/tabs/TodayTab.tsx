@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useJournalEntry } from '../hooks/useJournal'
 import { useDailyPlan, PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
@@ -486,20 +487,25 @@ type Panel     = 'plan' | 'journal'
 
 export function TodayTab() {
   const { t } = useLanguage()
-  const [mode, setMode]               = useState<TodayMode>('plan')
-  const [scope, setScope]             = useState<PlanScope>('day')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [mobilePanel, setMobilePanel] = useState<Panel>('plan')
-  const [dayDate, setDayDate]         = useState<string>(todayStr())
-  // When user picks a specific date from the month/year calendar
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
-  const today = todayStr()
+  const today    = todayStr()
+  const mode     = (searchParams.get('mode')  as TodayMode) ?? 'plan'
+  const scope    = (searchParams.get('scope') as PlanScope) ?? 'day'
+  const dayDate  = searchParams.get('date') ?? today
+  const selectedDate = searchParams.get('selected')
 
-  // Which date drives the day plan panel
-  const planDate = selectedDate ?? dayDate
+  function up(updates: Record<string, string | null>) {
+    setSearchParams(p => {
+      Object.entries(updates).forEach(([k, v]) => v !== null ? p.set(k, v) : p.delete(k))
+      return p
+    })
+  }
 
-  const isCalendarScope = scope === 'month' || scope === 'year'
+  const isCalendarScope   = scope === 'month' || scope === 'year'
   const showSelectedDayPlan = isCalendarScope && selectedDate !== null
+  const planDate = selectedDate ?? dayDate
 
   const headerSub =
     selectedDate      ? fmtFull(selectedDate) :
@@ -514,31 +520,13 @@ export function TodayTab() {
     { key: 'year',  label: 'Year'     },
   ]
 
-  function handleScopeChange(s: PlanScope) {
-    setScope(s)
-    setSelectedDate(null)
-  }
-
-  function prevDay() {
-    setDayDate(d => offsetDay(d, -1))
-    setScope('day')
-    setSelectedDate(null)
-  }
-
-  function nextDay() {
-    setDayDate(d => offsetDay(d, 1))
-    setScope('day')
-    setSelectedDate(null)
-  }
+  function handleScopeChange(s: PlanScope) { up({ scope: s, selected: null }) }
+  function prevDay() { up({ scope: 'day', date: offsetDay(dayDate, -1), selected: null }) }
+  function nextDay() { up({ scope: 'day', date: offsetDay(dayDate,  1), selected: null }) }
+  function handleCalendarSelect(date: string) { up({ selected: date }) }
+  function backToCalendar() { up({ selected: null }) }
 
   function handleCalendarSelect(date: string) {
-    setSelectedDate(date)
-  }
-
-  function backToCalendar() {
-    setSelectedDate(null)
-  }
-
   function renderPlanContent() {
     if (scope === 'week' && !selectedDate) return <WeekPlanView />
     return <PlanPanel key={planDate} date={scope === 'day' ? dayDate : planDate} />
@@ -578,13 +566,13 @@ export function TodayTab() {
           {/* Mode switcher */}
           <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
             <button
-              onClick={() => setMode('plan')}
+              onClick={() => up({ mode: 'plan' })}
               className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                 mode === 'plan' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
             >{t.planLabel}</button>
             <button
-              onClick={() => setMode('challenges')}
+              onClick={() => up({ mode: 'challenges' })}
               className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                 mode === 'challenges' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
@@ -599,7 +587,7 @@ export function TodayTab() {
                 className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors"
               ><IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} /></button>
               <button
-                onClick={() => { setScope('day'); setSelectedDate(null) }}
+                onClick={() => up({ scope: 'day', selected: null })}
                 className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors whitespace-nowrap min-w-[72px] text-center ${
                   scope === 'day' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
                 }`}

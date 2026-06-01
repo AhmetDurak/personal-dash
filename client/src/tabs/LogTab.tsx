@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useJournalEntry, useRecentJournal } from '../hooks/useJournal'
 import { useDailyPlan, PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
@@ -468,8 +469,13 @@ function EntryView({ date, onBack }: { date: string; onBack: () => void }) {
 
 export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const { t } = useLanguage()
-  const [view, setView] = useState<View>('today')
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = (searchParams.get('view') as View) ?? 'today'
+  const selectedDate = searchParams.get('date')
+  function setView(v: View) { setSearchParams(p => { p.set('view', v); p.delete('date'); return p }) }
+  function setSelectedDate(d: string | null) {
+    setSearchParams(p => { if (d) p.set('date', d); else p.delete('date'); return p })
+  }
 
   function handleSelectDate(d: string) {
     setSelectedDate(d)

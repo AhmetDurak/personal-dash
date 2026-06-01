@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useFoods, useMealLogs, useShoppingList } from '../hooks/useMeal'
 import type { Food, MealItem, MealType } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
@@ -379,7 +380,9 @@ type View = 'today' | 'library' | 'shopping'
 
 export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const { t } = useLanguage()
-  const [view, setView] = useState<View>('today')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = (searchParams.get('view') as View) ?? 'today'
+  function setView(v: View) { setSearchParams({ view: v }) }
   const VIEWS: { id: View; label: string }[] = [
     { id: 'today',    label: t.today },
     { id: 'library',  label: t.foodLibrary },

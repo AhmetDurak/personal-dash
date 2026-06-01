@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { IconEdit, IconClose } from '../lib/icons'
 import { useExercises, useTemplates, useWorkoutLogs, useFitnessTargets, useBodyWeight } from '../hooks/useSport'
@@ -833,7 +834,9 @@ type View = 'dashboard' | 'exercises' | 'log' | 'targets' | 'challenges' | 'weig
 
 export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const { t } = useLanguage()
-  const [view, setView] = useState<View>('dashboard')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = (searchParams.get('view') as View) ?? 'dashboard'
+  function setView(v: View) { setSearchParams({ view: v }) }
   const VIEWS: { id: View; label: string }[] = [
     { id: 'dashboard',  label: t.sportDashboard },
     { id: 'exercises',  label: t.exercises },
