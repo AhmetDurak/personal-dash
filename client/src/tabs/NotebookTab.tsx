@@ -1294,7 +1294,7 @@ function VocabView() {
   const [csvTooltipOpen, setCsvTooltipOpen] = useState(false)
   const csvInputRef = useRef<HTMLInputElement>(null)
   const csvTooltipRef = useRef<HTMLDivElement>(null)
-  const [sortBy, setSortBy] = useState<'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc'>(() => (localStorage.getItem('vocab:sortBy') as 'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc') ?? 'newest')
+  const [sortBy, setSortBy] = useState<'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc'|'rep-asc'|'rep-desc'>(() => (localStorage.getItem('vocab:sortBy') as 'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc'|'rep-asc'|'rep-desc') ?? 'newest')
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [movePicking, setMovePicking] = useState(false)
@@ -1336,6 +1336,8 @@ function VocabView() {
       case 'word-desc': return b.word.localeCompare(a.word)
       case 'due-asc':   return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
       case 'due-desc':  return new Date(b.due_at).getTime() - new Date(a.due_at).getTime()
+      case 'rep-asc':   return a.repetitions - b.repetitions
+      case 'rep-desc':  return b.repetitions - a.repetitions
       case 'oldest':    return a.id - b.id
       default:          return b.id - a.id
     }
@@ -1507,6 +1509,8 @@ function VocabView() {
               <option value="word-desc">Z → A</option>
               <option value="due-asc">Due soon</option>
               <option value="due-desc">Due late</option>
+              <option value="rep-asc">Least repeated</option>
+              <option value="rep-desc">Most repeated</option>
             </select>
             {/* Select mode toggle */}
             <button
