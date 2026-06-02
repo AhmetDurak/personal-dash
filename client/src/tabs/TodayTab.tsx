@@ -3,8 +3,9 @@ import { useSearchParams } from 'react-router-dom'
 import { useJournalEntry } from '../hooks/useJournal'
 import { useDailyPlan, PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
+import { useAllReminders } from '../hooks/useNotebook'
 import { ChallengesView } from '../components/web/ChallengesView'
-import { IconClose, IconChevronLeft, IconChevronRight } from '../lib/icons'
+import { IconClose, IconChevronLeft, IconChevronRight, IconBell } from '../lib/icons'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -52,10 +53,13 @@ function fmtShort(date: string) {
 function PlanPanel({ date }: { date: string }) {
   const { t } = useLanguage()
   const { plan, save } = useDailyPlan(date)
-  const [tasks, setTasks]   = useState<PlanTask[]>([])
-  const [notes, setNotes]   = useState('')
-  const [input, setInput]   = useState('')
-  const [saving, setSaving] = useState(false)
+  const { add: addReminder } = useAllReminders()
+  const [tasks, setTasks]       = useState<PlanTask[]>([])
+  const [notes, setNotes]       = useState('')
+  const [input, setInput]       = useState('')
+  const [saving, setSaving]     = useState(false)
+  const [reminderDt, setReminderDt]     = useState('')
+  const [showReminder, setShowReminder] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loaded = useRef(false)
 
@@ -73,12 +77,21 @@ function PlanPanel({ date }: { date: string }) {
     saveTimer.current = setTimeout(async () => { await save(ts, n); setSaving(false) }, 600)
   }
 
-  function addTask() {
+  async function addTask() {
     const text = input.trim()
     if (!text) return
     const next: PlanTask[] = [...tasks, { id: crypto.randomUUID(), text, done: false }]
     setTasks(next); setInput('')
     scheduleSave(next, notes)
+    if (reminderDt) {
+      await addReminder({ title: text, due_at: reminderDt })
+      setReminderDt(''); setShowReminder(false)
+    }
+  }
+
+  function toggleReminderInput() {
+    if (!showReminder && !reminderDt) setReminderDt(`${date}T09:00`)
+    setShowReminder(v => !v)
   }
 
   function toggleTask(id: string) {
@@ -132,7 +145,7 @@ function PlanPanel({ date }: { date: string }) {
         ))}
       </div>
 
-      <div className="flex-shrink-0 px-6 pb-4 space-y-3">
+      <div className="flex-shrink-0 px-6 pb-4 space-y-2">
         <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2">
           <input
             value={input}
@@ -140,10 +153,30 @@ function PlanPanel({ date }: { date: string }) {
             placeholder={t.addTask}
             className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300"
           />
+          <button
+            type="button"
+            onClick={toggleReminderInput}
+            title="Set reminder"
+            className={`flex-shrink-0 px-2.5 py-2 rounded-xl transition-colors ${
+              showReminder || reminderDt
+                ? 'bg-amber-100 text-amber-500 dark:bg-amber-900/30 dark:text-amber-400'
+                : 'bg-gray-100 text-gray-400 hover:text-amber-500 dark:bg-gray-700 dark:text-gray-500'
+            }`}
+          >
+            <IconBell className="w-4 h-4" strokeWidth={2} />
+          </button>
           <button type="submit" className="text-sm px-3 py-2 bg-gray-900 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
             {t.add}
           </button>
         </form>
+        {showReminder && (
+          <input
+            type="datetime-local"
+            value={reminderDt}
+            onChange={e => setReminderDt(e.target.value)}
+            className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 bg-amber-50/30"
+          />
+        )}
         <textarea
           value={notes}
           onChange={e => { setNotes(e.target.value); scheduleSave(tasks, e.target.value) }}
@@ -160,11 +193,14 @@ function PlanPanel({ date }: { date: string }) {
 
 function DayRow({ date }: { date: string }) {
   const { t } = useLanguage()
+  const { add: addReminder } = useAllReminders()
   const today     = date === todayStr()
   const tomorrow  = date === offsetDay(todayStr(), 1)
-  const [expanded, setExpanded] = useState(today)
-  const [input, setInput]       = useState('')
-  const [saving, setSaving]     = useState(false)
+  const [expanded, setExpanded]         = useState(today)
+  const [input, setInput]               = useState('')
+  const [saving, setSaving]             = useState(false)
+  const [reminderDt, setReminderDt]     = useState('')
+  const [showReminder, setShowReminder] = useState(false)
   const { plan, save } = useDailyPlan(date)
   const [tasks, setTasks] = useState<PlanTask[]>([])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -183,12 +219,21 @@ function DayRow({ date }: { date: string }) {
     saveTimer.current = setTimeout(async () => { await save(ts, plan?.notes ?? ''); setSaving(false) }, 600)
   }
 
-  function addTask() {
+  async function addTask() {
     const text = input.trim()
     if (!text) return
     const next: PlanTask[] = [...tasks, { id: crypto.randomUUID(), text, done: false }]
     setTasks(next); setInput('')
     scheduleSave(next)
+    if (reminderDt) {
+      await addReminder({ title: text, due_at: reminderDt })
+      setReminderDt(''); setShowReminder(false)
+    }
+  }
+
+  function toggleReminderInput() {
+    if (!showReminder && !reminderDt) setReminderDt(`${date}T09:00`)
+    setShowReminder(v => !v)
   }
 
   function toggleTask(id: string) {
@@ -253,15 +298,35 @@ function DayRow({ date }: { date: string }) {
               <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs">✕</button>
             </div>
           ))}
-          <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2 pt-1">
+          <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-1.5 pt-1">
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder={t.addTask}
               className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green placeholder-gray-300"
             />
+            <button
+              type="button"
+              onClick={toggleReminderInput}
+              title="Set reminder"
+              className={`flex-shrink-0 px-2 py-1.5 rounded-lg transition-colors ${
+                showReminder || reminderDt
+                  ? 'bg-amber-100 text-amber-500 dark:bg-amber-900/30 dark:text-amber-400'
+                  : 'bg-gray-100 text-gray-400 hover:text-amber-500 dark:bg-gray-700 dark:text-gray-500'
+              }`}
+            >
+              <IconBell className="w-3.5 h-3.5" strokeWidth={2} />
+            </button>
             <button type="submit" className="text-xs px-2.5 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium">+</button>
           </form>
+          {showReminder && (
+            <input
+              type="datetime-local"
+              value={reminderDt}
+              onChange={e => setReminderDt(e.target.value)}
+              className="w-full text-xs border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-300 bg-amber-50/30"
+            />
+          )}
         </div>
       )}
     </div>
