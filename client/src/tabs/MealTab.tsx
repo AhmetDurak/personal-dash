@@ -299,7 +299,7 @@ function FoodLibrary() {
 
 // ─── Recipes ──────────────────────────────────────────────────────────────────
 
-interface Recipe { id: string; name: string; url: string }
+interface Recipe { id: string; name: string; url: string; description: string }
 
 function useRecipes() {
   const [recipes, setRecipes] = useState<Recipe[]>(() => {
@@ -309,83 +309,196 @@ function useRecipes() {
     setRecipes(next)
     localStorage.setItem('meal:recipes', JSON.stringify(next))
   }
-  function add(name: string, url: string) {
-    save([...recipes, { id: crypto.randomUUID(), name: name.trim(), url: url.trim() }])
+  function add(name: string, url: string, description: string) {
+    save([...recipes, { id: crypto.randomUUID(), name: name.trim(), url: url.trim(), description: description.trim() }])
+  }
+  function update(id: string, fields: Partial<Omit<Recipe, 'id'>>) {
+    save(recipes.map(r => r.id === id ? { ...r, ...fields } : r))
   }
   function remove(id: string) { save(recipes.filter(r => r.id !== id)) }
-  return { recipes, add, remove }
+  return { recipes, add, update, remove }
 }
 
-function RecipesView() {
-  const { recipes, add, remove } = useRecipes()
-  const [name, setName] = useState('')
-  const [url, setUrl]   = useState('')
+function normalizeUrl(u: string) {
+  if (!u) return u
+  return u.startsWith('http://') || u.startsWith('https://') ? u : `https://${u}`
+}
 
-  function handleAdd(e: React.FormEvent) {
-    e.preventDefault()
+function RecipeCard({ recipe, onUpdate, onRemove }: {
+  recipe: Recipe
+  onUpdate: (fields: Partial<Omit<Recipe, 'id'>>) => void
+  onRemove: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [name, setName]         = useState(recipe.name)
+  const [url, setUrl]           = useState(recipe.url)
+  const [description, setDesc]  = useState(recipe.description)
+
+  function startEdit() {
+    setName(recipe.name); setUrl(recipe.url); setDesc(recipe.description)
+    setEditing(true)
+  }
+
+  function save() {
     if (!name.trim()) return
-    add(name, url)
-    setName(''); setUrl('')
+    onUpdate({ name: name.trim(), url: url.trim(), description: description.trim() })
+    setEditing(false)
   }
 
-  function normalizeUrl(u: string) {
-    if (!u) return u
-    return u.startsWith('http://') || u.startsWith('https://') ? u : `https://${u}`
+  function cancel() {
+    setName(recipe.name); setUrl(recipe.url); setDesc(recipe.description)
+    setEditing(false)
   }
 
-  return (
-    <div className="p-4 md:p-6 max-w-xl mx-auto space-y-4">
-      <form onSubmit={handleAdd} className="space-y-2">
-        <div className="flex gap-2">
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Recipe name…"
-            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
-          />
-          <button type="submit" className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors flex-shrink-0">
-            Add
-          </button>
-        </div>
+  if (editing) {
+    return (
+      <div className="bg-white rounded-xl border border-xero-green/40 px-4 py-4 space-y-2.5 shadow-sm">
+        <input
+          autoFocus
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Recipe name…"
+          className="w-full text-sm font-semibold border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+        />
         <input
           value={url}
           onChange={e => setUrl(e.target.value)}
           placeholder="Link (optional)…"
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
         />
-      </form>
-
-      {recipes.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-12">No recipes yet. Add your first one!</p>
-      ) : (
-        <div className="space-y-2">
-          {recipes.map(r => (
-            <div key={r.id} className="flex items-center gap-3 group bg-white rounded-xl px-4 py-3 border border-gray-100 hover:border-gray-200 transition-colors">
-              <div className="flex-1 min-w-0">
-                {r.url ? (
-                  <a
-                    href={normalizeUrl(r.url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium text-xero-green hover:underline truncate block"
-                  >
-                    {r.name}
-                  </a>
-                ) : (
-                  <p className="text-sm font-medium text-gray-800 truncate">{r.name}</p>
-                )}
-                {r.url && (
-                  <p className="text-[11px] text-gray-400 truncate mt-0.5">{r.url}</p>
-                )}
-              </div>
-              <button
-                onClick={() => remove(r.id)}
-                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all leading-none flex-shrink-0"
-              >×</button>
-            </div>
-          ))}
+        <textarea
+          value={description}
+          onChange={e => setDesc(e.target.value)}
+          placeholder="Description, ingredients, steps… (optional)"
+          rows={5}
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green resize-y"
+        />
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={save}
+            disabled={!name.trim()}
+            className="text-sm bg-xero-green text-white px-4 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors disabled:opacity-40"
+          >Save</button>
+          <button
+            onClick={cancel}
+            className="text-sm text-gray-400 hover:text-gray-600 px-3 py-1.5 transition-colors"
+          >Cancel</button>
+          <button
+            onClick={onRemove}
+            className="ml-auto text-sm text-red-400 hover:text-red-500 px-3 py-1.5 transition-colors"
+          >Delete</button>
         </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group bg-white rounded-xl px-4 py-3 border border-gray-100 hover:border-gray-200 transition-colors">
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          {recipe.url ? (
+            <a
+              href={normalizeUrl(recipe.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold text-xero-green hover:underline break-all"
+            >
+              {recipe.name}
+            </a>
+          ) : (
+            <p className="text-sm font-semibold text-gray-800">{recipe.name}</p>
+          )}
+          {recipe.url && (
+            <p className="text-[11px] text-gray-400 truncate mt-0.5">{recipe.url}</p>
+          )}
+          {recipe.description && (
+            <p className="text-sm text-gray-600 mt-1.5 whitespace-pre-wrap">{recipe.description}</p>
+          )}
+        </div>
+        <button
+          onClick={startEdit}
+          className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 transition-all text-xs px-1.5 py-1"
+          title="Edit"
+        >✏️</button>
+      </div>
+    </div>
+  )
+}
+
+function RecipesView() {
+  const { recipes, add, update, remove } = useRecipes()
+  const [name, setName]         = useState('')
+  const [url, setUrl]           = useState('')
+  const [description, setDesc]  = useState('')
+  const [showForm, setShowForm] = useState(false)
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return
+    add(name, url, description)
+    setName(''); setUrl(''); setDesc(''); setShowForm(false)
+  }
+
+  return (
+    <div className="p-4 md:p-6 max-w-xl mx-auto space-y-3">
+      {!showForm ? (
+        <button
+          onClick={() => setShowForm(true)}
+          className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+        >
+          + Add Recipe
+        </button>
+      ) : (
+        <form onSubmit={handleAdd} className="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-2.5 shadow-sm">
+          <input
+            autoFocus
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Recipe name…"
+            className="w-full text-sm font-semibold border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          <input
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            placeholder="Link (optional)…"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          <textarea
+            value={description}
+            onChange={e => setDesc(e.target.value)}
+            placeholder="Description, ingredients, steps… (optional)"
+            rows={5}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green resize-y"
+          />
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={!name.trim()}
+              className="text-sm bg-xero-green text-white px-4 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors disabled:opacity-40"
+            >Add</button>
+            <button
+              type="button"
+              onClick={() => { setShowForm(false); setName(''); setUrl(''); setDesc('') }}
+              className="text-sm text-gray-400 hover:text-gray-600 px-3 py-1.5 transition-colors"
+            >Cancel</button>
+          </div>
+        </form>
       )}
+
+      {recipes.length === 0 && !showForm && (
+        <p className="text-sm text-gray-400 text-center py-12">No recipes yet. Add your first one!</p>
+      )}
+
+      <div className="space-y-2">
+        {recipes.map(r => (
+          <RecipeCard
+            key={r.id}
+            recipe={r}
+            onUpdate={fields => update(r.id, fields)}
+            onRemove={() => remove(r.id)}
+          />
+        ))}
+      </div>
     </div>
   )
 }
