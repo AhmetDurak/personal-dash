@@ -93,3 +93,33 @@ export function useShoppingHistory() {
   const { data, mutate } = useSWR<ShoppingSession[]>('/api/meal/shopping/sessions', fetcher)
   return { sessions: data ?? [], refresh: mutate }
 }
+
+// ─── Receipt uploads ──────────────────────────────────────────────────────────
+
+export interface Receipt {
+  id: number
+  date: string
+  filename: string
+  orig_name: string
+  mime_type: string
+  size_bytes: number
+  created_at: string
+}
+
+export function useReceipts(date: string) {
+  const { data, mutate } = useSWR<Receipt[]>(`/api/receipts/${date}`, fetcher)
+
+  async function upload(file: File) {
+    const form = new FormData()
+    form.append('receipt', file)
+    await fetch(`/api/receipts/${date}`, { method: 'POST', body: form })
+    await mutate()
+  }
+
+  async function remove(id: number) {
+    await fetch(`/api/receipts/${id}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { receipts: data ?? [], upload, remove }
+}

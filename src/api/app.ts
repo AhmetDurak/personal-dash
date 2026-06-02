@@ -24,6 +24,7 @@ import { templatesRouter } from './routes/templates'
 import { authRouter } from './routes/auth'
 import { journalRouter } from './routes/journal'
 import { mealRouter } from './routes/meal'
+import { receiptsRouter } from './routes/receipts'
 import { sportRouter } from './routes/sport'
 import { planRouter } from './routes/plan'
 import { translateRouter } from './routes/translate'
@@ -90,6 +91,7 @@ app.use('/api/budgets',       budgetsRouter(pool))
 app.use('/api/templates',     templatesRouter(pool))
 app.use('/api/journal',       journalRouter(pool))
 app.use('/api/meal',          mealRouter(pool))
+app.use('/api/receipts',      receiptsRouter(pool))
 app.use('/api/sport',         sportRouter(pool))
 app.use('/api/plan',          planRouter(pool))
 app.use('/api/translate',     translateRouter())

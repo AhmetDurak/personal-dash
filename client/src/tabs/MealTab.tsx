@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useFoods, useMealLogs, useShoppingList, useShoppingHistory } from '../hooks/useMeal'
-import type { Food, MealItem, MealType } from '../hooks/useMeal'
+import { useFoods, useMealLogs, useShoppingList, useShoppingHistory, useReceipts } from '../hooks/useMeal'
+import type { Food, MealItem, MealType, Receipt } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
 
@@ -392,14 +392,59 @@ function RecipesView() {
 
 // ─── Shopping list ────────────────────────────────────────────────────────────
 
+function ReceiptCard({ receipt, onRemove }: { receipt: Receipt; onRemove: () => void }) {
+  const isPdf = receipt.mime_type === 'application/pdf'
+  const fileUrl = `/api/receipts/file/${receipt.id}`
+
+  return (
+    <div className="group relative w-24 flex-shrink-0">
+      <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="block">
+        {isPdf ? (
+          <div className="w-24 h-24 rounded-xl border border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-1 hover:border-xero-green transition-colors">
+            <span className="text-2xl">📄</span>
+            <p className="text-[10px] text-gray-400 text-center px-1 truncate w-full leading-tight">
+              {receipt.orig_name}
+            </p>
+          </div>
+        ) : (
+          <img
+            src={fileUrl}
+            alt={receipt.orig_name}
+            className="w-24 h-24 object-cover rounded-xl border border-gray-200 hover:border-xero-green transition-colors"
+          />
+        )}
+      </a>
+      <button
+        onClick={onRemove}
+        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center leading-none"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
 function ShoppingListView() {
   const today = todayStr()
   const [date, setDate] = useState(today)
   const { items, saveList } = useShoppingList(date)
   const { sessions } = useShoppingHistory()
+  const { receipts, upload: uploadReceipt, remove: removeReceipt } = useReceipts(date)
   const [checked, setChecked]   = useState<Set<number>>(new Set())
   const [newItem, setNewItem]   = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try { await uploadReceipt(file) } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   async function addItem(text?: string) {
     const v = (text ?? newItem).trim()
@@ -428,6 +473,15 @@ function ShoppingListView() {
     <div className="flex h-full overflow-hidden">
       {/* Main list */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+
         {/* Date selector */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <input
@@ -445,6 +499,14 @@ function ShoppingListView() {
             </button>
           )}
           <span className="text-xs text-gray-400 ml-auto">{fmtDate(date)}</span>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-1 flex-shrink-0"
+            title="Upload receipt"
+          >
+            {uploading ? '⏳' : '📄'} {uploading ? 'Uploading…' : 'Receipt'}
+          </button>
           {/* Mobile history toggle */}
           <button
             onClick={() => setSidebarOpen(v => !v)}
@@ -490,6 +552,18 @@ function ShoppingListView() {
           >
             Clear checked items
           </button>
+        )}
+
+        {/* Receipts */}
+        {receipts.length > 0 && (
+          <div className="mt-6 max-w-md">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Receipts</p>
+            <div className="flex flex-wrap gap-2">
+              {receipts.map(r => (
+                <ReceiptCard key={r.id} receipt={r} onRemove={() => removeReceipt(r.id)} />
+              ))}
+            </div>
+          </div>
         )}
       </div>
 

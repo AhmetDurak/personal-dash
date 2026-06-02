@@ -155,6 +155,17 @@ CREATE TABLE IF NOT EXISTS shopping_sessions (
   PRIMARY KEY (user_id, date)
 );
 
+CREATE TABLE IF NOT EXISTS receipt_uploads (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER REFERENCES users(id),
+  date        TEXT NOT NULL,
+  filename    TEXT NOT NULL,
+  orig_name   TEXT NOT NULL,
+  mime_type   TEXT NOT NULL,
+  size_bytes  INTEGER NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS exercises (
   id             SERIAL PRIMARY KEY,
   user_id        INTEGER REFERENCES users(id),
