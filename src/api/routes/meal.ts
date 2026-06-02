@@ -59,7 +59,7 @@ export function mealRouter(pool: Pool): Router {
     res.json(rows[0])
   })
 
-  // ─── Shopping list ────────────────────────────────────────────────────────
+  // ─── Shopping list (legacy — single shared list) ─────────────────────────
 
   router.get('/shopping', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
@@ -78,6 +78,42 @@ export function mealRouter(pool: Pool): Router {
        VALUES ($1,$2)
        ON CONFLICT (user_id) DO UPDATE SET items=$2, updated_at=now()`,
       [uid, JSON.stringify(items)]
+    )
+    res.json({ ok: true })
+  })
+
+  // ─── Shopping sessions (date-keyed) ───────────────────────────────────────
+
+  // GET all past sessions for the history sidebar
+  router.get('/shopping/sessions', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      `SELECT date, items FROM shopping_sessions
+       WHERE user_id=$1 ORDER BY date DESC LIMIT 30`,
+      [uid]
+    )
+    res.json(rows)
+  })
+
+  // GET items for a specific date
+  router.get('/shopping/:date', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      'SELECT items FROM shopping_sessions WHERE user_id=$1 AND date=$2',
+      [uid, req.params.date]
+    )
+    res.json(rows[0]?.items ?? [])
+  })
+
+  // PUT (upsert) items for a specific date
+  router.put('/shopping/:date', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const items = req.body.items ?? []
+    await pool.query(
+      `INSERT INTO shopping_sessions (user_id, date, items)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (user_id, date) DO UPDATE SET items=$3, updated_at=now()`,
+      [uid, req.params.date, JSON.stringify(items)]
     )
     res.json({ ok: true })
   })

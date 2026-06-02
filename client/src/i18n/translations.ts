@@ -91,6 +91,7 @@ export const TRANSLATIONS = {
     snack: 'Snack',
     foodLibrary: 'Food Library',
     shoppingList: 'Shopping List',
+    recipes: 'Recipes',
     // sport
     sportDashboard: 'Dashboard',
     exercises: 'Exercises',
@@ -212,6 +213,7 @@ export const TRANSLATIONS = {
     snack: 'Snack',
     foodLibrary: 'Lebensmittelbibliothek',
     shoppingList: 'Einkaufsliste',
+    recipes: 'Rezepte',
     sportDashboard: 'Übersicht',
     exercises: 'Übungen',
     logWorkout: 'Training protokollieren',
@@ -330,6 +332,7 @@ export const TRANSLATIONS = {
     snack: 'Atıştırmalık',
     foodLibrary: 'Besin Kütüphanesi',
     shoppingList: 'Alışveriş Listesi',
+    recipes: 'Tarifler',
     sportDashboard: 'Pano',
     exercises: 'Egzersizler',
     logWorkout: 'Antrenman Kaydet',

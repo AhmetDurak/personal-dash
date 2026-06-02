@@ -15,7 +15,7 @@ import { TransactionsTab } from './tabs/TransactionsTab'
 import { ETFTab } from './tabs/ETFTab'
 import { NewsTab } from './tabs/NewsTab'
 import { LearnTab } from './tabs/LearnTab'
-import { LearnSectionTab, LifeTab } from './tabs/NotebookTab'
+import { LearnSectionTab, LifeTab, RemindersView } from './tabs/NotebookTab'
 import { TodayTab } from './tabs/TodayTab'
 import { currentMonth } from './utils/format'
 import type { Span } from './components/web/BalanceChart'
@@ -84,20 +84,22 @@ export function App() {
           <Routes>
             <Route path="/planner"     element={<TodayTab />} />
             <Route path="/today"       element={<Navigate to="/planner" replace />} />
+            <Route path="/reminders"   element={<RemindersView standalone />} />
             <Route path="/life/*"      element={<LifeTab />} />
             <Route path="/learn/*"     element={<LearnSectionTab />} />
             <Route path="/news"        element={<NewsPage />} />
             <Route path="/finance/*"   element={<FinanceDashboard />} />
             {/* Legacy redirects */}
-            <Route path="/workspace/log/*"   element={<Navigate to="/life/log" replace />} />
-            <Route path="/workspace/meal/*"  element={<Navigate to="/life/meal" replace />} />
-            <Route path="/workspace/sport/*" element={<Navigate to="/life/sport" replace />} />
-            <Route path="/workspace/reminders" element={<Navigate to="/life/reminders" replace />} />
-            <Route path="/workspace/notes"   element={<Navigate to="/learn/notes" replace />} />
-            <Route path="/workspace/mindmap" element={<Navigate to="/learn/mindmap" replace />} />
-            <Route path="/workspace/vocab"   element={<Navigate to="/learn/language" replace />} />
-            <Route path="/learn/vocab"       element={<Navigate to="/learn/language" replace />} />
-            <Route path="/workspace/*"       element={<Navigate to="/learn/notes" replace />} />
+            <Route path="/workspace/log/*"     element={<Navigate to="/life/log" replace />} />
+            <Route path="/workspace/meal/*"    element={<Navigate to="/life/meal" replace />} />
+            <Route path="/workspace/sport/*"   element={<Navigate to="/life/sport" replace />} />
+            <Route path="/workspace/reminders" element={<Navigate to="/reminders" replace />} />
+            <Route path="/life/reminders"      element={<Navigate to="/reminders" replace />} />
+            <Route path="/workspace/notes"     element={<Navigate to="/learn/notes" replace />} />
+            <Route path="/workspace/mindmap"   element={<Navigate to="/learn/mindmap" replace />} />
+            <Route path="/workspace/vocab"     element={<Navigate to="/learn/language" replace />} />
+            <Route path="/learn/vocab"         element={<Navigate to="/learn/language" replace />} />
+            <Route path="/workspace/*"         element={<Navigate to="/learn/notes" replace />} />
             <Route path="*"            element={<Navigate to="/planner" replace />} />
           </Routes>
         </div>

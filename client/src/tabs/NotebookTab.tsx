@@ -2019,7 +2019,7 @@ function VocabView() {
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const MINS  = ['00', '15', '30', '45']
 
-function RemindersView() {
+export function RemindersView({ standalone }: { standalone?: boolean } = {}) {
   const { t } = useLanguage()
   const { reminders, isLoading, toggle, remove, add } = useAllReminders()
   const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null)
@@ -2100,7 +2100,7 @@ function RemindersView() {
     )
   }
 
-  return (
+  const inner = (
     <div className="p-6 overflow-y-auto h-full">
       <div className="max-w-xl">
 
@@ -2263,6 +2263,16 @@ function RemindersView() {
           onCancel={() => setConfirmRemoveId(null)}
         />
       )}
+    </div>
+  )
+
+  if (!standalone) return inner
+  return (
+    <div className="flex flex-col h-full overflow-hidden bg-xero-bg">
+      <header className="flex items-center px-4 md:px-6 py-2.5 bg-white border-b border-xero-border flex-shrink-0">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mr-2">{t.reminders}</p>
+      </header>
+      <div className="flex-1 overflow-hidden">{inner}</div>
     </div>
   )
 }
@@ -3231,10 +3241,9 @@ export function LifeTab() {
   const { t } = useLanguage()
 
   const VIEWS: SectionView[] = [
-    { path: '/life/log',       label: t.log,       icon: '📔' },
-    { path: '/life/meal',      label: t.meal,      icon: '🍽️' },
-    { path: '/life/sport',     label: t.sport,     icon: '💪' },
-    { path: '/life/reminders', label: t.reminders, icon: '📝' },
+    { path: '/life/log',   label: t.log,   icon: '📔' },
+    { path: '/life/meal',  label: t.meal,  icon: '🍽️' },
+    { path: '/life/sport', label: t.sport, icon: '💪' },
   ]
 
   return (
@@ -3247,10 +3256,9 @@ export function LifeTab() {
     >
       {(openSidebar) => (
         <>
-          <Route path="log/*"     element={<LogTab  onMenuClick={openSidebar} />} />
-          <Route path="meal/*"    element={<MealTab onMenuClick={openSidebar} />} />
-          <Route path="sport/*"   element={<SportTab onMenuClick={openSidebar} />} />
-          <Route path="reminders" element={<RemindersView />} />
+          <Route path="log/*"   element={<LogTab  onMenuClick={openSidebar} />} />
+          <Route path="meal/*"  element={<MealTab onMenuClick={openSidebar} />} />
+          <Route path="sport/*" element={<SportTab onMenuClick={openSidebar} />} />
         </>
       )}
     </SectionShell>

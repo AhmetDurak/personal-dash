@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useFoods, useMealLogs, useShoppingList } from '../hooks/useMeal'
+import { useFoods, useMealLogs, useShoppingList, useShoppingHistory } from '../hooks/useMeal'
 import type { Food, MealItem, MealType } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
@@ -297,18 +297,115 @@ function FoodLibrary() {
   )
 }
 
+// ─── Recipes ──────────────────────────────────────────────────────────────────
+
+interface Recipe { id: string; name: string; url: string }
+
+function useRecipes() {
+  const [recipes, setRecipes] = useState<Recipe[]>(() => {
+    try { return JSON.parse(localStorage.getItem('meal:recipes') ?? '[]') } catch { return [] }
+  })
+  function save(next: Recipe[]) {
+    setRecipes(next)
+    localStorage.setItem('meal:recipes', JSON.stringify(next))
+  }
+  function add(name: string, url: string) {
+    save([...recipes, { id: crypto.randomUUID(), name: name.trim(), url: url.trim() }])
+  }
+  function remove(id: string) { save(recipes.filter(r => r.id !== id)) }
+  return { recipes, add, remove }
+}
+
+function RecipesView() {
+  const { recipes, add, remove } = useRecipes()
+  const [name, setName] = useState('')
+  const [url, setUrl]   = useState('')
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim()) return
+    add(name, url)
+    setName(''); setUrl('')
+  }
+
+  function normalizeUrl(u: string) {
+    if (!u) return u
+    return u.startsWith('http://') || u.startsWith('https://') ? u : `https://${u}`
+  }
+
+  return (
+    <div className="p-4 md:p-6 max-w-xl mx-auto space-y-4">
+      <form onSubmit={handleAdd} className="space-y-2">
+        <div className="flex gap-2">
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Recipe name…"
+            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          <button type="submit" className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors flex-shrink-0">
+            Add
+          </button>
+        </div>
+        <input
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="Link (optional)…"
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+        />
+      </form>
+
+      {recipes.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-12">No recipes yet. Add your first one!</p>
+      ) : (
+        <div className="space-y-2">
+          {recipes.map(r => (
+            <div key={r.id} className="flex items-center gap-3 group bg-white rounded-xl px-4 py-3 border border-gray-100 hover:border-gray-200 transition-colors">
+              <div className="flex-1 min-w-0">
+                {r.url ? (
+                  <a
+                    href={normalizeUrl(r.url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium text-xero-green hover:underline truncate block"
+                  >
+                    {r.name}
+                  </a>
+                ) : (
+                  <p className="text-sm font-medium text-gray-800 truncate">{r.name}</p>
+                )}
+                {r.url && (
+                  <p className="text-[11px] text-gray-400 truncate mt-0.5">{r.url}</p>
+                )}
+              </div>
+              <button
+                onClick={() => remove(r.id)}
+                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all leading-none flex-shrink-0"
+              >×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Shopping list ────────────────────────────────────────────────────────────
 
 function ShoppingListView() {
-  const { items, saveList } = useShoppingList()
-  const [checked, setChecked] = useState<Set<number>>(new Set())
-  const [newItem, setNewItem] = useState('')
+  const today = todayStr()
+  const [date, setDate] = useState(today)
+  const { items, saveList } = useShoppingList(date)
+  const { sessions } = useShoppingHistory()
+  const [checked, setChecked]   = useState<Set<number>>(new Set())
+  const [newItem, setNewItem]   = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  async function addItem() {
-    const v = newItem.trim()
+  async function addItem(text?: string) {
+    const v = (text ?? newItem).trim()
     if (!v) return
-    await saveList([...items, v])
-    setNewItem('')
+    if (!items.includes(v)) await saveList([...items, v])
+    if (!text) setNewItem('')
   }
 
   async function removeItem(i: number) {
@@ -316,67 +413,167 @@ function ShoppingListView() {
     setChecked(prev => { const n = new Set(prev); n.delete(i); return n })
   }
 
+  function fmtDate(d: string) {
+    if (d === today) return 'Today'
+    const dt = new Date(d + 'T00:00:00')
+    return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  // unique items across all past sessions for the suggestion panel
+  const allPastItems = Array.from(
+    new Set(sessions.filter(s => s.date !== date).flatMap(s => s.items))
+  ).sort()
+
   return (
-    <div className="p-4 md:p-6 max-w-md mx-auto space-y-4">
-      <form onSubmit={e => { e.preventDefault(); addItem() }} className="flex gap-2">
-        <input
-          value={newItem}
-          onChange={e => setNewItem(e.target.value)}
-          placeholder="Add item…"
-          className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
-        />
-        <button type="submit" className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium">Add</button>
-      </form>
-
-      {items.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-12">Your shopping list is empty.</p>
-      ) : (
-        <div className="space-y-1.5">
-          {items.map((item, i) => (
-            <div key={i} className="flex items-center gap-3 group bg-white rounded-xl px-4 py-3 border border-gray-100">
-              <button
-                onClick={() => setChecked(prev => {
-                  const n = new Set(prev)
-                  n.has(i) ? n.delete(i) : n.add(i)
-                  return n
-                })}
-                className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                  checked.has(i) ? 'bg-xero-green border-xero-green' : 'border-gray-300'
-                }`}
-              >
-                {checked.has(i) && <span className="text-white font-bold" style={{ fontSize: 8 }}>✓</span>}
-              </button>
-              <p className={`flex-1 text-sm ${checked.has(i) ? 'line-through text-gray-300' : 'text-gray-800'}`}>{item}</p>
-              <button
-                onClick={() => removeItem(i)}
-                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all leading-none"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+    <div className="flex h-full overflow-hidden">
+      {/* Main list */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6">
+        {/* Date selector */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <input
+            type="date"
+            value={date}
+            onChange={e => { setDate(e.target.value); setChecked(new Set()) }}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          {date !== today && (
+            <button
+              onClick={() => { setDate(today); setChecked(new Set()) }}
+              className="text-xs text-xero-green hover:underline"
+            >
+              Back to today
+            </button>
+          )}
+          <span className="text-xs text-gray-400 ml-auto">{fmtDate(date)}</span>
+          {/* Mobile history toggle */}
+          <button
+            onClick={() => setSidebarOpen(v => !v)}
+            className="md:hidden text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+          >
+            History
+          </button>
         </div>
-      )}
 
-      {items.some((_, i) => checked.has(i)) && (
-        <button
-          onClick={() => {
-            const remaining = items.filter((_, i) => !checked.has(i))
-            saveList(remaining)
-            setChecked(new Set())
-          }}
-          className="text-xs text-gray-400 hover:text-red-400 transition-colors"
-        >
-          Clear checked items
-        </button>
-      )}
+        <form onSubmit={e => { e.preventDefault(); addItem() }} className="flex gap-2 mb-4">
+          <input
+            value={newItem}
+            onChange={e => setNewItem(e.target.value)}
+            placeholder="Add item…"
+            className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          <button type="submit" className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors">Add</button>
+        </form>
+
+        {items.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-12">List is empty. Add items or pick from history →</p>
+        ) : (
+          <div className="space-y-1.5 max-w-md">
+            {items.map((item, i) => (
+              <div key={i} className="flex items-center gap-3 group bg-white rounded-xl px-4 py-3 border border-gray-100">
+                <button
+                  onClick={() => setChecked(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })}
+                  className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${checked.has(i) ? 'bg-xero-green border-xero-green' : 'border-gray-300'}`}
+                >
+                  {checked.has(i) && <span className="text-white font-bold" style={{ fontSize: 8 }}>✓</span>}
+                </button>
+                <p className={`flex-1 text-sm ${checked.has(i) ? 'line-through text-gray-300' : 'text-gray-800'}`}>{item}</p>
+                <button onClick={() => removeItem(i)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all leading-none">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {items.some((_, i) => checked.has(i)) && (
+          <button
+            onClick={() => { saveList(items.filter((_, i) => !checked.has(i))); setChecked(new Set()) }}
+            className="mt-3 text-xs text-gray-400 hover:text-red-400 transition-colors"
+          >
+            Clear checked items
+          </button>
+        )}
+      </div>
+
+      {/* History sidebar — desktop always visible, mobile drawer */}
+      <aside className={`
+        ${sidebarOpen ? 'fixed inset-0 z-40 flex items-stretch' : 'hidden'}
+        md:relative md:flex md:inset-auto md:z-auto
+        w-full md:w-56 lg:w-64 flex-shrink-0
+      `}>
+        {/* Mobile backdrop */}
+        {sidebarOpen && <div className="absolute inset-0 bg-black/40 md:hidden" onClick={() => setSidebarOpen(false)} />}
+
+        <div className="relative ml-auto md:ml-0 w-72 md:w-full h-full bg-gray-50 border-l border-gray-100 flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Previous items</p>
+            <button onClick={() => setSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          </div>
+
+          {/* Past shopping sessions */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {sessions.length === 0 && (
+              <p className="text-xs text-gray-400 text-center py-6">No history yet.</p>
+            )}
+
+            {/* All unique past items as quick-add chips */}
+            {allPastItems.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Quick add</p>
+                <div className="flex flex-wrap gap-1">
+                  {allPastItems.map(item => (
+                    <button
+                      key={item}
+                      onClick={() => addItem(item)}
+                      disabled={items.includes(item)}
+                      className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                        items.includes(item)
+                          ? 'border-gray-100 text-gray-300 cursor-default'
+                          : 'border-gray-200 text-gray-600 hover:border-xero-green hover:text-xero-green bg-white'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sessions by date */}
+            {sessions.filter(s => s.date !== date).map(session => (
+              <div key={session.date}>
+                <button
+                  onClick={() => setDate(session.date)}
+                  className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 hover:text-xero-green transition-colors"
+                >
+                  {fmtDate(session.date)}
+                </button>
+                <div className="space-y-0.5">
+                  {session.items.map(item => (
+                    <button
+                      key={item}
+                      onClick={() => addItem(item)}
+                      disabled={items.includes(item)}
+                      className={`w-full text-left text-xs px-2 py-1 rounded-lg transition-colors ${
+                        items.includes(item)
+                          ? 'text-gray-300 cursor-default'
+                          : 'text-gray-600 hover:bg-xero-green/10 hover:text-xero-green'
+                      }`}
+                    >
+                      + {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </aside>
     </div>
   )
 }
 
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
-type View = 'today' | 'library' | 'shopping'
+type View = 'today' | 'library' | 'shopping' | 'recipes'
 
 export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const { t } = useLanguage()
@@ -386,6 +583,7 @@ export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const VIEWS: { id: View; label: string }[] = [
     { id: 'today',    label: t.today },
     { id: 'library',  label: t.foodLibrary },
+    { id: 'recipes',  label: t.recipes },
     { id: 'shopping', label: t.shoppingList },
   ]
 
@@ -415,6 +613,7 @@ export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
       <div className="flex-1 overflow-y-auto">
         {view === 'today'    && <TodayView />}
         {view === 'library'  && <FoodLibrary />}
+        {view === 'recipes'  && <RecipesView />}
         {view === 'shopping' && <ShoppingListView />}
       </div>
     </div>

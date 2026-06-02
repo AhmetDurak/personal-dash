@@ -67,13 +67,18 @@ export function useMealLogs(date: string) {
   return { logs: data ?? [], saveMeal }
 }
 
-// ─── Shopping list ────────────────────────────────────────────────────────────
+// ─── Shopping list (date-keyed) ───────────────────────────────────────────────
 
-export function useShoppingList() {
-  const { data, mutate } = useSWR<string[]>('/api/meal/shopping', fetcher)
+export interface ShoppingSession {
+  date: string
+  items: string[]
+}
+
+export function useShoppingList(date: string) {
+  const { data, mutate } = useSWR<string[]>(`/api/meal/shopping/${date}`, fetcher)
 
   async function saveList(items: string[]) {
-    await fetch('/api/meal/shopping', {
+    await fetch(`/api/meal/shopping/${date}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
@@ -82,4 +87,9 @@ export function useShoppingList() {
   }
 
   return { items: data ?? [], saveList }
+}
+
+export function useShoppingHistory() {
+  const { data, mutate } = useSWR<ShoppingSession[]>('/api/meal/shopping/sessions', fetcher)
+  return { sessions: data ?? [], refresh: mutate }
 }

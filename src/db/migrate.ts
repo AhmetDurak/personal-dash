@@ -147,6 +147,14 @@ CREATE TABLE IF NOT EXISTS shopping_list (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS shopping_sessions (
+  user_id    INTEGER REFERENCES users(id),
+  date       TEXT NOT NULL,
+  items      JSONB NOT NULL DEFAULT '[]',
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (user_id, date)
+);
+
 CREATE TABLE IF NOT EXISTS exercises (
   id             SERIAL PRIMARY KEY,
   user_id        INTEGER REFERENCES users(id),
