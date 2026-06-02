@@ -89,7 +89,7 @@ export const TRANSLATIONS = {
     lunch: 'Lunch',
     dinner: 'Dinner',
     snack: 'Snack',
-    foodLibrary: 'Food Library',
+    foodLibrary: 'Foods',
     shoppingList: 'Shopping List',
     recipes: 'Recipes',
     // sport

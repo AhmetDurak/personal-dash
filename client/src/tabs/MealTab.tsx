@@ -656,9 +656,9 @@ export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
   function setView(v: View) { setSearchParams({ view: v }) }
   const VIEWS: { id: View; label: string }[] = [
     { id: 'today',    label: t.today },
-    { id: 'library',  label: t.foodLibrary },
-    { id: 'recipes',  label: t.recipes },
     { id: 'shopping', label: t.shoppingList },
+    { id: 'recipes',  label: t.recipes },
+    { id: 'library',  label: t.foodLibrary },
   ]
 
   return (
