@@ -267,28 +267,35 @@ function FoodLibrary() {
       {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {filtered.map(food => (
-          <div key={food.id} className="bg-white rounded-xl border border-gray-100 p-4 group hover:shadow-sm transition-shadow relative">
-            <button
-              onClick={() => setConfirmId(food.id)}
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all leading-none text-base"
-            >
-              ×
-            </button>
-            {food.emoji && <p className="text-2xl mb-1">{food.emoji}</p>}
-            <p className="text-sm font-semibold text-gray-800 truncate">{food.name}</p>
-            <p className="text-[10px] text-gray-400 capitalize mt-0.5">{food.category}</p>
-            <p className="text-xs font-bold text-gray-600 mt-2">{food.calories_per_100g} <span className="font-normal text-gray-400">kcal/100g</span></p>
-            {confirmId === food.id && (
-              <ConfirmDialog
-                message={`"${food.name}" will be deleted from your food library.`}
-                confirmLabel="Delete"
-                onConfirm={() => { deleteFood(food.id); setConfirmId(null) }}
-                onCancel={() => setConfirmId(null)}
-              />
-            )}
-          </div>
-        ))}
+        {filtered.map(food => {
+          const isGlobal = food.user_id === null
+          return (
+            <div key={food.id} className="bg-white rounded-xl border border-gray-100 p-4 group hover:shadow-sm transition-shadow relative">
+              {isGlobal ? (
+                <span className="absolute top-2 right-2 text-[9px] font-semibold text-gray-300 uppercase tracking-wide">Default</span>
+              ) : (
+                <button
+                  onClick={() => setConfirmId(food.id)}
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all leading-none text-base"
+                >
+                  ×
+                </button>
+              )}
+              {food.emoji && <p className="text-2xl mb-1">{food.emoji}</p>}
+              <p className="text-sm font-semibold text-gray-800 truncate">{food.name}</p>
+              <p className="text-[10px] text-gray-400 capitalize mt-0.5">{food.category}</p>
+              <p className="text-xs font-bold text-gray-600 mt-2">{food.calories_per_100g} <span className="font-normal text-gray-400">kcal/100g</span></p>
+              {confirmId === food.id && (
+                <ConfirmDialog
+                  message={`"${food.name}" will be deleted from your food library.`}
+                  confirmLabel="Delete"
+                  onConfirm={() => { deleteFood(food.id); setConfirmId(null) }}
+                  onCancel={() => setConfirmId(null)}
+                />
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {filtered.length === 0 && !isLoading && (

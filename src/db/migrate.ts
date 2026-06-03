@@ -350,7 +350,60 @@ WHERE category IN ('Income','Salary','Freelance','Investment Income','Other Inco
                    'Fixed','Market','Health','Investment','Education','Entertainment','Others');
 `
 
+const GLOBAL_FOODS: [string, string, number, string][] = [
+  ['Chicken Breast',        'protein',    165, '🍗'],
+  ['Eggs',                  'protein',    155, '🥚'],
+  ['Salmon',                'protein',    208, '🐟'],
+  ['Tuna',                  'protein',    132, '🐟'],
+  ['Ground Beef',           'protein',    250, '🥩'],
+  ['Tofu',                  'protein',     76, '🫘'],
+  ['Lentils (cooked)',      'protein',    116, '🫘'],
+  ['Shrimp',                'protein',     99, '🦐'],
+  ['Brown Rice (cooked)',   'carbs',      216, '🍚'],
+  ['White Rice (cooked)',   'carbs',      130, '🍚'],
+  ['Oats',                  'carbs',      389, '🌾'],
+  ['Whole Wheat Bread',     'carbs',      247, '🍞'],
+  ['Pasta (cooked)',        'carbs',      158, '🍝'],
+  ['Potato (boiled)',       'carbs',       77, '🥔'],
+  ['Sweet Potato (baked)',  'carbs',       90, '🍠'],
+  ['Quinoa (cooked)',       'carbs',      120, '🌾'],
+  ['Broccoli',              'vegetable',   34, '🥦'],
+  ['Spinach',               'vegetable',   23, '🥬'],
+  ['Carrot',                'vegetable',   41, '🥕'],
+  ['Tomato',                'vegetable',   18, '🍅'],
+  ['Cucumber',              'vegetable',   16, '🥒'],
+  ['Bell Pepper',           'vegetable',   31, '🫑'],
+  ['Zucchini',              'vegetable',   17, '🥒'],
+  ['Onion',                 'vegetable',   40, '🧅'],
+  ['Banana',                'fruit',       89, '🍌'],
+  ['Apple',                 'fruit',       52, '🍎'],
+  ['Orange',                'fruit',       47, '🍊'],
+  ['Strawberries',          'fruit',       32, '🍓'],
+  ['Blueberries',           'fruit',       57, '🫐'],
+  ['Grapes',                'fruit',       67, '🍇'],
+  ['Greek Yogurt',          'dairy',       97, '🥛'],
+  ['Cottage Cheese',        'dairy',       98, '🧀'],
+  ['Milk (whole)',          'dairy',       61, '🥛'],
+  ['Cheddar Cheese',        'dairy',      403, '🧀'],
+  ['Olive Oil',             'fat',        884, '🫒'],
+  ['Avocado',               'fat',        160, '🥑'],
+  ['Mixed Nuts',            'fat',        607, '🥜'],
+  ['Peanut Butter',         'fat',        588, '🥜'],
+  ['Almonds',               'fat',        579, '🫘'],
+]
+
 export async function migrate() {
   await pool.query(SCHEMA)
   console.log('DB migration complete')
+
+  // Seed global default foods (user_id = NULL) — idempotent
+  for (const [name, category, calories, emoji] of GLOBAL_FOODS) {
+    await pool.query(
+      `INSERT INTO foods (name, category, calories_per_100g, emoji, user_id)
+       SELECT $1,$2,$3,$4,NULL
+       WHERE NOT EXISTS (SELECT 1 FROM foods WHERE name=$1 AND user_id IS NULL)`,
+      [name, category, calories, emoji]
+    )
+  }
+  console.log('Global foods seeded')
 }

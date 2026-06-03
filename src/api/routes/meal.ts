@@ -9,7 +9,9 @@ export function mealRouter(pool: Pool): Router {
   router.get('/foods', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { rows } = await pool.query(
-      'SELECT * FROM foods WHERE user_id=$1 ORDER BY name ASC',
+      `SELECT * FROM foods
+       WHERE user_id = $1 OR user_id IS NULL
+       ORDER BY user_id NULLS FIRST, name ASC`,
       [uid]
     )
     res.json(rows)

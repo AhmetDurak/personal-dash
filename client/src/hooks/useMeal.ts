@@ -4,6 +4,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 export interface Food {
   id: number
+  user_id: number | null
   name: string
   category: string
   calories_per_100g: number
