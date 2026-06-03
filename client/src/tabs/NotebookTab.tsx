@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
-import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete } from '../lib/icons'
+import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
+  IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
@@ -2282,7 +2283,7 @@ export function RemindersView({ standalone }: { standalone?: boolean } = {}) {
 interface SectionView {
   path: string
   label: string
-  icon: string
+  icon: ReactNode
 }
 
 function SectionShell({
@@ -2326,7 +2327,7 @@ function SectionShell({
               }`
             }
           >
-            <span className="text-base w-5 text-center">{v.icon}</span>
+            <span className="flex-shrink-0 w-4 h-4">{v.icon}</span>
             <span className="font-medium">{v.label}</span>
           </NavLink>
         ))}
@@ -3209,9 +3210,9 @@ export function LearnSectionTab() {
   const { t } = useLanguage()
 
   const VIEWS: SectionView[] = [
-    { path: '/learn/notes',   label: t.notes,   icon: '📓' },
-    { path: '/learn/mindmap', label: t.mindmap, icon: '🧠' },
-    { path: '/learn/language', label: t.languageSection, icon: '🌍' },
+    { path: '/learn/notes',    label: t.notes,           icon: <IconNote     className="w-4 h-4" strokeWidth={1.75} /> },
+    { path: '/learn/mindmap',  label: t.mindmap,         icon: <IconMindmap  className="w-4 h-4" strokeWidth={1.75} /> },
+    { path: '/learn/language', label: t.languageSection, icon: <IconLanguage className="w-4 h-4" strokeWidth={1.75} /> },
   ]
 
   return (
@@ -3241,9 +3242,9 @@ export function LifeTab() {
   const { t } = useLanguage()
 
   const VIEWS: SectionView[] = [
-    { path: '/life/log',   label: t.log,   icon: '📔' },
-    { path: '/life/meal',  label: t.meal,  icon: '🍽️' },
-    { path: '/life/sport', label: t.sport, icon: '💪' },
+    { path: '/life/log',   label: t.log,   icon: <IconLog     className="w-4 h-4" strokeWidth={1.75} /> },
+    { path: '/life/meal',  label: t.meal,  icon: <IconMeal    className="w-4 h-4" strokeWidth={1.75} /> },
+    { path: '/life/sport', label: t.sport, icon: <IconWorkout className="w-4 h-4" strokeWidth={1.75} /> },
   ]
 
   return (

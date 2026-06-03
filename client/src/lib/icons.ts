@@ -88,6 +88,7 @@ export { Target        as IconTarget       } from 'lucide-react'
 export { Scale         as IconScale        } from 'lucide-react'
 export { GraduationCap as IconGraduation   } from 'lucide-react'
 export { ArrowLeftRight as IconTransfer    } from 'lucide-react'
+export { Activity      as IconActivity     } from 'lucide-react'
 
 // ── Content ───────────────────────────────────────────────────────────────────
 export { BookOpen    as IconBook        } from 'lucide-react'
@@ -100,6 +101,10 @@ export { RotateCw    as IconFlip        } from 'lucide-react'
 export { Volume2     as IconSpeaker     } from 'lucide-react'
 export { Languages   as IconLanguage    } from 'lucide-react'
 export { Globe       as IconGlobe       } from 'lucide-react'
+export { NotebookPen as IconLog         } from 'lucide-react'
+export { Utensils    as IconMeal        } from 'lucide-react'
+export { Network     as IconMindmap     } from 'lucide-react'
+export { UtensilsCrossed as IconRecipes } from 'lucide-react'
 
 // ── Misc ──────────────────────────────────────────────────────────────────────
 export { Calendar    as IconCalendar    } from 'lucide-react'
