@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { IconEdit, IconClose } from '../lib/icons'
+import { IconEdit, IconClose, IconDashboard, IconWorkout, IconClipboard, IconTarget, IconTrophy, IconScale } from '../lib/icons'
+import type { ReactNode } from 'react'
 import { useExercises, useTemplates, useWorkoutLogs, useFitnessTargets, useBodyWeight } from '../hooks/useSport'
 import type { ExerciseType, MuscleGroup, WorkoutSetGroup, SetEntry } from '../hooks/useSport'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
@@ -837,13 +838,13 @@ export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const view = (searchParams.get('view') as View) ?? 'dashboard'
   function setView(v: View) { setSearchParams({ view: v }) }
-  const VIEWS: { id: View; label: string }[] = [
-    { id: 'dashboard',  label: t.sportDashboard },
-    { id: 'exercises',  label: t.exercises },
-    { id: 'log',        label: t.logWorkout },
-    { id: 'targets',    label: t.targets },
-    { id: 'challenges', label: '🏆 Challenges' },
-    { id: 'weight',     label: '⚖️ Weight' },
+  const VIEWS: { id: View; label: string; icon: ReactNode }[] = [
+    { id: 'dashboard',  label: t.sportDashboard, icon: <IconDashboard className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'exercises',  label: t.exercises,      icon: <IconWorkout   className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'log',        label: t.logWorkout,     icon: <IconClipboard className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'targets',    label: t.targets,        icon: <IconTarget    className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'challenges', label: 'Challenges',     icon: <IconTrophy    className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'weight',     label: 'Weight',         icon: <IconScale     className="w-3.5 h-3.5" strokeWidth={2} /> },
   ]
 
   return (
@@ -860,11 +861,11 @@ export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
             <button
               key={v.id}
               onClick={() => setView(v.id)}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
                 view === v.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
-              {v.label}
+              {v.icon}{v.label}
             </button>
           ))}
         </div>

@@ -75,10 +75,10 @@ export function TopBar() {
     <>
     <div className="h-10 bg-gray-950/95 backdrop-blur-md flex items-center px-3 md:px-4 gap-1 flex-shrink-0 border-b border-white/5 w-full sticky top-0 z-30">
       {/* Brand */}
-      <div className="flex items-center gap-2 pr-3 md:pr-4 mr-1 md:mr-2 border-r border-gray-800 flex-shrink-0">
+      <Link to="/home" className="flex items-center gap-2 pr-3 md:pr-4 mr-1 md:mr-2 border-r border-gray-800 flex-shrink-0 hover:opacity-80 transition-opacity">
         <Logo />
         <span className="hidden sm:inline text-sm font-semibold text-white tracking-tight">Personal Dashboard</span>
-      </div>
+      </Link>
 
       {/* App switcher */}
       <div className="flex-1 flex overflow-x-auto min-w-0" style={{ scrollbarWidth: 'none' }}>

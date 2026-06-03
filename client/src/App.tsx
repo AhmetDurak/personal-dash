@@ -17,6 +17,7 @@ import { NewsTab } from './tabs/NewsTab'
 import { LearnTab } from './tabs/LearnTab'
 import { LearnSectionTab, LifeTab, RemindersView } from './tabs/NotebookTab'
 import { TodayTab } from './tabs/TodayTab'
+import { HomeTab } from './tabs/HomeTab'
 import { currentMonth } from './utils/format'
 import type { Span } from './components/web/BalanceChart'
 
@@ -82,6 +83,7 @@ export function App() {
         <AppTour />
         <div className="flex-1 overflow-hidden">
           <Routes>
+            <Route path="/home"        element={<HomeTab />} />
             <Route path="/planner"     element={<TodayTab />} />
             <Route path="/today"       element={<Navigate to="/planner" replace />} />
             <Route path="/reminders"   element={<RemindersView standalone />} />
@@ -100,7 +102,7 @@ export function App() {
             <Route path="/workspace/vocab"     element={<Navigate to="/learn/language" replace />} />
             <Route path="/learn/vocab"         element={<Navigate to="/learn/language" replace />} />
             <Route path="/workspace/*"         element={<Navigate to="/learn/notes" replace />} />
-            <Route path="*"            element={<Navigate to="/planner" replace />} />
+            <Route path="*"            element={<Navigate to="/home" replace />} />
           </Routes>
         </div>
       </div>

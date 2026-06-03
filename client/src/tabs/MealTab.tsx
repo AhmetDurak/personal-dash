@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useFoods, useMealLogs, useShoppingList, useShoppingHistory, useReceipts } from '../hooks/useMeal'
 import type { Food, MealItem, MealType, Receipt } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
+import { IconCalendarDay, IconCart, IconRecipes, IconApple } from '../lib/icons'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -767,11 +768,11 @@ export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const view = (searchParams.get('view') as View) ?? 'today'
   function setView(v: View) { setSearchParams({ view: v }) }
-  const VIEWS: { id: View; label: string }[] = [
-    { id: 'today',    label: t.today },
-    { id: 'shopping', label: t.shoppingList },
-    { id: 'recipes',  label: t.recipes },
-    { id: 'library',  label: t.foodLibrary },
+  const VIEWS: { id: View; label: string; icon: ReactNode }[] = [
+    { id: 'today',    label: t.today,        icon: <IconCalendarDay className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'shopping', label: t.shoppingList, icon: <IconCart        className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'recipes',  label: t.recipes,      icon: <IconRecipes     className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'library',  label: t.foodLibrary,  icon: <IconApple       className="w-3.5 h-3.5" strokeWidth={2} /> },
   ]
 
   return (
@@ -788,11 +789,11 @@ export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
             <button
               key={v.id}
               onClick={() => setView(v.id)}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
                 view === v.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
-              {v.label}
+              {v.icon}{v.label}
             </button>
           ))}
         </div>

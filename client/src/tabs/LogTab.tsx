@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useJournalEntry, useRecentJournal } from '../hooks/useJournal'
 import { useDailyPlan, PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
-import { IconClose, IconChevronLeft, IconChevronRight } from '../lib/icons'
+import { IconClose, IconChevronLeft, IconChevronRight, IconCalendarDay, IconClipboard, IconCalendar, IconHistory } from '../lib/icons'
+import type { ReactNode } from 'react'
 
 type View = 'today' | 'plan' | 'calendar' | 'history'
 
@@ -481,11 +482,11 @@ export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
     })
   }
 
-  const VIEWS: { id: View; label: string }[] = [
-    { id: 'today',    label: t.todayLabel },
-    { id: 'plan',     label: t.planLabel },
-    { id: 'calendar', label: t.calendar },
-    { id: 'history',  label: t.history },
+  const VIEWS: { id: View; label: string; icon: ReactNode }[] = [
+    { id: 'today',    label: t.todayLabel, icon: <IconCalendarDay className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'plan',     label: t.planLabel,  icon: <IconClipboard  className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'calendar', label: t.calendar,  icon: <IconCalendar   className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'history',  label: t.history,   icon: <IconHistory    className="w-3.5 h-3.5" strokeWidth={2} /> },
   ]
 
   return (
@@ -502,11 +503,11 @@ export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
             <button
               key={v.id}
               onClick={() => nav({ view: v.id, date: null })}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
                 view === v.id && !selectedDate ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
-              {v.label}
+              {v.icon}{v.label}
             </button>
           ))}
         </div>

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
-  IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage } from '../lib/icons'
+  IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage,
+  IconBook, IconMessage, IconLayers } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
@@ -3170,10 +3171,10 @@ function LanguageTab() {
   const { dark } = useDarkMode()
   const [view, setView] = useState<LangView>('vocab')
 
-  const LANG_VIEWS: { id: LangView; label: string }[] = [
-    { id: 'vocab',    label: t.vocab },
-    { id: 'sentence', label: t.sentence },
-    { id: 'scenario', label: t.scenario },
+  const LANG_VIEWS: { id: LangView; label: string; icon: ReactNode }[] = [
+    { id: 'vocab',    label: t.vocab,    icon: <IconBook     className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'sentence', label: t.sentence, icon: <IconMessage  className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'scenario', label: t.scenario, icon: <IconLayers   className="w-3.5 h-3.5" strokeWidth={2} /> },
   ]
 
   return (
@@ -3184,13 +3185,13 @@ function LanguageTab() {
             <button
               key={v.id}
               onClick={() => setView(v.id)}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
                 view === v.id
                   ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900'
                   : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
               }`}
             >
-              {v.label}
+              {v.icon}{v.label}
             </button>
           ))}
         </div>
