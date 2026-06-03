@@ -1,12 +1,13 @@
 /**
  * Seed a demo user with rich realistic data.
- * Run with:  npx ts-node src/db/seed-demo.ts
- * Safe to re-run — uses ON CONFLICT DO NOTHING / DO UPDATE.
+ * Exports seedDemoUser(pool) — safe to call from the auth route on first access.
+ * CLI:  npx ts-node src/db/seed-demo.ts
  */
 
-import { pool } from './pool'
+import { Pool } from 'pg'
+import { pool as defaultPool } from './pool'
 
-const DEMO_GOOGLE_ID = 'DEMO_USER_2024'
+export const DEMO_GOOGLE_ID = 'DEMO_USER_2024'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ function monthStr(offset = 0): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-async function seedDemo() {
+export async function seedDemoUser(pool: Pool): Promise<void> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -464,8 +465,12 @@ Consistency > Intensity. Don't miss two days in a row.
     throw err
   } finally {
     client.release()
-    await pool.end()
   }
 }
 
-seedDemo()
+// CLI entrypoint: npx ts-node src/db/seed-demo.ts
+if (require.main === module) {
+  seedDemoUser(defaultPool)
+    .then(() => { console.log('Done'); defaultPool.end() })
+    .catch(e => { console.error(e); process.exit(1) })
+}

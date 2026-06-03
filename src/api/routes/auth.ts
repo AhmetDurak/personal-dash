@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express'
 import passport from 'passport'
 import { Pool } from 'pg'
-
-const DEMO_GOOGLE_ID = 'DEMO_USER_2024'
+import { seedDemoUser, DEMO_GOOGLE_ID } from '../../db/seed-demo'
 
 export function authRouter(pool?: Pool) {
   const router = Router()
@@ -30,15 +29,22 @@ export function authRouter(pool?: Pool) {
     res.json({ token: (user as Express.User & { bearer_token: string }).bearer_token })
   })
 
-  // Demo login — no OAuth needed
+  // Demo login — auto-seeds on first access, no OAuth needed
   router.get('/demo', async (req: Request, res: Response, next) => {
     if (!pool) { res.status(503).json({ error: 'Demo not available' }); return }
     try {
-      const { rows } = await pool.query(
+      let { rows } = await pool.query(
         'SELECT * FROM users WHERE google_id=$1',
         [DEMO_GOOGLE_ID]
       )
-      if (!rows[0]) { res.status(404).json({ error: 'Demo user not found' }); return }
+      if (!rows[0]) {
+        await seedDemoUser(pool)
+        ;({ rows } = await pool.query(
+          'SELECT * FROM users WHERE google_id=$1',
+          [DEMO_GOOGLE_ID]
+        ))
+      }
+      if (!rows[0]) { res.status(500).json({ error: 'Demo seed failed' }); return }
       req.login(rows[0], (err) => {
         if (err) return next(err)
         res.redirect(process.env.FRONTEND_URL ?? '/')
