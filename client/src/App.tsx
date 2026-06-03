@@ -73,7 +73,12 @@ export function App() {
   useReminderNotifications()
 
   if (isLoading) return <div className="h-screen bg-gray-950" />
-  if (!user)     return <LoginPage />
+  if (!user) return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="*"      element={<Navigate to="/login" replace />} />
+    </Routes>
+  )
 
   const isDemo = user.email === 'demo@personaldashboard.app'
 
@@ -94,6 +99,7 @@ export function App() {
         <AppTour />
         <div className="flex-1 overflow-hidden">
           <Routes>
+            <Route path="/login"       element={<Navigate to="/home" replace />} />
             <Route path="/home"        element={<HomeTab />} />
             <Route path="/planner"     element={<TodayTab />} />
             <Route path="/today"       element={<Navigate to="/planner" replace />} />
