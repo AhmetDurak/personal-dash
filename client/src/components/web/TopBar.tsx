@@ -21,11 +21,12 @@ const LANG_OPTIONS: { value: Lang; label: string }[] = [
 
 function Logo() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <rect x="1" y="1"  width="8" height="8" rx="1.5" fill="#13B5EA" />
-      <rect x="11" y="1"  width="8" height="8" rx="1.5" fill="white" fillOpacity="0.22" />
-      <rect x="1"  y="11" width="8" height="8" rx="1.5" fill="white" fillOpacity="0.22" />
-      <rect x="11" y="11" width="8" height="8" rx="1.5" fill="white" fillOpacity="0.22" />
+    <svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <rect width="32" height="32" rx="7" fill="#0F172A" />
+      <rect x="4"  y="4"  width="11" height="11" rx="2.5" fill="#13B5EA" />
+      <rect x="17" y="4"  width="11" height="11" rx="2.5" fill="#7AA2F7" opacity=".9" />
+      <rect x="4"  y="17" width="11" height="11" rx="2.5" fill="#34D399" opacity=".9" />
+      <rect x="17" y="17" width="11" height="11" rx="2.5" fill="#CBA6F7" opacity=".9" />
     </svg>
   )
 }
