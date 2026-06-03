@@ -47,7 +47,7 @@ app.use(passport.initialize())
 app.use(passport.session())
 
 // Auth routes (public)
-app.use('/auth', authRouter())
+app.use('/auth', authRouter(pool))
 
 // Require login for all API routes (session cookie OR Bearer token)
 async function requireAuth(req: Request, res: Response, next: NextFunction) {

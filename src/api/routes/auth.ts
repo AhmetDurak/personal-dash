@@ -1,7 +1,10 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import passport from 'passport'
+import { Pool } from 'pg'
 
-export function authRouter() {
+const DEMO_GOOGLE_ID = 'DEMO_USER_2024'
+
+export function authRouter(pool?: Pool) {
   const router = Router()
 
   router.get('/google',
@@ -25,6 +28,22 @@ export function authRouter() {
     if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' })
     const user = req.user as Express.User
     res.json({ token: (user as Express.User & { bearer_token: string }).bearer_token })
+  })
+
+  // Demo login — no OAuth needed
+  router.get('/demo', async (req: Request, res: Response, next) => {
+    if (!pool) { res.status(503).json({ error: 'Demo not available' }); return }
+    try {
+      const { rows } = await pool.query(
+        'SELECT * FROM users WHERE google_id=$1',
+        [DEMO_GOOGLE_ID]
+      )
+      if (!rows[0]) { res.status(404).json({ error: 'Demo user not found' }); return }
+      req.login(rows[0], (err) => {
+        if (err) return next(err)
+        res.redirect(process.env.FRONTEND_URL ?? '/')
+      })
+    } catch (err) { next(err) }
   })
 
   router.post('/logout', (req, res, next) => {

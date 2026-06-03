@@ -76,9 +76,21 @@ export function App() {
   if (isLoading) return <div className="h-screen bg-gray-950" />
   if (!user)     return <LoginPage />
 
+  const isDemo = user.email === 'demo@personaldashboard.app'
+
   return (
     <LanguageContext.Provider value={langCtx}>
       <div className="flex flex-col h-dvh overflow-hidden">
+        {isDemo && (
+          <div className="flex items-center justify-center gap-3 px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 flex-shrink-0">
+            <span className="text-xs text-amber-400 font-medium">
+              You're exploring the demo — data resets periodically.
+            </span>
+            <a href="/auth/google" className="text-xs text-amber-300 underline underline-offset-2 hover:text-amber-200 transition-colors font-semibold">
+              Sign in with Google to save your own data →
+            </a>
+          </div>
+        )}
         <TopBar />
         <AppTour />
         <div className="flex-1 overflow-hidden">
