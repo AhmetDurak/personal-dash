@@ -138,10 +138,26 @@ export class ETFAgent {
     const cached = fromCache<ETFSnapshot>(key)
     if (cached) return cached
 
-    const [quote, summary] = await Promise.all([
-      (yahooFinance.quote as (symbol: string, q: Record<string, never>, opts: YFOptions) => Promise<Record<string, unknown>>)(ticker, {}, { validateResult: false }),
-      safeQuoteSummary(ticker, ['summaryDetail', 'defaultKeyStatistics', 'fundProfile', 'topHoldings', 'assetProfile']),
-    ])
+    let quote: Record<string, unknown>
+    try {
+      quote = await (yahooFinance.quote as (
+        symbol: string, q: Record<string, never>, opts: YFOptions
+      ) => Promise<Record<string, unknown>>)(ticker, {}, { validateResult: false })
+    } catch {
+      const err = new Error(`Ticker not found: ${ticker}`) as Error & { status?: number }
+      err.status = 404
+      throw err
+    }
+
+    if (!quote['regularMarketPrice'] && !quote['longName']) {
+      const err = new Error(`Ticker not found: ${ticker}`) as Error & { status?: number }
+      err.status = 404
+      throw err
+    }
+
+    const summary = await safeQuoteSummary(
+      ticker, ['summaryDetail', 'defaultKeyStatistics', 'fundProfile', 'topHoldings', 'assetProfile']
+    )
 
     const sd   = summary?.['summaryDetail'] as Record<string, unknown> | undefined
     const ks   = summary?.['defaultKeyStatistics'] as Record<string, unknown> | undefined

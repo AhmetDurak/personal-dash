@@ -22,7 +22,10 @@ export function etfRouter(): Router {
 
   router.get('/snapshot/:ticker', async (req: Request, res: Response) => {
     try { res.json(await req.etf.snapshot(req.params.ticker)) }
-    catch (e) { res.status(500).json({ error: String(e) }) }
+    catch (e) {
+      const status = (e as Error & { status?: number }).status ?? 500
+      res.status(status).json({ error: (e as Error).message })
+    }
   })
 
   router.get('/chart/:ticker', async (req: Request, res: Response) => {

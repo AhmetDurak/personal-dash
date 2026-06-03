@@ -1,18 +1,16 @@
 import { NavLink } from 'react-router-dom'
 import {
-  IconDashboard    as LayoutDashboard,
-  IconTransfer     as ArrowLeftRight,
-  IconList         as AlignJustify,
-  IconSort         as ArrowUpDown,
-  IconIncome       as TrendingUp,
-  IconGraduation   as GraduationCap,
+  IconSort        as ArrowUpDown,
+  IconTransfer    as ArrowLeftRight,
+  IconDashboard   as LayoutDashboard,
+  IconIncome      as TrendingUp,
+  IconGraduation  as GraduationCap,
 } from '../../lib/icons'
 
 const NAV = [
-  { path: '/finance/overview',     label: 'Profit & Loss',   Icon: LayoutDashboard },
-  { path: '/finance/cashflow',     label: 'Cash Flow',       Icon: ArrowLeftRight },
-  { path: '/finance/simplified',   label: 'Simplified',      Icon: AlignJustify },
   { path: '/finance/transactions', label: 'Transactions',    Icon: ArrowUpDown },
+  { path: '/finance/cashflow',     label: 'Cash Flow',       Icon: ArrowLeftRight },
+  { path: '/finance/overview',     label: 'Profit & Loss',   Icon: LayoutDashboard },
   { path: '/finance/etf',          label: 'ETF Monitor',     Icon: TrendingUp },
   { path: '/finance/learn',        label: 'Finance Academy', Icon: GraduationCap },
 ]

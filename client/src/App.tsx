@@ -10,7 +10,6 @@ import { AppTour } from './components/web/AppTour'
 import { DashboardHeader } from './components/web/DashboardHeader'
 import { OverviewTab } from './tabs/OverviewTab'
 import { CashFlowTab } from './tabs/CashFlowTab'
-import { SimplifiedTab } from './tabs/SimplifiedTab'
 import { TransactionsTab } from './tabs/TransactionsTab'
 import { ETFTab } from './tabs/ETFTab'
 import { NewsTab } from './tabs/NewsTab'
@@ -54,13 +53,13 @@ function FinanceDashboard() {
         <DashboardHeader month={month} onMonthChange={setMonth} onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
           <Routes>
-            <Route path="overview"     element={<OverviewTab month={month} span={span} onSpanChange={setSpan} />} />
-            <Route path="cashflow"     element={<CashFlowTab month={month} span={span} onSpanChange={setSpan} />} />
-            <Route path="simplified"   element={<SimplifiedTab month={month} span={span} onSpanChange={setSpan} />} />
             <Route path="transactions" element={<TransactionsTab month={month} onMonthChange={setMonth} />} />
+            <Route path="cashflow"     element={<CashFlowTab month={month} span={span} onSpanChange={setSpan} />} />
+            <Route path="overview"     element={<OverviewTab month={month} span={span} onSpanChange={setSpan} />} />
             <Route path="etf"          element={<ETFTab />} />
             <Route path="learn"        element={<LearnTab />} />
-            <Route path="*"            element={<Navigate to="/finance/overview" replace />} />
+            <Route path="simplified"   element={<Navigate to="/finance/transactions" replace />} />
+            <Route path="*"            element={<Navigate to="/finance/transactions" replace />} />
           </Routes>
         </main>
       </div>
@@ -82,11 +81,11 @@ export function App() {
     <LanguageContext.Provider value={langCtx}>
       <div className="flex flex-col h-dvh overflow-hidden">
         {isDemo && (
-          <div className="flex items-center justify-center gap-3 px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/20 flex-shrink-0">
-            <span className="text-xs text-amber-400 font-medium">
+          <div className="flex items-center justify-center gap-3 px-4 py-1.5 bg-amber-500 flex-shrink-0">
+            <span className="text-xs text-amber-950 font-semibold">
               You're exploring the demo — data resets periodically.
             </span>
-            <a href="/auth/google" className="text-xs text-amber-300 underline underline-offset-2 hover:text-amber-200 transition-colors font-semibold">
+            <a href="/auth/google" className="text-xs text-amber-950 underline underline-offset-2 hover:opacity-70 transition-opacity font-bold">
               Sign in with Google to save your own data →
             </a>
           </div>
