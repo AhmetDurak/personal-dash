@@ -137,33 +137,54 @@ function TodayView() {
               />
             </div>
             <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-              {filtered.slice(0, 20).map(food => (
-                <div key={food.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {food.emoji && <span>{food.emoji}</span>}
-                    <div>
-                      <p className="text-sm text-gray-800">{food.name}</p>
-                      <p className="text-[10px] text-gray-400">{food.calories_per_100g} kcal/100g</p>
+              {filtered.slice(0, 20).map(food => {
+                const g    = Math.max(1, Number(amounts[food.id] ?? 100) || 1)
+                const kcal = Math.round(food.calories_per_100g * g / 100)
+                const setG = (n: number) => setAmounts(a => ({ ...a, [food.id]: String(Math.max(1, n)) }))
+                return (
+                  <div key={food.id} className="flex items-center gap-3 px-4 py-3">
+                    {/* Food info */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {food.emoji && <span className="text-lg flex-shrink-0">{food.emoji}</span>}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{food.name}</p>
+                        <p className="text-[10px] text-gray-400">{kcal} kcal</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={amounts[food.id] ?? 100}
-                      onChange={e => setAmounts(a => ({ ...a, [food.id]: e.target.value }))}
-                      className="w-14 text-xs border border-gray-200 rounded-lg px-2 py-1 text-center focus:outline-none"
-                      min={1}
-                    />
-                    <span className="text-xs text-gray-400">g</span>
+
+                    {/* Stepper */}
+                    <div className="flex items-center rounded-xl border border-gray-200 overflow-hidden flex-shrink-0">
+                      <button
+                        onClick={() => setG(g - 10)}
+                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors font-bold text-base leading-none"
+                      >−</button>
+                      <div className="flex items-center border-x border-gray-200 px-1">
+                        <input
+                          type="number"
+                          value={amounts[food.id] ?? 100}
+                          onChange={e => setAmounts(a => ({ ...a, [food.id]: e.target.value }))}
+                          onBlur={e => setG(Number(e.target.value))}
+                          className="w-9 text-center text-xs font-semibold text-gray-800 outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          min={1}
+                        />
+                        <span className="text-[10px] text-gray-400 -ml-0.5">g</span>
+                      </div>
+                      <button
+                        onClick={() => setG(g + 10)}
+                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors font-bold text-base leading-none"
+                      >+</button>
+                    </div>
+
+                    {/* Add */}
                     <button
                       onClick={() => addItem(picking.mealType, food)}
-                      className="text-xs bg-xero-green text-white px-2.5 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+                      className="text-xs bg-xero-green text-white px-3 py-2 rounded-xl font-semibold hover:bg-xero-green-dark transition-colors flex-shrink-0"
                     >
                       Add
                     </button>
                   </div>
-                </div>
-              ))}
+                )
+              })}
               {filtered.length === 0 && (
                 <p className="text-xs text-gray-400 px-4 py-6 text-center">No foods found. Add some in the Food Library.</p>
               )}
