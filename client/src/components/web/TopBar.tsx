@@ -74,9 +74,9 @@ export function TopBar() {
 
   return (
     <>
-    <div className="h-10 bg-gray-950/95 backdrop-blur-md flex items-center px-3 md:px-4 gap-1 flex-shrink-0 border-b border-white/5 w-full sticky top-0 z-30">
+    <div className="h-10 bg-xero-navy backdrop-blur-md flex items-center px-3 md:px-4 gap-1 flex-shrink-0 border-b border-white/5 w-full sticky top-0 z-30">
       {/* Brand */}
-      <Link to="/home" className="flex items-center gap-2 pr-3 md:pr-4 mr-1 md:mr-2 border-r border-gray-800 flex-shrink-0 hover:opacity-80 transition-opacity">
+      <Link to="/home" className="flex items-center gap-2 pr-3 md:pr-4 mr-1 md:mr-2 border-r border-xero-navy-light flex-shrink-0 hover:opacity-80 transition-opacity">
         <Logo />
         <span className="hidden sm:inline text-sm font-semibold text-white tracking-tight">Personal Dashboard</span>
       </Link>
@@ -106,7 +106,7 @@ export function TopBar() {
 
         {/* User menu */}
         {user && (
-          <div ref={userMenuRef} className="relative flex items-center pl-2 ml-1 border-l border-gray-800">
+          <div ref={userMenuRef} className="relative flex items-center pl-2 ml-1 border-l border-xero-navy-light">
             <button
               onClick={() => setUserMenuOpen(o => !o)}
               className="flex items-center gap-1.5 md:gap-2 text-gray-400 hover:text-gray-200 transition-colors"
@@ -120,7 +120,7 @@ export function TopBar() {
             </button>
 
             {userMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl py-2 min-w-[200px] z-50">
+              <div className="absolute right-0 top-full mt-2 bg-xero-navy border border-xero-navy-light rounded-2xl shadow-2xl py-2 min-w-[200px] z-50">
 
                 {settingsOpen ? (
                   /* ── Settings sub-panel ── */
@@ -133,7 +133,7 @@ export function TopBar() {
                       Back
                     </button>
 
-                    <div className="border-t border-gray-800 my-1" />
+                    <div className="border-t border-xero-navy-light my-1" />
 
                     {/* Language */}
                     <div className="px-3 py-2">
@@ -153,7 +153,7 @@ export function TopBar() {
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-800 my-1" />
+                    <div className="border-t border-xero-navy-light my-1" />
 
                     {/* Theme grid */}
                     <div className="px-3 pb-2">
@@ -190,7 +190,7 @@ export function TopBar() {
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-800 my-1" />
+                    <div className="border-t border-xero-navy-light my-1" />
 
                     {/* Replay tour */}
                     <button
@@ -216,7 +216,7 @@ export function TopBar() {
                       <IconChevronRight className="w-3 h-3 text-gray-600" strokeWidth={2} />
                     </button>
 
-                    <div className="border-t border-gray-800 my-1" />
+                    <div className="border-t border-xero-navy-light my-1" />
 
                     {/* Mobile token */}
                     <button
@@ -230,7 +230,7 @@ export function TopBar() {
                       <span>{tokenCopied ? 'Copied!' : 'Copy mobile token'}</span>
                     </button>
 
-                    <div className="border-t border-gray-800 my-1" />
+                    <div className="border-t border-xero-navy-light my-1" />
 
                     {/* Sign out */}
                     <button
