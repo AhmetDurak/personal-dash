@@ -61,6 +61,17 @@ function fmtDueLabel(due: string, group: 'overdue' | 'today' | 'upcoming'): stri
   return time ? `${date} · ${time}` : date
 }
 
+function relativeDay(dateStr: string): string {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const d = new Date(dateStr); d.setHours(0, 0, 0, 0)
+  const diff = Math.round((d.getTime() - today.getTime()) / 86400000)
+  if (diff === 0)  return 'today'
+  if (diff === -1) return 'yesterday'
+  if (diff === 1)  return 'tomorrow'
+  if (diff < -1)   return `${Math.abs(diff)}d ago`
+  return `in ${diff}d`
+}
+
 // ─── NotesView ────────────────────────────────────────────────────────────────
 
 marked.use({ gfm: true, breaks: true })
@@ -1767,7 +1778,7 @@ function VocabView() {
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
                   </div>
                   <span className={`text-[9px] mt-0.5 block ${new Date(card.due_at) <= today ? 'text-red-400' : 'text-gray-300 dark:text-slate-500'}`}>
-                    Due {new Date(card.due_at).toLocaleDateString('de-DE')}
+                    Due {relativeDay(card.due_at)}, {new Date(card.due_at).toLocaleDateString('de-DE')}
                   </span>
                 </div>
               )
