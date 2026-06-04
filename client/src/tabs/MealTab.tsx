@@ -4,7 +4,7 @@ import { useFoods, useMealLogs, useShoppingList, useShoppingHistory, useReceipts
 import type { Food, MealItem, MealType, Receipt } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
-import { IconCalendarDay, IconCart, IconRecipes, IconApple } from '../lib/icons'
+import { IconCalendarDay, IconCart, IconRecipes, IconApple, IconSunrise, IconSun, IconMoon, IconCookie } from '../lib/icons'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -18,11 +18,11 @@ const CATEGORIES = ['protein', 'carbs', 'fat', 'vegetable', 'fruit', 'dairy', 'o
 
 function TodayView() {
   const { t, lang } = useLanguage()
-  const MEAL_TYPES: { id: MealType; label: string; icon: string }[] = [
-    { id: 'breakfast', label: t.breakfast, icon: '🌅' },
-    { id: 'lunch',     label: t.lunch,     icon: '☀️' },
-    { id: 'dinner',    label: t.dinner,    icon: '🌙' },
-    { id: 'snack',     label: t.snack,     icon: '🍎' },
+  const MEAL_TYPES: { id: MealType; label: string; icon: ReactNode }[] = [
+    { id: 'breakfast', label: t.breakfast, icon: <IconSunrise className="w-4 h-4" strokeWidth={1.75} /> },
+    { id: 'lunch',     label: t.lunch,     icon: <IconSun     className="w-4 h-4" strokeWidth={1.75} /> },
+    { id: 'dinner',    label: t.dinner,    icon: <IconMoon    className="w-4 h-4" strokeWidth={1.75} /> },
+    { id: 'snack',     label: t.snack,     icon: <IconCookie  className="w-4 h-4" strokeWidth={1.75} /> },
   ]
   const date = todayStr()
   const { logs, saveMeal } = useMealLogs(date)
@@ -83,7 +83,7 @@ function TodayView() {
           <div key={id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
               <div className="flex items-center gap-2">
-                <span>{icon}</span>
+                <span className="w-4 h-4 flex-shrink-0 text-gray-500">{icon}</span>
                 <p className="text-sm font-semibold text-gray-800">{label}</p>
                 {mealCals > 0 && <span className="text-xs text-gray-400">{mealCals} kcal</span>}
               </div>
