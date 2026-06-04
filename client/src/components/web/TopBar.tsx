@@ -91,7 +91,7 @@ export function TopBar() {
               key={href}
               to={href}
               className={`flex-shrink-0 px-2.5 md:px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
-                active ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
+                active ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
               }`}
             >
               {app.label}
@@ -127,7 +127,7 @@ export function TopBar() {
                   <>
                     <button
                       onClick={() => setSettingsOpen(false)}
-                      className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1.5 transition-colors"
+                      className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 flex items-center gap-1.5 transition-colors"
                     >
                       <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2} />
                       Back
@@ -137,7 +137,7 @@ export function TopBar() {
 
                     {/* Language */}
                     <div className="px-3 py-2">
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">{t.language}</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">{t.language}</p>
                       <div className="flex gap-1">
                         {LANG_OPTIONS.map(o => (
                           <button
@@ -157,7 +157,7 @@ export function TopBar() {
 
                     {/* Theme grid */}
                     <div className="px-3 pb-2">
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Theme</p>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">Theme</p>
                       <div className="grid grid-cols-4 gap-1.5">
                         {THEMES.map(tm => {
                           const active = theme === tm.id

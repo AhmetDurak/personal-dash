@@ -289,7 +289,7 @@ html, body {
 [data-theme="solarized"] .hover\:shadow-md:hover   { box-shadow: 0 4px 6px -1px rgba(7,54,66,.15); }
 [data-theme="solarized"] .divide-gray-50 > * + *   { border-color: #EEE8D5; }
 [data-theme="solarized"] .divide-gray-100 > * + *  { border-color: #D5CEBB; }
-[data-theme="solarized"] header.border-b { background-color: #002B36; }
+[data-theme="solarized"] header.border-b { background-color: #FDF6E3; }
 [data-theme="solarized"] input, [data-theme="solarized"] textarea, [data-theme="solarized"] select {
   background-color: #FDF6E3; color: #073642; border-color: #C3BCA9;
 }
