@@ -1,6 +1,6 @@
 import { useState, useRef, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useFoods, useMealLogs, useShoppingList, useShoppingHistory, useReceipts } from '../hooks/useMeal'
+import { useFoods, useMealLogs, useShoppingList, useShoppingHistory, useReceipts, localFoodName } from '../hooks/useMeal'
 import type { Food, MealItem, MealType, Receipt } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
@@ -17,7 +17,7 @@ const CATEGORIES = ['protein', 'carbs', 'fat', 'vegetable', 'fruit', 'dairy', 'o
 // ─── Today view ───────────────────────────────────────────────────────────────
 
 function TodayView() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const MEAL_TYPES: { id: MealType; label: string; icon: string }[] = [
     { id: 'breakfast', label: t.breakfast, icon: '🌅' },
     { id: 'lunch',     label: t.lunch,     icon: '☀️' },
@@ -127,12 +127,14 @@ function TodayView() {
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 p-4" onClick={() => setPicking(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-gray-100 flex-shrink-0">
-              <p className="text-sm font-semibold text-gray-800 mb-2">Add to {MEAL_TYPES.find(m => m.id === picking.mealType)?.label}</p>
+              <p className="text-sm font-semibold text-gray-800 mb-2">
+                {t.addToMeal} {MEAL_TYPES.find(m => m.id === picking.mealType)?.label}
+              </p>
               <input
                 autoFocus
                 value={picking.search}
                 onChange={e => setPicking(p => p && ({ ...p, search: e.target.value }))}
-                placeholder="Search food…"
+                placeholder={t.searchFood}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
               />
             </div>
@@ -147,7 +149,7 @@ function TodayView() {
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       {food.emoji && <span className="text-lg flex-shrink-0">{food.emoji}</span>}
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{food.name}</p>
+                        <p className="text-sm font-medium text-gray-800 truncate">{localFoodName(food, lang)}</p>
                         <p className="text-[10px] text-gray-400">{kcal} kcal</p>
                       </div>
                     </div>
@@ -180,13 +182,13 @@ function TodayView() {
                       onClick={() => addItem(picking.mealType, food)}
                       className="text-xs bg-xero-green text-white px-3 py-2 rounded-xl font-semibold hover:bg-xero-green-dark transition-colors flex-shrink-0"
                     >
-                      Add
+                      {t.add}
                     </button>
                   </div>
                 )
               })}
               {filtered.length === 0 && (
-                <p className="text-xs text-gray-400 px-4 py-6 text-center">No foods found. Add some in the Food Library.</p>
+                <p className="text-xs text-gray-400 px-4 py-6 text-center">{t.noFoodsFound}</p>
               )}
             </div>
           </div>
@@ -199,6 +201,7 @@ function TodayView() {
 // ─── Food library ─────────────────────────────────────────────────────────────
 
 function FoodLibrary() {
+  const { t, lang } = useLanguage()
   const { foods, isLoading, addFood, deleteFood } = useFoods()
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<string | null>(null)
@@ -206,9 +209,12 @@ function FoodLibrary() {
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [form, setForm] = useState({ name: '', category: 'other', calories_per_100g: '', emoji: '' })
 
+  const q = search.toLowerCase()
   const filtered = foods.filter(f =>
     (!catFilter || f.category === catFilter) &&
-    f.name.toLowerCase().includes(search.toLowerCase())
+    (f.name.toLowerCase().includes(q) ||
+     (f.name_de ?? '').toLowerCase().includes(q) ||
+     (f.name_tr ?? '').toLowerCase().includes(q))
   )
 
   async function handleAdd(e: React.FormEvent) {
@@ -230,14 +236,14 @@ function FoodLibrary() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search…"
+          placeholder={t.searchFood}
           className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-40 focus:outline-none focus:ring-1 focus:ring-xero-green"
         />
         <button
           onClick={() => setCatFilter(null)}
           className={`text-xs px-2.5 py-1 rounded-full transition-colors ${!catFilter ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'}`}
         >
-          All
+          {t.all}
         </button>
         {CATEGORIES.map(c => (
           <button
@@ -252,7 +258,7 @@ function FoodLibrary() {
           onClick={() => setShowAdd(v => !v)}
           className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors ml-auto"
         >
-          + Add Food
+          + {t.foodLibrary}
         </button>
       </div>
 
@@ -280,8 +286,8 @@ function FoodLibrary() {
             <input value={form.emoji} onChange={e => setForm(p => ({ ...p, emoji: e.target.value }))}
               placeholder="🥩" className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-16 focus:outline-none" />
           </div>
-          <button type="submit" className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium">Add</button>
-          <button type="button" onClick={() => setShowAdd(false)} className="text-sm text-gray-400 hover:text-gray-600 px-1">Cancel</button>
+          <button type="submit" className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium">{t.add}</button>
+          <button type="button" onClick={() => setShowAdd(false)} className="text-sm text-gray-400 hover:text-gray-600 px-1">{t.cancel}</button>
         </form>
       )}
 
@@ -303,12 +309,12 @@ function FoodLibrary() {
                 </button>
               )}
               {food.emoji && <p className="text-2xl mb-1">{food.emoji}</p>}
-              <p className="text-sm font-semibold text-gray-800 truncate">{food.name}</p>
+              <p className="text-sm font-semibold text-gray-800 truncate">{localFoodName(food, lang)}</p>
               <p className="text-[10px] text-gray-400 capitalize mt-0.5">{food.category}</p>
               <p className="text-xs font-bold text-gray-600 mt-2">{food.calories_per_100g} <span className="font-normal text-gray-400">kcal/100g</span></p>
               {confirmId === food.id && (
                 <ConfirmDialog
-                  message={`"${food.name}" will be deleted from your food library.`}
+                  message={`"${localFoodName(food, lang)}" will be deleted from your food library.`}
                   confirmLabel="Delete"
                   onConfirm={() => { deleteFood(food.id); setConfirmId(null) }}
                   onCancel={() => setConfirmId(null)}

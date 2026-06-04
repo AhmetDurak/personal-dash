@@ -6,10 +6,18 @@ export interface Food {
   id: number
   user_id: number | null
   name: string
+  name_de: string | null
+  name_tr: string | null
   category: string
   calories_per_100g: number
   emoji: string | null
   created_at: string
+}
+
+export function localFoodName(food: Pick<Food, 'name' | 'name_de' | 'name_tr'>, lang: string): string {
+  if (lang === 'de' && food.name_de) return food.name_de
+  if (lang === 'tr' && food.name_tr) return food.name_tr
+  return food.name
 }
 
 export interface MealItem {

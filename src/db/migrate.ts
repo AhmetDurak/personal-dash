@@ -123,11 +123,15 @@ CREATE TABLE IF NOT EXISTS foods (
   id                SERIAL PRIMARY KEY,
   user_id           INTEGER REFERENCES users(id),
   name              TEXT NOT NULL,
+  name_de           TEXT,
+  name_tr           TEXT,
   category          TEXT NOT NULL DEFAULT 'other',
   calories_per_100g INTEGER NOT NULL DEFAULT 0,
   emoji             TEXT,
   created_at        TIMESTAMPTZ DEFAULT now()
 );
+ALTER TABLE foods ADD COLUMN IF NOT EXISTS name_de TEXT;
+ALTER TABLE foods ADD COLUMN IF NOT EXISTS name_tr TEXT;
 
 CREATE TABLE IF NOT EXISTS meal_logs (
   id         SERIAL PRIMARY KEY,
@@ -350,59 +354,72 @@ WHERE category IN ('Income','Salary','Freelance','Investment Income','Other Inco
                    'Fixed','Market','Health','Investment','Education','Entertainment','Others');
 `
 
-const GLOBAL_FOODS: [string, string, number, string][] = [
-  ['Chicken Breast',        'protein',    165, '🍗'],
-  ['Eggs',                  'protein',    155, '🥚'],
-  ['Salmon',                'protein',    208, '🐟'],
-  ['Tuna',                  'protein',    132, '🐟'],
-  ['Ground Beef',           'protein',    250, '🥩'],
-  ['Tofu',                  'protein',     76, '🫘'],
-  ['Lentils (cooked)',      'protein',    116, '🫘'],
-  ['Shrimp',                'protein',     99, '🦐'],
-  ['Brown Rice (cooked)',   'carbs',      216, '🍚'],
-  ['White Rice (cooked)',   'carbs',      130, '🍚'],
-  ['Oats',                  'carbs',      389, '🌾'],
-  ['Whole Wheat Bread',     'carbs',      247, '🍞'],
-  ['Pasta (cooked)',        'carbs',      158, '🍝'],
-  ['Potato (boiled)',       'carbs',       77, '🥔'],
-  ['Sweet Potato (baked)',  'carbs',       90, '🍠'],
-  ['Quinoa (cooked)',       'carbs',      120, '🌾'],
-  ['Broccoli',              'vegetable',   34, '🥦'],
-  ['Spinach',               'vegetable',   23, '🥬'],
-  ['Carrot',                'vegetable',   41, '🥕'],
-  ['Tomato',                'vegetable',   18, '🍅'],
-  ['Cucumber',              'vegetable',   16, '🥒'],
-  ['Bell Pepper',           'vegetable',   31, '🫑'],
-  ['Zucchini',              'vegetable',   17, '🥒'],
-  ['Onion',                 'vegetable',   40, '🧅'],
-  ['Banana',                'fruit',       89, '🍌'],
-  ['Apple',                 'fruit',       52, '🍎'],
-  ['Orange',                'fruit',       47, '🍊'],
-  ['Strawberries',          'fruit',       32, '🍓'],
-  ['Blueberries',           'fruit',       57, '🫐'],
-  ['Grapes',                'fruit',       67, '🍇'],
-  ['Greek Yogurt',          'dairy',       97, '🥛'],
-  ['Cottage Cheese',        'dairy',       98, '🧀'],
-  ['Milk (whole)',          'dairy',       61, '🥛'],
-  ['Cheddar Cheese',        'dairy',      403, '🧀'],
-  ['Olive Oil',             'fat',        884, '🫒'],
-  ['Avocado',               'fat',        160, '🥑'],
-  ['Mixed Nuts',            'fat',        607, '🥜'],
-  ['Peanut Butter',         'fat',        588, '🥜'],
-  ['Almonds',               'fat',        579, '🫘'],
+// [name, category, kcal/100g, emoji, name_de, name_tr]
+const GLOBAL_FOODS: [string, string, number, string, string, string][] = [
+  // Protein
+  ['Chicken Breast',       'protein',  165, '🍗', 'Hähnchenbrust',          'Tavuk Göğsü'],
+  ['Eggs',                 'protein',  155, '🥚', 'Eier',                   'Yumurta'],
+  ['Salmon',               'protein',  208, '🐟', 'Lachs',                  'Somon'],
+  ['Tuna',                 'protein',  132, '🐟', 'Thunfisch',              'Ton Balığı'],
+  ['Ground Beef',          'protein',  250, '🥩', 'Hackfleisch',            'Kıyma'],
+  ['Tofu',                 'protein',   76, '🫘', 'Tofu',                   'Tofu'],
+  ['Lentils (cooked)',     'protein',  116, '🫘', 'Linsen (gekocht)',        'Mercimek (pişmiş)'],
+  ['Shrimp',               'protein',   99, '🦐', 'Garnelen',               'Karides'],
+  // Carbs
+  ['Brown Rice (cooked)',  'carbs',    216, '🍚', 'Brauner Reis (gekocht)', 'Esmer Pirinç (pişmiş)'],
+  ['White Rice (cooked)',  'carbs',    130, '🍚', 'Weißer Reis (gekocht)',  'Beyaz Pirinç (pişmiş)'],
+  ['Oats',                 'carbs',    389, '🌾', 'Haferflocken',           'Yulaf'],
+  ['Whole Wheat Bread',    'carbs',    247, '🍞', 'Vollkornbrot',           'Tam Buğday Ekmeği'],
+  ['Pasta (cooked)',       'carbs',    158, '🍝', 'Nudeln (gekocht)',        'Makarna (pişmiş)'],
+  ['Potato (boiled)',      'carbs',     77, '🥔', 'Kartoffel (gekocht)',    'Patates (haşlanmış)'],
+  ['Sweet Potato (baked)', 'carbs',     90, '🍠', 'Süßkartoffel (gebacken)','Tatlı Patates (fırında)'],
+  ['Quinoa (cooked)',      'carbs',    120, '🌾', 'Quinoa (gekocht)',        'Kinoa (pişmiş)'],
+  // Vegetables
+  ['Broccoli',             'vegetable', 34, '🥦', 'Brokkoli',               'Brokoli'],
+  ['Spinach',              'vegetable', 23, '🥬', 'Spinat',                 'Ispanak'],
+  ['Carrot',               'vegetable', 41, '🥕', 'Karotte',                'Havuç'],
+  ['Tomato',               'vegetable', 18, '🍅', 'Tomate',                 'Domates'],
+  ['Cucumber',             'vegetable', 16, '🥒', 'Gurke',                  'Salatalık'],
+  ['Bell Pepper',          'vegetable', 31, '🫑', 'Paprika',                'Biber'],
+  ['Zucchini',             'vegetable', 17, '🥒', 'Zucchini',               'Kabak'],
+  ['Onion',                'vegetable', 40, '🧅', 'Zwiebel',                'Soğan'],
+  // Fruit
+  ['Banana',               'fruit',     89, '🍌', 'Banane',                 'Muz'],
+  ['Apple',                'fruit',     52, '🍎', 'Apfel',                  'Elma'],
+  ['Orange',               'fruit',     47, '🍊', 'Orange',                 'Portakal'],
+  ['Strawberries',         'fruit',     32, '🍓', 'Erdbeeren',              'Çilek'],
+  ['Blueberries',          'fruit',     57, '🫐', 'Blaubeeren',             'Yaban Mersini'],
+  ['Grapes',               'fruit',     67, '🍇', 'Trauben',                'Üzüm'],
+  // Dairy
+  ['Greek Yogurt',         'dairy',     97, '🥛', 'Griechischer Joghurt',   'Yunan Yoğurdu'],
+  ['Cottage Cheese',       'dairy',     98, '🧀', 'Hüttenkäse',             'Lor Peyniri'],
+  ['Milk (whole)',         'dairy',     61, '🥛', 'Vollmilch',              'Tam Yağlı Süt'],
+  ['Cheddar Cheese',       'dairy',    403, '🧀', 'Cheddar-Käse',           'Çedar Peyniri'],
+  // Fat
+  ['Olive Oil',            'fat',      884, '🫒', 'Olivenöl',               'Zeytinyağı'],
+  ['Avocado',              'fat',      160, '🥑', 'Avocado',                'Avokado'],
+  ['Mixed Nuts',           'fat',      607, '🥜', 'Gemischte Nüsse',        'Karışık Kuruyemiş'],
+  ['Peanut Butter',        'fat',      588, '🥜', 'Erdnussbutter',          'Fıstık Ezmesi'],
+  ['Almonds',              'fat',      579, '🫘', 'Mandeln',                'Badem'],
 ]
 
 export async function migrate() {
   await pool.query(SCHEMA)
   console.log('DB migration complete')
 
-  // Seed global default foods (user_id = NULL) — idempotent
-  for (const [name, category, calories, emoji] of GLOBAL_FOODS) {
+  // Seed global default foods (user_id = NULL) — idempotent; upsert translations
+  for (const [name, category, calories, emoji, name_de, name_tr] of GLOBAL_FOODS) {
     await pool.query(
-      `INSERT INTO foods (name, category, calories_per_100g, emoji, user_id)
-       SELECT $1,$2,$3,$4,NULL
-       WHERE NOT EXISTS (SELECT 1 FROM foods WHERE name=$1 AND user_id IS NULL)`,
-      [name, category, calories, emoji]
+      `INSERT INTO foods (name, category, calories_per_100g, emoji, name_de, name_tr, user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,NULL)
+       ON CONFLICT DO NOTHING`,
+      [name, category, calories, emoji, name_de, name_tr]
+    )
+    // Backfill translations on existing rows that have no conflict key
+    await pool.query(
+      `UPDATE foods SET name_de=$1, name_tr=$2
+       WHERE name=$3 AND user_id IS NULL AND (name_de IS NULL OR name_tr IS NULL)`,
+      [name_de, name_tr, name]
     )
   }
   console.log('Global foods seeded')
