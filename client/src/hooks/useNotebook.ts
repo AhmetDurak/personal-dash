@@ -25,6 +25,8 @@ export interface MMEdge {
   from: string
   to: string
   bidirectional?: boolean
+  fromSide?: 'left' | 'right'
+  toSide?: 'left' | 'right'
 }
 
 export interface MindmapMeta {

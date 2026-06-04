@@ -637,7 +637,10 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
           (e.from === c.targetId && e.to === c.sourceId)
         )
         if (!already) {
-          const newEdge: MMEdge = { id: `e${Date.now()}`, from: c.sourceId, to: c.targetId, bidirectional: true }
+          const fromSide: 'left' | 'right' = c.fromLeft ? 'left' : 'right'
+          const tgt = nodesRef.current.find(n => n.id === c.targetId)
+          const toSide: 'left' | 'right' = tgt && c.x <= (tgt.x ?? 0) + NODE_W / 2 ? 'left' : 'right'
+          const newEdge: MMEdge = { id: `e${Date.now()}`, from: c.sourceId, to: c.targetId, bidirectional: true, fromSide, toSide }
           persist(nodesRef.current, [...edgesRef.current, newEdge])
         }
       }
@@ -752,11 +755,14 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             if (!n.parentId) return null
             const p = nodes.find(p => p.id === n.parentId)
             if (!p) return null
-            const x1 = (p.x ?? 0) + NODE_W, y1 = (p.y ?? 0) + NODE_H / 2
-            const x2 = n.x ?? 0,            y2 = (n.y ?? 0) + NODE_H / 2
+            const pRight = (p.x ?? 0) <= (n.x ?? 0)
+            const x1 = pRight ? (p.x ?? 0) + NODE_W : (p.x ?? 0)
+            const y1 = (p.y ?? 0) + NODE_H / 2
+            const x2 = pRight ? (n.x ?? 0) : (n.x ?? 0) + NODE_W
+            const y2 = (n.y ?? 0) + NODE_H / 2
             const t = Math.max(60, Math.abs(x2 - x1) * 0.45)
             const color = nodeColor(n.id)
-            const d = `M ${x1} ${y1} C ${x1 + t} ${y1} ${x2 - t} ${y2} ${x2} ${y2}`
+            const d = `M ${x1} ${y1} C ${x1 + (pRight ? t : -t)} ${y1} ${x2 + (pRight ? -t : t)} ${y2} ${x2} ${y2}`
             return (
               <g key={`e-${n.id}`}>
                 <path d={d} fill="none" stroke="transparent" strokeWidth={12}
@@ -773,14 +779,18 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             const from = nodes.find(n => n.id === e.from)
             const to   = nodes.find(n => n.id === e.to)
             if (!from || !to) return null
-            const fromIsLeft = (from.x ?? 0) <= (to.x ?? 0)
-            const x1 = fromIsLeft ? (from.x ?? 0) + NODE_W : (from.x ?? 0)
+            const posRight = (from.x ?? 0) <= (to.x ?? 0)
+            const fromSide = e.fromSide ?? (posRight ? 'right' : 'left')
+            const toSide   = e.toSide   ?? (posRight ? 'left'  : 'right')
+            const x1 = fromSide === 'right' ? (from.x ?? 0) + NODE_W : (from.x ?? 0)
             const y1 = (from.y ?? 0) + NODE_H / 2
-            const x2 = fromIsLeft ? (to.x ?? 0) : (to.x ?? 0) + NODE_W
+            const x2 = toSide === 'right' ? (to.x ?? 0) + NODE_W : (to.x ?? 0)
             const y2 = (to.y ?? 0) + NODE_H / 2
             const t  = Math.max(60, Math.abs(x2 - x1) * 0.45)
+            const fSign = fromSide === 'right' ? 1 : -1
+            const tSign = toSide   === 'right' ? 1 : -1
             const color = nodeColor(e.from)
-            const dPath = `M ${x1} ${y1} C ${x1 + (fromIsLeft ? t : -t)} ${y1} ${x2 + (fromIsLeft ? -t : t)} ${y2} ${x2} ${y2}`
+            const dPath = `M ${x1} ${y1} C ${x1 + fSign * t} ${y1} ${x2 + tSign * t} ${y2} ${x2} ${y2}`
             return (
               <g key={e.id}>
                 <path d={dPath} fill="none" stroke="transparent" strokeWidth={12}
