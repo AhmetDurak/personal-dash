@@ -343,7 +343,7 @@ function RenditePanel({ ticker }: { ticker: string }) {
         </div>
       </div>
       {calRows.length > 0 && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-white rounded-xl border border-xero-border p-6">
             <p className="text-sm font-semibold text-gray-700 mb-4">{t.etfCalYearReturns}</p>
             <div className="space-y-2.5">
@@ -447,7 +447,7 @@ function ZusammensetzungPanel({ ticker }: { ticker: string }) {
           <ResponsiveContainer width="100%" height={chartHeight}>
             <BarChart data={data.sectors} layout="vertical" barSize={14} margin={{ right: 48 }}>
               <XAxis type="number" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} width={140} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} width={140} />
               <Tooltip formatter={(v: number) => [`${v.toFixed(2)}%`, t.etfShareLabel]} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
               <Bar dataKey="weight" radius={[0, 4, 4, 0]}>
                 {data.sectors.map((_, i) => <Cell key={i} fill={SECTOR_COLORS[i % SECTOR_COLORS.length]} />)}
@@ -521,7 +521,7 @@ function SparplanPanel({ ticker, currency }: { ticker: string; currency: string 
   return (
     <div className="bg-white rounded-xl border border-xero-border p-6">
       <p className="text-sm font-semibold text-gray-700 mb-4">{ticker}</p>
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         {([
           { label: t.etfMonthlyRate, value: monthly, min: 1, max: undefined, step: 1, unit: '€', set: setMonthly },
           { label: t.etfDuration, value: years, min: 1, max: 50, step: 1, unit: 'J', set: setYears },
@@ -538,7 +538,7 @@ function SparplanPanel({ ticker, currency }: { ticker: string; currency: string 
           </label>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
         {[
           { label: t.etfFinalValue, value: fmtPrice(finalValue, currency), color: 'text-xero-green' },
           { label: t.etfInvested,   value: fmtPrice(totalInvested, currency), color: 'text-gray-900' },
