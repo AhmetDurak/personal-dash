@@ -446,9 +446,8 @@ function ZusammensetzungPanel({ ticker }: { ticker: string }) {
           <p className="text-sm font-semibold text-gray-700 mb-4">{t.etfSectors}</p>
           <ResponsiveContainer width="100%" height={chartHeight}>
             <BarChart data={data.sectors} layout="vertical" barSize={14} margin={{ right: 48 }}>
-              <XAxis type="number" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
+              <XAxis type="number" tick={false} axisLine={false} tickLine={false} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} width={140} />
-              <Tooltip formatter={(v: number) => [`${v.toFixed(2)}%`, t.etfShareLabel]} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
               <Bar dataKey="weight" radius={[0, 4, 4, 0]}>
                 {data.sectors.map((_, i) => <Cell key={i} fill={SECTOR_COLORS[i % SECTOR_COLORS.length]} />)}
                 <LabelList dataKey="weight" position="right" formatter={(v: number) => `${v.toFixed(1)}%`} style={{ fontSize: 10, fill: '#9CA3AF' }} />
