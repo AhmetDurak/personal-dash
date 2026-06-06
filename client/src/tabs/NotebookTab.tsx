@@ -72,6 +72,63 @@ function relativeDay(dateStr: string): string {
   return `in ${diff}d`
 }
 
+// ─── SwipeToDelete ────────────────────────────────────────────────────────────
+
+const DELETE_BTN_W = 72
+
+function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children: ReactNode }) {
+  const [offset, setOffset] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const startX = useRef(0)
+  const didDrag = useRef(false)
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (e.pointerType !== 'touch') return
+    startX.current = e.clientX
+    didDrag.current = false
+    setDragging(true)
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragging) return
+    const dx = e.clientX - startX.current
+    if (Math.abs(dx) > 4) didDrag.current = true
+    if (dx >= 0) { setOffset(0); return }
+    setOffset(Math.max(dx, -DELETE_BTN_W))
+  }
+
+  function onPointerUp() {
+    if (!dragging) return
+    setDragging(false)
+    setOffset(prev => (prev < -DELETE_BTN_W / 2 ? -DELETE_BTN_W : 0))
+  }
+
+  return (
+    <div className="relative overflow-hidden">
+      <div
+        className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-red-500 select-none"
+        style={{ width: DELETE_BTN_W }}
+        onClick={e => { e.stopPropagation(); setOffset(0); onDelete() }}
+      >
+        <span className="text-white text-xs font-bold">Delete</span>
+      </div>
+      <div
+        style={{ transform: `translateX(${offset}px)`, transition: dragging ? 'none' : 'transform 0.2s ease' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onClickCapture={e => {
+          if (offset < 0) { setOffset(0); e.stopPropagation(); return }
+          if (didDrag.current) { e.stopPropagation(); didDrag.current = false }
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // ─── NotesView ────────────────────────────────────────────────────────────────
 
 marked.use({ gfm: true, breaks: true })
@@ -209,18 +266,19 @@ function NotesView() {
         <div className="flex-1 overflow-y-auto">
           {isLoading && <p className="text-xs text-gray-400 p-4">Loading…</p>}
           {visibleNotes.map(n => (
-            <button
-              key={n.id}
-              onClick={() => setSelectedId(n.id)}
-              className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-100 transition-colors ${
-                selectedId === n.id ? 'bg-gray-100 border-l-2 border-l-xero-green' : ''
-              }`}
-            >
-              <p className="text-sm font-medium text-gray-800 truncate">{n.title || t.untitled}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {new Date(n.updated_at).toLocaleDateString('de-DE')}
-              </p>
-            </button>
+            <SwipeToDelete key={n.id} onDelete={() => handleDelete(n.id)}>
+              <button
+                onClick={() => setSelectedId(n.id)}
+                className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-100 transition-colors ${
+                  selectedId === n.id ? 'bg-gray-100 border-l-2 border-l-xero-green' : ''
+                }`}
+              >
+                <p className="text-sm font-medium text-gray-800 truncate">{n.title || t.untitled}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {new Date(n.updated_at).toLocaleDateString('de-DE')}
+                </p>
+              </button>
+            </SwipeToDelete>
           ))}
         </div>
       </div>
@@ -1106,32 +1164,34 @@ function MindmapView() {
         <div className="flex-1 overflow-y-auto py-1">
           {isLoading && <p className="text-xs text-gray-500 px-3 py-2">Loading…</p>}
           {visibleMaps.map(m => (
-            <div key={m.id} className={`group flex items-center justify-between px-3 py-2 cursor-pointer rounded mx-1 my-0.5 transition-colors ${selectedId === m.id ? 'bg-xero-green/20 text-xero-green' : 'text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'}`}
-              onClick={() => { setSelectedId(m.id); onSelect() }}>
-              <span className="text-sm truncate flex-1">{m.title}</span>
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                {/* Folder picker for this map */}
-                <div className="relative">
-                  <button onClick={e => { e.stopPropagation(); setFolderPickerId(folderPickerId === m.id ? null : m.id) }}
-                    className="text-gray-500 hover:text-gray-300 p-0.5 rounded" title="Move to folder"><IconFolder className="w-3 h-3" strokeWidth={2} /></button>
-                  {folderPickerId === m.id && (
-                    <div className="absolute left-0 top-full mt-0.5 z-30 bg-xero-navy border border-xero-navy-light rounded-lg shadow-xl py-1 min-w-[130px]" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => { moveMindmapToFolder(m.id, null); setFolderPickerId(null) }} className="w-full text-left text-[10px] px-3 py-1.5 text-gray-400 hover:bg-xero-navy-light hover:text-gray-200">No folder</button>
-                      {mmFolders.map(f => (
-                        <button key={f} onClick={() => { moveMindmapToFolder(m.id, f); setFolderPickerId(null) }} className="w-full text-left text-[10px] px-3 py-1.5 text-gray-300 hover:bg-xero-navy-light hover:text-white">{f}</button>
-                      ))}
-                      <div className="border-t border-xero-navy-light mt-1 pt-1 px-2">
-                        <input placeholder="New folder…" className="w-full text-[10px] bg-xero-navy-light rounded px-2 py-1 text-gray-200 outline-none"
-                          onKeyDown={e => { if (e.key === 'Enter') { const n = (e.target as HTMLInputElement).value.trim(); if (n) { moveMindmapToFolder(m.id, n); setFolderPickerId(null) } } }} />
+            <SwipeToDelete key={m.id} onDelete={() => setConfirmDeleteId(m.id)}>
+              <div className={`group flex items-center justify-between px-3 py-2 cursor-pointer rounded mx-1 my-0.5 transition-colors ${selectedId === m.id ? 'bg-xero-green/20 text-xero-green' : 'text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'}`}
+                onClick={() => { setSelectedId(m.id); onSelect() }}>
+                <span className="text-sm truncate flex-1">{m.title}</span>
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                  {/* Folder picker for this map */}
+                  <div className="relative">
+                    <button onClick={e => { e.stopPropagation(); setFolderPickerId(folderPickerId === m.id ? null : m.id) }}
+                      className="text-gray-500 hover:text-gray-300 p-0.5 rounded" title="Move to folder"><IconFolder className="w-3 h-3" strokeWidth={2} /></button>
+                    {folderPickerId === m.id && (
+                      <div className="absolute left-0 top-full mt-0.5 z-30 bg-xero-navy border border-xero-navy-light rounded-lg shadow-xl py-1 min-w-[130px]" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => { moveMindmapToFolder(m.id, null); setFolderPickerId(null) }} className="w-full text-left text-[10px] px-3 py-1.5 text-gray-400 hover:bg-xero-navy-light hover:text-gray-200">No folder</button>
+                        {mmFolders.map(f => (
+                          <button key={f} onClick={() => { moveMindmapToFolder(m.id, f); setFolderPickerId(null) }} className="w-full text-left text-[10px] px-3 py-1.5 text-gray-300 hover:bg-xero-navy-light hover:text-white">{f}</button>
+                        ))}
+                        <div className="border-t border-xero-navy-light mt-1 pt-1 px-2">
+                          <input placeholder="New folder…" className="w-full text-[10px] bg-xero-navy-light rounded px-2 py-1 text-gray-200 outline-none"
+                            onKeyDown={e => { if (e.key === 'Enter') { const n = (e.target as HTMLInputElement).value.trim(); if (n) { moveMindmapToFolder(m.id, n); setFolderPickerId(null) } } }} />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(m.id) }} className="text-gray-500 hover:text-red-400 transition-all p-0.5 rounded">
+                    <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
+                  </button>
                 </div>
-                <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(m.id) }} className="text-gray-500 hover:text-red-400 transition-all p-0.5 rounded">
-                  <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
-                </button>
               </div>
-            </div>
+            </SwipeToDelete>
           ))}
           {!isLoading && visibleMaps.length === 0 && (
             <p className="text-xs text-gray-500 px-3 py-3">No maps{activeFolder ? ` in "${activeFolder}"` : ' yet'}.</p>
