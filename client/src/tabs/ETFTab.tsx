@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell,
+  BarChart, Bar, Cell, LabelList,
 } from 'recharts'
 import {
   useETFWatchlist, useETFSnapshot, useETFChart, useETFComposition, useETFRisk, useETFSearch,
 } from '../hooks/useETF'
 import type { ETFSnapshot, ETFCandle } from '../types'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
+import { useLanguage } from '../hooks/useLanguage'
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -37,20 +38,38 @@ function fmtNum(v: number | null, decimals = 2) {
 
 type SubTab = 'overview' | 'chart' | 'rendite' | 'basisinfo' | 'zusammensetzung' | 'risiko' | 'sparplan'
 
-const SUB_TABS: { id: SubTab; label: string }[] = [
-  { id: 'overview',        label: 'Overview' },
-  { id: 'chart',           label: 'Chart' },
-  { id: 'rendite',         label: 'Rendite' },
-  { id: 'basisinfo',       label: 'Basisinfo' },
-  { id: 'zusammensetzung', label: 'Zusammensetzung' },
-  { id: 'risiko',          label: 'Risiko' },
-  { id: 'sparplan',        label: 'Sparplan' },
-]
+const SUB_TABS: SubTab[] = ['overview', 'chart', 'rendite', 'basisinfo', 'zusammensetzung', 'risiko', 'sparplan']
 
 const CHART_RANGES = ['1mo', '3mo', '6mo', '1y', '3y', '5y'] as const
 type ChartRange = typeof CHART_RANGES[number]
 const RANGE_LABELS: Record<ChartRange, string> = { '1mo': '1M', '3mo': '3M', '6mo': '6M', '1y': '1J', '3y': '3J', '5y': '5J' }
 const COMPARE_COLORS = ['#1D9E75', '#378ADD', '#D85A30']
+
+const TICK_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function buildChartTicks(candles: ETFCandle[], range: ChartRange): { ticks: string[]; fmt: (d: string) => string } {
+  if (!candles.length) return { ticks: [], fmt: d => d }
+  const seen = new Set<string>()
+  const ticks: string[] = []
+  for (const c of candles) {
+    const [y, m, d] = c.date.split('-')
+    let key: string
+    if (range === '5y') key = y
+    else if (range === '3y') key = `${y}-Q${Math.ceil(Number(m) / 3)}`
+    else if (range === '1mo') key = `${y}-${m}-W${Math.floor((Number(d) - 1) / 7)}`
+    else key = `${y}-${m}`
+    if (!seen.has(key)) { seen.add(key); ticks.push(c.date) }
+  }
+  const fmt = (date: string): string => {
+    const [y, m, d] = date.split('-')
+    const mon = TICK_MONTHS[Number(m) - 1]
+    if (range === '5y') return y
+    if (range === '3y') return `${mon} '${y.slice(2)}`
+    if (range === '1y') return mon
+    return `${d}.${m}`
+  }
+  return { ticks, fmt }
+}
 
 // ── Section header ────────────────────────────────────────────────────────────
 
@@ -209,8 +228,10 @@ function OverviewPanel({ snap }: { snap: ETFSnapshot }) {
 function ChartPanel({ ticker, currency }: { ticker: string; currency: string }) {
   const [range, setRange] = useState<ChartRange>('1y')
   const { data: candles, isLoading } = useETFChart(ticker, range)
+  const { t } = useLanguage()
 
-  const chartData = (candles ?? []).map(c => ({ date: c.date.slice(5), close: c.close }))
+  const chartData = (candles ?? []).map(c => ({ date: c.date, close: c.close }))
+  const { ticks, fmt } = buildChartTicks(candles ?? [], range)
   const minClose = candles?.length ? Math.min(...candles.map(c => c.close)) : 0
   const maxClose = candles?.length ? Math.max(...candles.map(c => c.close)) : 0
   const domain: [number, number] = [minClose * 0.98, maxClose * 1.01]
@@ -219,7 +240,7 @@ function ChartPanel({ ticker, currency }: { ticker: string; currency: string }) 
   return (
     <div className="bg-white rounded-xl border border-xero-border p-6">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-semibold text-gray-700">Kursverlauf</p>
+        <p className="text-sm font-semibold text-gray-700">{t.etfPriceHistory}</p>
         <div className="flex gap-1">
           {CHART_RANGES.map(r => (
             <button key={r} onClick={() => setRange(r)}
@@ -236,9 +257,9 @@ function ChartPanel({ ticker, currency }: { ticker: string; currency: string }) 
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E8EBF0" vertical={false} />
-            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+            <XAxis dataKey="date" ticks={ticks} tickFormatter={fmt} tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
             <YAxis domain={domain} tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(0)}`} width={50} />
-            <Tooltip formatter={(v: number) => [fmtPrice(v, currency), 'Kurs']} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
+            <Tooltip formatter={(v: number) => [fmtPrice(v, currency), t.etfPriceLabel]} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
             <Line type="monotone" dataKey="close" stroke={positive ? '#1D9E75' : '#EF4444'} strokeWidth={2} dot={false} />
           </LineChart>
         </ResponsiveContainer>
@@ -288,15 +309,16 @@ function RetBar({ value, maxAbs }: { value: number | null; maxAbs: number }) {
 
 function RenditePanel({ ticker }: { ticker: string }) {
   const { data: candles, isLoading } = useETFChart(ticker, '5y')
+  const { t } = useLanguage()
 
   if (isLoading) return <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
-  if (!candles?.length) return <div className="text-sm text-gray-400 py-8 text-center">Keine Renditedaten</div>
+  if (!candles?.length) return <div className="text-sm text-gray-400 py-8 text-center">{t.etfNoData}</div>
 
   const periods = [
-    { label: '1 Monat', days: 30 }, { label: '3 Monate', days: 90 },
-    { label: '6 Monate', days: 180 }, { label: '1 Jahr', days: 365 },
-    { label: '2 Jahre', days: 730 }, { label: '3 Jahre', days: 1095 },
-    { label: '5 Jahre', days: 1825 },
+    { label: t.period1M, days: 30 }, { label: t.period3M, days: 90 },
+    { label: t.period6M, days: 180 }, { label: t.period1Y, days: 365 },
+    { label: t.period2Y, days: 730 }, { label: t.period3Y, days: 1095 },
+    { label: t.period5Y, days: 1825 },
   ]
   const currentYear = new Date().getFullYear()
   const periodRows = periods.map(p => ({ label: p.label, ret: periodReturn(candles, p.days) }))
@@ -308,7 +330,7 @@ function RenditePanel({ ticker }: { ticker: string }) {
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border border-xero-border p-6">
-        <p className="text-sm font-semibold text-gray-700 mb-4">Zeitraum-Renditen</p>
+        <p className="text-sm font-semibold text-gray-700 mb-4">{t.etfPeriodReturns}</p>
         <div className="space-y-2.5">
           {periodRows.map(r => (
             <div key={r.label} className="grid grid-cols-[130px_1fr] items-center gap-4">
@@ -321,7 +343,7 @@ function RenditePanel({ ticker }: { ticker: string }) {
       {calRows.length > 0 && (
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white rounded-xl border border-xero-border p-6">
-            <p className="text-sm font-semibold text-gray-700 mb-4">Kalendarjahr-Renditen</p>
+            <p className="text-sm font-semibold text-gray-700 mb-4">{t.etfCalYearReturns}</p>
             <div className="space-y-2.5">
               {calRows.map(r => (
                 <div key={r.year} className="grid grid-cols-[60px_1fr] items-center gap-4">
@@ -332,13 +354,13 @@ function RenditePanel({ ticker }: { ticker: string }) {
             </div>
           </div>
           <div className="bg-white rounded-xl border border-xero-border p-6">
-            <p className="text-sm font-semibold text-gray-700 mb-4">Jahresrenditen</p>
+            <p className="text-sm font-semibold text-gray-700 mb-4">{t.etfAnnualChart}</p>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={calRows.map(r => ({ year: String(r.year), ret: r.ret ?? 0 }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E8EBF0" vertical={false} />
                 <XAxis dataKey="year" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(0)}%`} />
-                <Tooltip formatter={(v: number) => [`${v.toFixed(2)}%`, 'Rendite']} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
+                <Tooltip formatter={(v: number) => [`${v.toFixed(2)}%`, t.etfReturnLabel]} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
                 <Bar dataKey="ret" radius={[4, 4, 0, 0]}>
                   {calRows.map((r, i) => <Cell key={i} fill={(r.ret ?? 0) >= 0 ? '#1D9E75' : '#EF4444'} />)}
                 </Bar>
@@ -354,21 +376,22 @@ function RenditePanel({ ticker }: { ticker: string }) {
 // ── Basisinfo panel ───────────────────────────────────────────────────────────
 
 function BasiInfoPanel({ snap }: { snap: ETFSnapshot }) {
+  const { t } = useLanguage()
   const rows: { label: string; value: string }[] = [
-    { label: 'Ticker',            value: snap.ticker },
-    { label: 'Name',              value: snap.name },
-    { label: 'ISIN',              value: snap.isin ?? '—' },
-    { label: 'Währung',           value: snap.currency },
-    { label: 'Fondsgesellschaft', value: snap.fundFamily ?? '—' },
-    { label: 'Kategorie',         value: snap.category ?? '—' },
-    { label: 'TER p.a.',          value: fmtTer(snap.ter) },
-    { label: 'Ausschüttungsart',  value: snap.distribution ?? '—' },
-    { label: 'Replikation',       value: snap.replicationMethod ?? '—' },
-    { label: 'Auflagedatum',      value: snap.inception ?? '—' },
-    { label: 'Fondsvolumen',      value: fmtAssets(snap.totalAssets) },
-    { label: 'Beta (3J)',         value: fmtNum(snap.beta) },
-    { label: 'Rendite p.a.',      value: fmtPct(snap.yield) },
-    { label: 'YTD Return',        value: fmtPct(snap.ytdReturn) },
+    { label: 'Ticker',           value: snap.ticker },
+    { label: 'Name',             value: snap.name },
+    { label: 'ISIN',             value: snap.isin ?? '—' },
+    { label: t.etfCurrency,      value: snap.currency },
+    { label: t.etfFundFamily,    value: snap.fundFamily ?? '—' },
+    { label: t.etfCategory,      value: snap.category ?? '—' },
+    { label: 'TER p.a.',         value: fmtTer(snap.ter) },
+    { label: t.etfDistribution,  value: snap.distribution ?? '—' },
+    { label: t.etfReplication,   value: snap.replicationMethod ?? '—' },
+    { label: t.etfInception,     value: snap.inception ?? '—' },
+    { label: t.etfAum,           value: fmtAssets(snap.totalAssets) },
+    { label: t.etfBeta3y,        value: fmtNum(snap.beta) },
+    { label: t.etfReturnPa,      value: fmtPct(snap.yield) },
+    { label: t.etfYtdReturn,     value: fmtPct(snap.ytdReturn) },
   ]
   return (
     <div className="bg-white rounded-xl border border-xero-border overflow-hidden">
@@ -390,16 +413,19 @@ function BasiInfoPanel({ snap }: { snap: ETFSnapshot }) {
 
 function ZusammensetzungPanel({ ticker }: { ticker: string }) {
   const { data, isLoading } = useETFComposition(ticker)
+  const { t } = useLanguage()
   if (isLoading) return <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
-  if (!data) return <div className="text-sm text-gray-400 py-8 text-center">Keine Daten</div>
+  if (!data) return <div className="text-sm text-gray-400 py-8 text-center">{t.etfNoData}</div>
 
   const SECTOR_COLORS = ['#1D9E75','#378ADD','#534AB7','#D85A30','#BA7517','#D4537E','#3B6D11','#888780','#0EA5E9','#6366F1']
+  const sectorCount = data.sectors.length
+  const chartHeight = Math.max(160, sectorCount * 28)
 
   return (
     <div className="space-y-4">
       {data.topHoldings.length > 0 && (
         <div className="bg-white rounded-xl border border-xero-border p-6">
-          <p className="text-sm font-semibold text-gray-700 mb-4">Top Holdings</p>
+          <p className="text-sm font-semibold text-gray-700 mb-4">{t.etfTopHoldings}</p>
           <div className="space-y-2">
             {data.topHoldings.map(h => (
               <div key={h.name} className="flex items-center gap-3">
@@ -415,21 +441,22 @@ function ZusammensetzungPanel({ ticker }: { ticker: string }) {
       )}
       {data.sectors.length > 0 && (
         <div className="bg-white rounded-xl border border-xero-border p-6">
-          <p className="text-sm font-semibold text-gray-700 mb-4">Sektoren</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={data.sectors} layout="vertical" barSize={14}>
+          <p className="text-sm font-semibold text-gray-700 mb-4">{t.etfSectors}</p>
+          <ResponsiveContainer width="100%" height={chartHeight}>
+            <BarChart data={data.sectors} layout="vertical" barSize={14} margin={{ right: 48 }}>
               <XAxis type="number" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#6B7280' }} axisLine={false} tickLine={false} width={140} />
-              <Tooltip formatter={(v: number) => [`${v.toFixed(2)}%`, 'Anteil']} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
+              <Tooltip formatter={(v: number) => [`${v.toFixed(2)}%`, t.etfShareLabel]} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
               <Bar dataKey="weight" radius={[0, 4, 4, 0]}>
                 {data.sectors.map((_, i) => <Cell key={i} fill={SECTOR_COLORS[i % SECTOR_COLORS.length]} />)}
+                <LabelList dataKey="weight" position="right" formatter={(v: number) => `${v.toFixed(1)}%`} style={{ fontSize: 10, fill: '#6B7280' }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
       {data.topHoldings.length === 0 && data.sectors.length === 0 && (
-        <p className="text-sm text-gray-400 text-center py-8">Keine Zusammensetzungsdaten verfügbar</p>
+        <p className="text-sm text-gray-400 text-center py-8">{t.etfNoData}</p>
       )}
     </div>
   )
@@ -439,17 +466,18 @@ function ZusammensetzungPanel({ ticker }: { ticker: string }) {
 
 function RisikoPanel({ ticker }: { ticker: string }) {
   const { data, isLoading } = useETFRisk(ticker)
+  const { t } = useLanguage()
   if (isLoading) return <div className="text-sm text-gray-400 py-8 text-center">Loading…</div>
-  if (!data) return <div className="text-sm text-gray-400 py-8 text-center">Keine Risikodaten</div>
+  if (!data) return <div className="text-sm text-gray-400 py-8 text-center">{t.etfNoRiskData}</div>
 
   const metrics = [
-    { label: 'Beta',            value: fmtNum(data.beta),       desc: 'Volatilität relativ zum Index' },
-    { label: 'Alpha',           value: fmtNum(data.alpha),      desc: 'Überrendite gegenüber Index' },
-    { label: 'Sharpe Ratio',    value: fmtNum(data.sharpe),     desc: 'Rendite je Risikoeinheit' },
-    { label: 'Treynor Ratio',   value: fmtNum(data.treynor),    desc: 'Rendite je Marktrisiko' },
-    { label: 'R²',              value: fmtNum(data.r2),         desc: 'Bestimmtheitsmaß zum Index' },
-    { label: 'Std. Abweichung', value: fmtTer(data.stdDev),     desc: 'Streuung der Monatsrenditen' },
-    { label: 'Ø Jahresrendite', value: fmtPct(data.meanReturn), desc: 'Mittlere jährliche Rendite' },
+    { label: 'Beta',           value: fmtNum(data.beta),       desc: t.etfBetaDesc },
+    { label: 'Alpha',          value: fmtNum(data.alpha),      desc: t.etfAlphaDesc },
+    { label: 'Sharpe Ratio',   value: fmtNum(data.sharpe),     desc: t.etfSharpeDesc },
+    { label: 'Treynor Ratio',  value: fmtNum(data.treynor),    desc: t.etfTreynorDesc },
+    { label: 'R²',             value: fmtNum(data.r2),         desc: t.etfR2Desc },
+    { label: t.etfStdDev,      value: fmtTer(data.stdDev),     desc: t.etfStdDevDesc },
+    { label: t.etfMeanReturn,  value: fmtPct(data.meanReturn), desc: t.etfMeanReturnDesc },
   ]
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -486,14 +514,16 @@ function SparplanPanel({ ticker, currency }: { ticker: string; currency: string 
 
   const gain = finalValue - totalInvested
 
+  const { t } = useLanguage()
+
   return (
     <div className="bg-white rounded-xl border border-xero-border p-6">
-      <p className="text-sm font-semibold text-gray-700 mb-4">Sparplan-Rechner — {ticker}</p>
+      <p className="text-sm font-semibold text-gray-700 mb-4">{ticker}</p>
       <div className="grid grid-cols-3 gap-4 mb-5">
         {([
-          { label: 'Monatliche Rate', value: monthly, min: 1, max: undefined, step: 1, unit: '€', set: setMonthly },
-          { label: 'Laufzeit', value: years, min: 1, max: 50, step: 1, unit: 'Jahre', set: setYears },
-          { label: 'Jährl. Rendite', value: rate, min: 0, max: 50, step: 0.5, unit: '%', set: setRate },
+          { label: t.etfMonthlyRate, value: monthly, min: 1, max: undefined, step: 1, unit: '€', set: setMonthly },
+          { label: t.etfDuration, value: years, min: 1, max: 50, step: 1, unit: 'J', set: setYears },
+          { label: t.etfAnnualReturn, value: rate, min: 0, max: 50, step: 0.5, unit: '%', set: setRate },
         ] as const).map(f => (
           <label key={f.label} className="block">
             <span className="text-xs text-gray-500 mb-1 block">{f.label}</span>
@@ -508,9 +538,9 @@ function SparplanPanel({ ticker, currency }: { ticker: string; currency: string 
       </div>
       <div className="grid grid-cols-3 gap-3 mb-5">
         {[
-          { label: 'Endwert', value: fmtPrice(finalValue, currency), color: 'text-xero-green' },
-          { label: 'Eingezahlt', value: fmtPrice(totalInvested, currency), color: 'text-gray-900' },
-          { label: 'Gewinn', value: fmtPrice(gain, currency), color: gain >= 0 ? 'text-emerald-600' : 'text-red-500' },
+          { label: t.etfFinalValue, value: fmtPrice(finalValue, currency), color: 'text-xero-green' },
+          { label: t.etfInvested,   value: fmtPrice(totalInvested, currency), color: 'text-gray-900' },
+          { label: t.etfGain,       value: fmtPrice(gain, currency), color: gain >= 0 ? 'text-emerald-600' : 'text-red-500' },
         ].map(k => (
           <div key={k.label} className="bg-gray-50 rounded-xl p-4">
             <p className="text-xs text-gray-400 mb-1">{k.label}</p>
@@ -523,7 +553,7 @@ function SparplanPanel({ ticker, currency }: { ticker: string; currency: string 
           <CartesianGrid strokeDasharray="3 3" stroke="#E8EBF0" vertical={false} />
           <XAxis dataKey="year" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}J`} />
           <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
-          <Tooltip formatter={(v: number, name: string) => [fmtPrice(v, currency), name === 'value' ? 'Depotwert' : 'Eingezahlt']} labelFormatter={l => `Jahr ${l}`} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
+          <Tooltip formatter={(v: number, name: string) => [fmtPrice(v, currency), name === 'value' ? t.etfDepotValue : t.etfInvested]} labelFormatter={l => `Jahr ${l}`} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
           <Line type="monotone" dataKey="invested" stroke="#CBD5E1" strokeWidth={2} dot={false} />
           <Line type="monotone" dataKey="value" stroke="#1D9E75" strokeWidth={2} dot={false} />
         </LineChart>
@@ -536,6 +566,7 @@ function SparplanPanel({ ticker, currency }: { ticker: string; currency: string 
 
 function ComparePanel({ tickers }: { tickers: string[] }) {
   const [range, setRange] = useState<ChartRange>('1y')
+  const { t } = useLanguage()
 
   // Fixed-count hooks (always 3, nulled for missing)
   const snap0 = useETFSnapshot(tickers[0] ?? null)
@@ -548,42 +579,46 @@ function ComparePanel({ tickers }: { tickers: string[] }) {
   const snapshots = [snap0.data, snap1.data, snap2.data].slice(0, tickers.length)
   const rawCharts = [chart0.data, chart1.data, chart2.data].slice(0, tickers.length)
 
-  const normalizedData = useMemo(() => {
+  const { normalizedData, allCandles } = useMemo(() => {
     const byDate: Record<string, Record<string, number>> = {}
-    tickers.forEach((t, i) => {
+    const allCandles: ETFCandle[] = []
+    tickers.forEach((tk, i) => {
       const candles = rawCharts[i] ?? []
       if (!candles.length) return
+      allCandles.push(...candles)
       const base = candles[0].close
       candles.forEach(c => {
         if (!byDate[c.date]) byDate[c.date] = {}
-        byDate[c.date][t] = Math.round((c.close / base) * 10000) / 100
+        byDate[c.date][tk] = Math.round((c.close / base) * 10000) / 100
       })
     })
-    return Object.keys(byDate).sort().map(date => ({ date: date.slice(5), ...byDate[date] }))
+    const normalizedData = Object.keys(byDate).sort().map(date => ({ date, ...byDate[date] }))
+    return { normalizedData, allCandles }
   }, [tickers.join(','), chart0.data, chart1.data, chart2.data])
 
+  const { ticks: cmpTicks, fmt: cmpFmt } = buildChartTicks(allCandles, range)
+
   const METRICS: { label: string; get: (s: ETFSnapshot) => string }[] = [
-    { label: 'Kurs',              get: s => fmtPrice(s.price, s.currency) },
-    { label: 'Tagesveränderung',  get: s => `${fmtPct(s.changePct)}` },
-    { label: 'NAV',               get: s => s.nav ? fmtPrice(s.nav, s.currency) : '—' },
-    { label: 'TER p.a.',          get: s => fmtTer(s.ter) },
-    { label: 'Rendite p.a.',      get: s => fmtPct(s.yield) },
-    { label: 'YTD Return',        get: s => fmtPct(s.ytdReturn) },
-    { label: 'Beta',              get: s => fmtNum(s.beta) },
-    { label: 'Fondsvolumen',      get: s => fmtAssets(s.totalAssets) },
-    { label: '52W Hoch',          get: s => fmtPrice(s.high52w, s.currency) },
-    { label: '52W Tief',          get: s => fmtPrice(s.low52w, s.currency) },
-    { label: 'Fondsgesellschaft', get: s => s.fundFamily ?? '—' },
-    { label: 'Auflagedatum',      get: s => s.inception ?? '—' },
+    { label: t.etfPriceLabel,  get: s => fmtPrice(s.price, s.currency) },
+    { label: 'NAV',            get: s => s.nav ? fmtPrice(s.nav, s.currency) : '—' },
+    { label: 'TER p.a.',       get: s => fmtTer(s.ter) },
+    { label: t.etfReturnPa,    get: s => fmtPct(s.yield) },
+    { label: t.etfYtdReturn,   get: s => fmtPct(s.ytdReturn) },
+    { label: 'Beta',           get: s => fmtNum(s.beta) },
+    { label: t.etfAum,         get: s => fmtAssets(s.totalAssets) },
+    { label: '52W High',       get: s => fmtPrice(s.high52w, s.currency) },
+    { label: '52W Low',        get: s => fmtPrice(s.low52w, s.currency) },
+    { label: t.etfFundFamily,  get: s => s.fundFamily ?? '—' },
+    { label: t.etfInception,   get: s => s.inception ?? '—' },
   ]
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-gray-800">Vergleich</h2>
+        <h2 className="text-base font-semibold text-gray-800">{t.etfCompare}</h2>
         <div className="flex gap-2">
-          {tickers.map((t, i) => (
-            <span key={t} className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg text-white" style={{ backgroundColor: COMPARE_COLORS[i] }}>{t}</span>
+          {tickers.map((tk, i) => (
+            <span key={tk} className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg text-white" style={{ backgroundColor: COMPARE_COLORS[i] }}>{tk}</span>
           ))}
         </div>
       </div>
@@ -591,7 +626,7 @@ function ComparePanel({ tickers }: { tickers: string[] }) {
       {/* Normalized chart */}
       <div className="bg-white rounded-xl border border-xero-border p-6">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-semibold text-gray-700">Kursvergleich (Basis 100)</p>
+          <p className="text-sm font-semibold text-gray-700">{t.etfPriceComparison}</p>
           <div className="flex gap-1">
             {CHART_RANGES.map(r => (
               <button key={r} onClick={() => setRange(r)}
@@ -604,19 +639,19 @@ function ComparePanel({ tickers }: { tickers: string[] }) {
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={normalizedData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E8EBF0" vertical={false} />
-            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+            <XAxis dataKey="date" ticks={cmpTicks} tickFormatter={cmpFmt} tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
             <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} formatter={(v: number, name: string) => [`${v.toFixed(2)}`, name]} />
-            {tickers.map((t, i) => (
-              <Line key={t} type="monotone" dataKey={t} stroke={COMPARE_COLORS[i]} strokeWidth={2} dot={false} connectNulls />
+            {tickers.map((tk, i) => (
+              <Line key={tk} type="monotone" dataKey={tk} stroke={COMPARE_COLORS[i]} strokeWidth={2} dot={false} connectNulls />
             ))}
           </LineChart>
         </ResponsiveContainer>
         <div className="flex gap-6 mt-3 justify-center flex-wrap">
-          {tickers.map((t, i) => (
-            <div key={t} className="flex items-center gap-2">
+          {tickers.map((tk, i) => (
+            <div key={tk} className="flex items-center gap-2">
               <div className="w-8 h-0.5 rounded" style={{ backgroundColor: COMPARE_COLORS[i] }} />
-              <span className="text-xs font-mono font-semibold text-gray-700">{t}</span>
+              <span className="text-xs font-mono font-semibold text-gray-700">{tk}</span>
               {snapshots[i] && <span className="text-xs text-gray-400">{snapshots[i]!.name.slice(0, 28)}</span>}
             </div>
           ))}
@@ -628,10 +663,10 @@ function ComparePanel({ tickers }: { tickers: string[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-xero-border">
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-44">Kennzahl</th>
-              {tickers.map((t, i) => (
-                <th key={t} className="px-5 py-3 text-left">
-                  <span className="text-xs font-bold font-mono" style={{ color: COMPARE_COLORS[i] }}>{t}</span>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-44">{t.etfKeyFigures}</th>
+              {tickers.map((tk, i) => (
+                <th key={tk} className="px-5 py-3 text-left">
+                  <span className="text-xs font-bold font-mono" style={{ color: COMPARE_COLORS[i] }}>{tk}</span>
                   {snapshots[i] && (
                     <span className="block text-xs text-gray-400 font-normal truncate max-w-[160px]">{snapshots[i]!.name}</span>
                   )}
@@ -643,8 +678,8 @@ function ComparePanel({ tickers }: { tickers: string[] }) {
             {METRICS.map((metric, ri) => (
               <tr key={metric.label} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                 <td className="px-5 py-2.5 text-gray-500 font-medium">{metric.label}</td>
-                {tickers.map((t, i) => (
-                  <td key={t} className="px-5 py-2.5 text-gray-900">
+                {tickers.map((tk, i) => (
+                  <td key={tk} className="px-5 py-2.5 text-gray-900">
                     {snapshots[i] ? metric.get(snapshots[i]!) : <span className="text-gray-300">—</span>}
                   </td>
                 ))}
@@ -662,9 +697,16 @@ function ComparePanel({ tickers }: { tickers: string[] }) {
 function ETFDetailPanel({ ticker, onRemove }: { ticker: string; onRemove: () => void }) {
   const [confirmRemove, setConfirmRemove] = useState(false)
   const { data: snap, isLoading, error } = useETFSnapshot(ticker)
+  const { t } = useLanguage()
   const containerRef = useRef<HTMLDivElement>(null)
   const sectionRefs = useRef<Partial<Record<SubTab, HTMLDivElement>>>({})
   const [activeSection, setActiveSection] = useState<SubTab>('overview')
+
+  const subTabLabels: Record<SubTab, string> = {
+    overview: t.etfOverview, chart: t.etfChart, rendite: t.etfYield,
+    basisinfo: t.etfDetails, zusammensetzung: t.etfComposition,
+    risiko: t.etfRisk, sparplan: t.etfSavingsPlan,
+  }
 
   useEffect(() => {
     const container = containerRef.current
@@ -672,10 +714,10 @@ function ETFDetailPanel({ ticker, onRemove }: { ticker: string; onRemove: () => 
     const handle = () => {
       const containerTop = container.getBoundingClientRect().top
       let active: SubTab = 'overview'
-      for (const t of SUB_TABS) {
-        const el = sectionRefs.current[t.id]
+      for (const id of SUB_TABS) {
+        const el = sectionRefs.current[id]
         if (!el) continue
-        if (el.getBoundingClientRect().top - containerTop <= 60) active = t.id
+        if (el.getBoundingClientRect().top - containerTop <= 60) active = id
       }
       setActiveSection(active)
     }
@@ -704,7 +746,7 @@ function ETFDetailPanel({ ticker, onRemove }: { ticker: string; onRemove: () => 
           {snap && <span className="ml-2 text-sm text-gray-400">{snap.name}</span>}
         </div>
         <button onClick={() => setConfirmRemove(true)} className="text-xs text-red-400 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50">
-          Remove
+          {t.etfRemove}
         </button>
         {confirmRemove && (
           <ConfirmDialog
@@ -718,12 +760,12 @@ function ETFDetailPanel({ ticker, onRemove }: { ticker: string; onRemove: () => 
 
       {/* Anchor nav — outside scroll area so it doesn't affect scroll calculations */}
       <div className="bg-white border-b border-xero-border flex overflow-x-auto flex-shrink-0">
-        {SUB_TABS.map(t => (
-          <button key={t.id} onClick={() => scrollTo(t.id)}
+        {SUB_TABS.map(id => (
+          <button key={id} onClick={() => scrollTo(id)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap flex-shrink-0 ${
-              activeSection === t.id ? 'border-xero-green text-xero-green' : 'border-transparent text-gray-500 hover:text-gray-800'
+              activeSection === id ? 'border-xero-green text-xero-green' : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}>
-            {t.label}
+            {subTabLabels[id]}
           </button>
         ))}
       </div>
@@ -749,31 +791,31 @@ function ETFDetailPanel({ ticker, onRemove }: { ticker: string; onRemove: () => 
         {snap && !error && (
           <div className="p-6 space-y-10">
             <div ref={sectionRef('overview')}>
-              <SectionHeader>Overview</SectionHeader>
+              <SectionHeader>{subTabLabels.overview}</SectionHeader>
               <OverviewPanel snap={snap} />
             </div>
             <div ref={sectionRef('chart')}>
-              <SectionHeader>Chart</SectionHeader>
+              <SectionHeader>{subTabLabels.chart}</SectionHeader>
               <ChartPanel ticker={ticker} currency={snap.currency} />
             </div>
             <div ref={sectionRef('rendite')}>
-              <SectionHeader>Rendite</SectionHeader>
+              <SectionHeader>{subTabLabels.rendite}</SectionHeader>
               <RenditePanel ticker={ticker} />
             </div>
             <div ref={sectionRef('basisinfo')}>
-              <SectionHeader>Basisinfo</SectionHeader>
+              <SectionHeader>{subTabLabels.basisinfo}</SectionHeader>
               <BasiInfoPanel snap={snap} />
             </div>
             <div ref={sectionRef('zusammensetzung')}>
-              <SectionHeader>Zusammensetzung</SectionHeader>
+              <SectionHeader>{subTabLabels.zusammensetzung}</SectionHeader>
               <ZusammensetzungPanel ticker={ticker} />
             </div>
             <div ref={sectionRef('risiko')}>
-              <SectionHeader>Risiko</SectionHeader>
+              <SectionHeader>{subTabLabels.risiko}</SectionHeader>
               <RisikoPanel ticker={ticker} />
             </div>
             <div ref={sectionRef('sparplan')} className="pb-16">
-              <SectionHeader>Sparplan</SectionHeader>
+              <SectionHeader>{subTabLabels.sparplan}</SectionHeader>
               <SparplanPanel ticker={ticker} currency={snap.currency} />
             </div>
           </div>
@@ -790,6 +832,7 @@ export function ETFTab() {
   const [compareMode, setCompareMode] = useState(false)
   const [compareSet, setCompareSet] = useState<Set<string>>(new Set())
   const { tickers, add, remove } = useETFWatchlist()
+  const { t } = useLanguage()
 
   function handleSelect(ticker: string) { setSelected(ticker) }
 
@@ -822,12 +865,12 @@ export function ETFTab() {
       {/* Watchlist sidebar — hidden on mobile when detail is open */}
       <div className={`${showDetailMobile ? 'hidden md:flex' : 'flex'} w-full md:w-56 flex-shrink-0 border-r border-xero-border bg-white flex-col min-h-0`}>
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Watchlist</p>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t.etfWatchlist}</p>
           <button onClick={toggleCompareMode}
             className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
               compareMode ? 'bg-blue-500 text-white' : 'text-gray-500 hover:bg-gray-100 border border-gray-200'
             }`}>
-            {compareMode ? `${compareList.length}/3 ✓` : 'Vergleich'}
+            {compareMode ? `${compareList.length}/3 ✓` : t.etfCompare}
           </button>
         </div>
         <AddTickerPanel onAdd={add} />
