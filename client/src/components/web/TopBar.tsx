@@ -12,6 +12,7 @@ import {
   IconCheck, IconChevronDown,
 } from '../../lib/icons'
 import { THEMES } from '../../hooks/useDarkMode'
+import { useBackendStatus } from '../../hooks/useBackendStatus'
 
 const LANG_OPTIONS: { value: Lang; label: string }[] = [
   { value: 'en', label: 'EN' },
@@ -36,6 +37,7 @@ export function TopBar() {
   const { theme, setTheme } = useDarkMode()
   const { user, logout } = useAuth()
   const { lang, t, setLang } = useLanguage()
+  const backendStatus = useBackendStatus()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -102,6 +104,12 @@ export function TopBar() {
 
       {/* Right side */}
       <div className="ml-auto flex items-center gap-1">
+        {backendStatus === 'down' && (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/30 mr-1" title="Backend unreachable — showing cached data">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />
+            <span className="text-[10px] text-red-400 font-medium hidden sm:inline">Offline</span>
+          </div>
+        )}
         <NotificationsPanel />
 
         {/* User menu */}
