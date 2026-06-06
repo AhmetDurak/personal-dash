@@ -60,6 +60,8 @@ function buildChartTicks(candles: ETFCandle[], range: ChartRange): { ticks: stri
     else key = `${y}-${m}`
     if (!seen.has(key)) { seen.add(key); ticks.push(c.date) }
   }
+  // Cap 1Y at every other month to avoid label crowding on narrow screens
+  if (range === '1y' && ticks.length > 6) ticks.splice(0, ticks.length, ...ticks.filter((_, i) => i % 2 === 0))
   const fmt = (date: string): string => {
     const [y, m, d] = date.split('-')
     const mon = TICK_MONTHS[Number(m) - 1]
@@ -195,9 +197,9 @@ function OverviewPanel({ snap }: { snap: ETFSnapshot }) {
     <div className="space-y-4">
       <div className="bg-white rounded-xl border border-xero-border p-6">
         <p className="text-sm text-gray-500 mb-1">{snap.name}</p>
-        <div className="flex items-end gap-4">
-          <span className="text-4xl font-bold text-gray-900">{fmtPrice(snap.price, snap.currency)}</span>
-          <span className={`text-lg font-semibold mb-0.5 ${pos ? 'text-emerald-600' : 'text-red-500'}`}>
+        <div className="flex flex-wrap items-end gap-3">
+          <span className="text-2xl md:text-4xl font-bold text-gray-900">{fmtPrice(snap.price, snap.currency)}</span>
+          <span className={`text-base md:text-lg font-semibold mb-0.5 ${pos ? 'text-emerald-600' : 'text-red-500'}`}>
             {fmtPct(snap.changePct)} ({pos ? '+' : ''}{fmtPrice(snap.change, snap.currency)})
           </span>
         </div>
@@ -211,7 +213,7 @@ function OverviewPanel({ snap }: { snap: ETFSnapshot }) {
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {kpis.map(k => (
           <div key={k.label} className="bg-white rounded-xl border border-xero-border p-4">
             <p className="text-xs text-gray-400 mb-1">{k.label}</p>
@@ -244,7 +246,7 @@ function ChartPanel({ ticker, currency }: { ticker: string; currency: string }) 
         <div className="flex gap-1">
           {CHART_RANGES.map(r => (
             <button key={r} onClick={() => setRange(r)}
-              className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${
+              className={`px-2.5 py-2 text-xs rounded-md font-medium transition-colors ${
                 range === r ? 'bg-xero-green text-white' : 'text-gray-500 hover:bg-gray-100'
               }`}>
               {RANGE_LABELS[r]}
@@ -449,7 +451,7 @@ function ZusammensetzungPanel({ ticker }: { ticker: string }) {
               <Tooltip formatter={(v: number) => [`${v.toFixed(2)}%`, t.etfShareLabel]} contentStyle={{ borderRadius: 8, border: '1px solid #E8EBF0', fontSize: 12 }} />
               <Bar dataKey="weight" radius={[0, 4, 4, 0]}>
                 {data.sectors.map((_, i) => <Cell key={i} fill={SECTOR_COLORS[i % SECTOR_COLORS.length]} />)}
-                <LabelList dataKey="weight" position="right" formatter={(v: number) => `${v.toFixed(1)}%`} style={{ fontSize: 10, fill: '#6B7280' }} />
+                <LabelList dataKey="weight" position="right" formatter={(v: number) => `${v.toFixed(1)}%`} style={{ fontSize: 10, fill: '#9CA3AF' }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -630,7 +632,7 @@ function ComparePanel({ tickers }: { tickers: string[] }) {
           <div className="flex gap-1">
             {CHART_RANGES.map(r => (
               <button key={r} onClick={() => setRange(r)}
-                className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${range === r ? 'bg-xero-green text-white' : 'text-gray-500 hover:bg-gray-100'}`}>
+                className={`px-2.5 py-2 text-xs rounded-md font-medium transition-colors ${range === r ? 'bg-xero-green text-white' : 'text-gray-500 hover:bg-gray-100'}`}>
                 {RANGE_LABELS[r]}
               </button>
             ))}
@@ -659,8 +661,8 @@ function ComparePanel({ tickers }: { tickers: string[] }) {
       </div>
 
       {/* Metrics table */}
-      <div className="bg-white rounded-xl border border-xero-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-xl border border-xero-border overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="bg-gray-50 border-b border-xero-border">
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-44">{t.etfKeyFigures}</th>
@@ -857,8 +859,8 @@ export function ETFTab() {
 
   const compareList = Array.from(compareSet)
 
-  // On mobile: show detail panel full-screen when an ETF is selected
-  const showDetailMobile = !compareMode && selected
+  // On mobile: show detail panel full-screen when an ETF is selected, or compare is ready
+  const showDetailMobile = (!compareMode && selected) || (compareMode && compareList.length >= 2)
 
   return (
     <div className="flex h-full min-h-0">
@@ -878,14 +880,14 @@ export function ETFTab() {
           {tickers.length === 0 && (
             <p className="text-xs text-gray-400 text-center py-6 px-4">Noch keine ETFs. Ticker oben eingeben.</p>
           )}
-          {tickers.map(t => (
+          {tickers.map(tk => (
             <WatchlistRow
-              key={t} ticker={t}
-              selected={!compareMode && selected === t}
-              onClick={() => !compareMode && handleSelect(t)}
+              key={tk} ticker={tk}
+              selected={!compareMode && selected === tk}
+              onClick={() => !compareMode && handleSelect(tk)}
               compareMode={compareMode}
-              inCompare={compareSet.has(t)}
-              onToggleCompare={() => toggleCompare(t)}
+              inCompare={compareSet.has(tk)}
+              onToggleCompare={() => toggleCompare(tk)}
             />
           ))}
         </div>
@@ -901,12 +903,20 @@ export function ETFTab() {
       {/* Right panel — full-screen on mobile when detail is open */}
       <div className={`${showDetailMobile ? 'flex' : 'hidden md:flex'} flex-1 flex-col min-h-0 overflow-hidden`}>
         {/* Mobile back button */}
-        {showDetailMobile && (
+        {!compareMode && showDetailMobile && (
           <button
             onClick={() => setSelected(null)}
             className="md:hidden flex items-center gap-1.5 px-4 py-2.5 text-sm text-gray-500 hover:text-gray-800 border-b border-xero-border bg-white flex-shrink-0"
           >
-            ← Watchlist
+            ← {t.etfWatchlist}
+          </button>
+        )}
+        {compareMode && showDetailMobile && (
+          <button
+            onClick={toggleCompareMode}
+            className="md:hidden flex items-center gap-1.5 px-4 py-2.5 text-sm text-gray-500 hover:text-gray-800 border-b border-xero-border bg-white flex-shrink-0"
+          >
+            ← {t.etfWatchlist}
           </button>
         )}
         {compareMode
