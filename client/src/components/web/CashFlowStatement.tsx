@@ -1,12 +1,46 @@
+import { useState } from 'react'
 import { formatEur } from '../../utils/format'
 import { CAT_COLORS } from '../../constants/categories'
 import { EXPENSE_CATS } from '../../types'
 import type { MonthSummary } from '../../types'
 
+type SortCol = 'category' | 'amount'
+type SortDir = 'asc' | 'desc'
+
 interface Props { summary: MonthSummary; prevEndBalance?: number }
 
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  return (
+    <span className={`ml-1 text-[10px] ${active ? 'text-gray-700' : 'text-gray-400'}`}>
+      {active ? (dir === 'asc' ? '▲' : '▼') : '⇅'}
+    </span>
+  )
+}
+
 export function CashFlowStatement({ summary, prevEndBalance = 0 }: Props) {
+  const [sortCol, setSortCol] = useState<SortCol>('amount')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
   const closingBalance = prevEndBalance + summary.net
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir(col === 'amount' ? 'desc' : 'asc') }
+  }
+
+  const expenseRows = EXPENSE_CATS
+    .map(cat => ({ cat, amount: summary.byCategory[cat] ?? 0 }))
+    .filter(r => r.amount > 0)
+    .sort((a, b) => {
+      const cmp = sortCol === 'category'
+        ? a.cat.localeCompare(b.cat)
+        : a.amount - b.amount
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+
+  function thClass(col: SortCol) {
+    return `text-right px-3 md:px-4 py-2.5 font-medium cursor-pointer select-none hover:text-gray-700 transition-colors ${sortCol === col ? 'text-gray-700' : ''}`
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-xero-border overflow-hidden">
@@ -17,9 +51,16 @@ export function CashFlowStatement({ summary, prevEndBalance = 0 }: Props) {
         <table className="w-full text-sm min-w-[420px]">
           <thead>
             <tr className="bg-xero-bg text-xs uppercase tracking-wide text-gray-500 border-b border-xero-border">
-              <th className="text-left px-4 md:px-6 py-2.5 font-medium">Category</th>
+              <th
+                className="text-left px-4 md:px-6 py-2.5 font-medium cursor-pointer select-none hover:text-gray-700 transition-colors"
+                onClick={() => handleSort('category')}
+              >
+                Category<SortIcon active={sortCol === 'category'} dir={sortDir} />
+              </th>
               <th className="text-right px-3 md:px-4 py-2.5 font-medium">Cash In</th>
-              <th className="text-right px-3 md:px-4 py-2.5 font-medium">Cash Out</th>
+              <th className={thClass('amount')} onClick={() => handleSort('amount')}>
+                Cash Out<SortIcon active={sortCol === 'amount'} dir={sortDir} />
+              </th>
               <th className="text-right px-4 md:px-6 py-2.5 font-medium">Net</th>
             </tr>
           </thead>
@@ -39,21 +80,17 @@ export function CashFlowStatement({ summary, prevEndBalance = 0 }: Props) {
             <tr className="bg-xero-bg/50">
               <td className="px-4 md:px-6 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide" colSpan={4}>Expenses</td>
             </tr>
-            {EXPENSE_CATS.map(cat => {
-              const amount = summary.byCategory[cat] ?? 0
-              if (!amount) return null
-              return (
-                <tr key={cat} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 md:px-6 py-3 flex items-center gap-2.5">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS[cat] }} />
-                    <span className="text-gray-700">{cat}</span>
-                  </td>
-                  <td className="px-3 md:px-4 py-3 text-right text-gray-400">—</td>
-                  <td className="px-3 md:px-4 py-3 text-right text-gray-700">{formatEur(amount)}</td>
-                  <td className="px-4 md:px-6 py-3 text-right text-gray-700">-{formatEur(amount)}</td>
-                </tr>
-              )
-            })}
+            {expenseRows.map(({ cat, amount }) => (
+              <tr key={cat} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 md:px-6 py-3 flex items-center gap-2.5">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS[cat] }} />
+                  <span className="text-gray-700">{cat}</span>
+                </td>
+                <td className="px-3 md:px-4 py-3 text-right text-gray-400">—</td>
+                <td className="px-3 md:px-4 py-3 text-right text-gray-700">{formatEur(amount)}</td>
+                <td className="px-4 md:px-6 py-3 text-right text-gray-700">-{formatEur(amount)}</td>
+              </tr>
+            ))}
           </tbody>
           <tfoot className="border-t-2 border-xero-border">
             <tr className="bg-xero-bg">
