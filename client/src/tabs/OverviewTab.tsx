@@ -9,7 +9,6 @@ import { NetSavingsLine } from '../components/web/NetSavingsLine'
 import { CategoryDonut } from '../components/web/CategoryDonut'
 import { CategoryStackedBar } from '../components/web/CategoryStackedBar'
 import { IncomeStackedBar } from '../components/web/IncomeStackedBar'
-import { SavingsRateLine } from '../components/web/SavingsRateLine'
 import { CategoryTrendLines } from '../components/web/CategoryTrendLines'
 import { TopPayeesBar } from '../components/web/TopPayeesBar'
 import { AddEntryModal } from '../components/web/AddEntryModal'
@@ -64,7 +63,6 @@ export function OverviewTab({ month, span, onSpanChange }: Props) {
             </div>
             {stackedExp && <CategoryStackedBar data={stackedExp} />}
             {stackedInc && <IncomeStackedBar data={stackedInc} />}
-            {bar && <SavingsRateLine data={bar} />}
             {stackedExp && <CategoryTrendLines data={stackedExp} />}
             {topPayees && topPayees.length > 0 && <TopPayeesBar data={topPayees} />}
           </>
