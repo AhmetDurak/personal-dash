@@ -76,7 +76,7 @@ function relativeDay(dateStr: string): string {
 
 const DELETE_BTN_W = 72
 
-function SwipeToDelete({ onDelete, children, resetKey }: { onDelete: () => void; children: ReactNode; resetKey?: number }) {
+function SwipeToDelete({ onDelete, children, resetKey, contentBg = '' }: { onDelete: () => void; children: ReactNode; resetKey?: number; contentBg?: string }) {
   const [offset, setOffset] = useState(0)
   const isDragging = useRef(false)
   const startX = useRef(0)
@@ -89,6 +89,7 @@ function SwipeToDelete({ onDelete, children, resetKey }: { onDelete: () => void;
     startX.current = e.clientX
     didDrag.current = false
     isDragging.current = true
+    e.currentTarget.setPointerCapture(e.pointerId)
   }
 
   function onPointerMove(e: React.PointerEvent) {
@@ -115,6 +116,7 @@ function SwipeToDelete({ onDelete, children, resetKey }: { onDelete: () => void;
         <span className="text-white text-xs font-bold">Delete</span>
       </div>
       <div
+        className={contentBg}
         style={{ transform: `translateX(${offset}px)`, transition: isDragging.current ? 'none' : 'transform 0.2s ease', touchAction: 'pan-y' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -268,7 +270,7 @@ function NotesView() {
         <div className="flex-1 overflow-y-auto">
           {isLoading && <p className="text-xs text-gray-400 p-4">Loading…</p>}
           {visibleNotes.map(n => (
-            <SwipeToDelete key={n.id} onDelete={() => handleDelete(n.id)}>
+            <SwipeToDelete key={n.id} onDelete={() => handleDelete(n.id)} contentBg="bg-gray-50">
               <button
                 onClick={() => setSelectedId(n.id)}
                 className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-100 transition-colors ${
@@ -1133,6 +1135,7 @@ function MindmapView() {
   async function handleDelete(id: number) {
     await deleteMindmap(id)
     setConfirmDeleteId(null)
+    setSwipeResetKey(k => k + 1)
     if (selectedId === id) setSelectedId(mindmaps.find(m => m.id !== id)?.id ?? null)
   }
 
@@ -1167,7 +1170,7 @@ function MindmapView() {
         <div className="flex-1 overflow-y-auto py-1">
           {isLoading && <p className="text-xs text-gray-500 px-3 py-2">Loading…</p>}
           {visibleMaps.map(m => (
-            <SwipeToDelete key={m.id} onDelete={() => setConfirmDeleteId(m.id)} resetKey={swipeResetKey}>
+            <SwipeToDelete key={m.id} onDelete={() => setConfirmDeleteId(m.id)} resetKey={swipeResetKey} contentBg="bg-xero-navy">
               <div className={`group flex items-center justify-between px-3 py-2 min-h-[44px] cursor-pointer rounded mx-1 my-0.5 transition-colors ${selectedId === m.id ? 'bg-xero-green/20 text-xero-green' : 'text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'}`}
                 onClick={() => { setSelectedId(m.id); onSelect() }}>
                 <span className="text-sm truncate flex-1">{m.title}</span>
