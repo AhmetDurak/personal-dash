@@ -76,21 +76,23 @@ function relativeDay(dateStr: string): string {
 
 const DELETE_BTN_W = 72
 
-function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children: ReactNode }) {
+function SwipeToDelete({ onDelete, children, resetKey }: { onDelete: () => void; children: ReactNode; resetKey?: number }) {
   const [offset, setOffset] = useState(0)
-  const [dragging, setDragging] = useState(false)
+  const isDragging = useRef(false)
   const startX = useRef(0)
   const didDrag = useRef(false)
+
+  useEffect(() => { setOffset(0) }, [resetKey])
 
   function onPointerDown(e: React.PointerEvent) {
     if (e.pointerType !== 'touch') return
     startX.current = e.clientX
     didDrag.current = false
-    setDragging(true)
+    isDragging.current = true
   }
 
   function onPointerMove(e: React.PointerEvent) {
-    if (!dragging) return
+    if (!isDragging.current) return
     const dx = e.clientX - startX.current
     if (Math.abs(dx) > 4) didDrag.current = true
     if (dx >= 0) { setOffset(0); return }
@@ -98,13 +100,13 @@ function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children:
   }
 
   function onPointerUp() {
-    if (!dragging) return
-    setDragging(false)
+    if (!isDragging.current) return
+    isDragging.current = false
     setOffset(prev => (prev < -DELETE_BTN_W / 2 ? -DELETE_BTN_W : 0))
   }
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative">
       <div
         className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-red-500 select-none"
         style={{ width: DELETE_BTN_W }}
@@ -113,7 +115,7 @@ function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children:
         <span className="text-white text-xs font-bold">Delete</span>
       </div>
       <div
-        style={{ transform: `translateX(${offset}px)`, transition: dragging ? 'none' : 'transform 0.2s ease' }}
+        style={{ transform: `translateX(${offset}px)`, transition: isDragging.current ? 'none' : 'transform 0.2s ease', touchAction: 'pan-y' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -1097,6 +1099,7 @@ function MindmapView() {
     setMapParams(p => { id !== null ? p.set('map', String(id)) : p.delete('map'); return p })
   }
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [swipeResetKey, setSwipeResetKey] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeFolder, setActiveFolder] = useState<string | null>(null)
   const [newFolderInput, setNewFolderInput] = useState(false)
@@ -1164,11 +1167,11 @@ function MindmapView() {
         <div className="flex-1 overflow-y-auto py-1">
           {isLoading && <p className="text-xs text-gray-500 px-3 py-2">Loading…</p>}
           {visibleMaps.map(m => (
-            <SwipeToDelete key={m.id} onDelete={() => setConfirmDeleteId(m.id)}>
-              <div className={`group flex items-center justify-between px-3 py-2 cursor-pointer rounded mx-1 my-0.5 transition-colors ${selectedId === m.id ? 'bg-xero-green/20 text-xero-green' : 'text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'}`}
+            <SwipeToDelete key={m.id} onDelete={() => setConfirmDeleteId(m.id)} resetKey={swipeResetKey}>
+              <div className={`group flex items-center justify-between px-3 py-2 min-h-[44px] cursor-pointer rounded mx-1 my-0.5 transition-colors ${selectedId === m.id ? 'bg-xero-green/20 text-xero-green' : 'text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'}`}
                 onClick={() => { setSelectedId(m.id); onSelect() }}>
                 <span className="text-sm truncate flex-1">{m.title}</span>
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                <div className="flex items-center gap-0.5 md:opacity-0 md:group-hover:opacity-100 transition-all">
                   {/* Folder picker for this map */}
                   <div className="relative">
                     <button onClick={e => { e.stopPropagation(); setFolderPickerId(folderPickerId === m.id ? null : m.id) }}
@@ -1249,7 +1252,7 @@ function MindmapView() {
           message="This mindmap and all its nodes will be deleted."
           confirmLabel="Delete"
           onConfirm={() => handleDelete(confirmDeleteId)}
-          onCancel={() => setConfirmDeleteId(null)}
+          onCancel={() => { setConfirmDeleteId(null); setSwipeResetKey(k => k + 1) }}
         />
       )}
     </div>
