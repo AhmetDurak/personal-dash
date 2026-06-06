@@ -218,9 +218,11 @@ function NotesView() {
   }
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [swipeResetKey, setSwipeResetKey] = useState(0)
 
   async function handleDelete(id: number) {
     await deleteNote(id)
+    setSwipeResetKey(k => k + 1)
     if (selectedId === id) setSelectedId(null)
   }
 
@@ -270,7 +272,7 @@ function NotesView() {
         <div className="flex-1 overflow-y-auto">
           {isLoading && <p className="text-xs text-gray-400 p-4">Loading…</p>}
           {visibleNotes.map(n => (
-            <SwipeToDelete key={n.id} onDelete={() => handleDelete(n.id)} contentBg="bg-gray-50">
+            <SwipeToDelete key={n.id} onDelete={() => handleDelete(n.id)} contentBg="bg-gray-50" resetKey={swipeResetKey}>
               <button
                 onClick={() => setSelectedId(n.id)}
                 className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-100 transition-colors ${
