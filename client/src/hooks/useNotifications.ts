@@ -64,7 +64,7 @@ export function useNotifications() {
   const urgentCount = (data?.reminders ?? []).filter(r =>
     r.due_at != null && new Date(r.due_at).getTime() <= Date.now() + 24 * 60 * 60 * 1000
   ).length
-  const badgeCount = (data?.etfAlerts.length ?? 0) + urgentCount
+  const badgeCount = urgentCount
 
   return { data, isLoading, badgeCount, addReminder, toggleDone, deleteReminder }
 }
