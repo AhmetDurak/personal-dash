@@ -154,48 +154,46 @@ function PreviewCard({ label, value, color }: { label: string; value: string; tr
 
 // ── Feature data ───────────────────────────────────────────────────────────────
 
-import {
-  TrendingUp, CalendarCheck, Dumbbell, BookOpen, Utensils, Bell,
-} from 'lucide-react'
+import { IconIncome, IconCalCheck, IconWorkout, IconBook, IconMeal, IconBell } from '../../lib/icons'
 
 const FEATURES = [
   {
-    Icon: TrendingUp,
+    Icon: IconIncome,
     label: 'Finance Tracking',
     desc: 'Profit & Loss, cash flow, ETF watchlist, and budget goals.',
     bg: 'bg-blue-500/10',
     color: 'text-blue-400',
   },
   {
-    Icon: CalendarCheck,
+    Icon: IconCalCheck,
     label: 'Daily Planner',
     desc: 'Tasks, journal, weekly view — stay on top of every day.',
     bg: 'bg-purple-500/10',
     color: 'text-purple-400',
   },
   {
-    Icon: Dumbbell,
+    Icon: IconWorkout,
     label: 'Fitness & Health',
     desc: 'Log workouts, track weight, set targets and monitor progress.',
     bg: 'bg-rose-500/10',
     color: 'text-rose-400',
   },
   {
-    Icon: Utensils,
+    Icon: IconMeal,
     label: 'Meal & Nutrition',
     desc: 'Calorie tracking, recipes, and smart shopping lists.',
     bg: 'bg-emerald-500/10',
     color: 'text-emerald-400',
   },
   {
-    Icon: BookOpen,
+    Icon: IconBook,
     label: 'Learning Hub',
     desc: 'Notes, mindmaps, vocabulary flashcards with spaced repetition.',
     bg: 'bg-amber-500/10',
     color: 'text-amber-400',
   },
   {
-    Icon: Bell,
+    Icon: IconBell,
     label: 'Reminders',
     desc: 'Never miss anything important with smart date-based alerts.',
     bg: 'bg-cyan-500/10',

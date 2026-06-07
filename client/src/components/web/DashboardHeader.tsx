@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import { MonthSelector } from './MonthSelector'
+import { IconMenu } from '../../lib/icons'
 
 const TITLES: Record<string, string> = {
   overview:     'Profit & Loss',
@@ -30,11 +31,7 @@ export function DashboardHeader({ month, onMonthChange, onMenuClick }: Props) {
           className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
           aria-label="Open menu"
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <rect y="3"  width="18" height="2" rx="1" fill="currentColor"/>
-            <rect y="8"  width="18" height="2" rx="1" fill="currentColor"/>
-            <rect y="13" width="18" height="2" rx="1" fill="currentColor"/>
-          </svg>
+          <IconMenu className="w-5 h-5" strokeWidth={2} />
         </button>
         <h1 className="text-lg md:text-xl font-semibold text-gray-900">{TITLES[page] ?? 'Dashboard'}</h1>
       </div>

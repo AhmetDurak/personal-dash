@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage,
-  IconBook, IconMessage, IconLayers } from '../lib/icons'
+  IconBook, IconMessage, IconLayers, IconMenu, IconCheck } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
@@ -1236,9 +1236,7 @@ function MindmapView() {
             onClick={() => setMobileOpen(true)}
             className="text-gray-400 hover:text-white transition-colors p-1"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <IconMenu className="w-4 h-4" strokeWidth={2} />
           </button>
           <span className="text-sm text-gray-300 font-medium truncate">{selectedTitle}</span>
         </div>
@@ -1751,9 +1749,7 @@ function VocabView() {
                   selectedIds.has(card.id) ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'
                 }`}>
                   {selectedIds.has(card.id) && (
-                    <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
-                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+                    <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />
                   )}
                 </div>
               ) : (
@@ -2453,9 +2449,7 @@ function SectionShell({
               onClick={() => setSidebarOpen(true)}
               className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <IconMenu className="w-5 h-5" strokeWidth={2} />
             </button>
             <h1 className="text-xl font-semibold text-gray-900">{currentLabel}</h1>
           </header>
