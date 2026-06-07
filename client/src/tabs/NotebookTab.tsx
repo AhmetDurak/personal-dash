@@ -3376,9 +3376,9 @@ function LanguageTab() {
   const { dark } = useDarkMode()
 
   const LANG_VIEWS = [
-    { path: 'vocab',    label: t.vocab,    icon: <IconBook     className="w-3.5 h-3.5" strokeWidth={2} /> },
-    { path: 'sentence', label: t.sentence, icon: <IconMessage  className="w-3.5 h-3.5" strokeWidth={2} /> },
     { path: 'scenario', label: t.scenario, icon: <IconLayers   className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { path: 'sentence', label: t.sentence, icon: <IconMessage  className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { path: 'vocab',    label: t.vocab,    icon: <IconBook     className="w-3.5 h-3.5" strokeWidth={2} /> },
   ]
 
   return (
@@ -3407,7 +3407,7 @@ function LanguageTab() {
           <Route path="vocab"    element={<VocabView />} />
           <Route path="sentence" element={<SentenceView />} />
           <Route path="scenario" element={<ScenarioView />} />
-          <Route index element={<Navigate to="vocab" replace />} />
+          <Route index element={<Navigate to="scenario" replace />} />
         </Routes>
       </div>
     </div>
