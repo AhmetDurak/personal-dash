@@ -3169,7 +3169,7 @@ function SentenceView() {
   const cardCls = `rounded-2xl border p-4 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'}`
 
   // Reusable edit form fields (shared between new-card and inline edit)
-  function EditFormFields({ isInline = false }: { isInline?: boolean }) {
+  function editFormFields(isInline = false) {
     return (
       <div className="space-y-2">
         <textarea
@@ -3300,7 +3300,7 @@ function SentenceView() {
       {editingId === 'new' && (
         <div className={cardCls}>
           <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">{t.addSentence}</p>
-          <EditFormFields />
+          {editFormFields()}
         </div>
       )}
 
@@ -3313,7 +3313,7 @@ function SentenceView() {
         return (
           <div key={s.id} className={cardCls}>
             {editingId === s.id ? (
-              <EditFormFields isInline />
+              editFormFields(true)
             ) : (
               <div>
                 {/* Memory palace badge */}
