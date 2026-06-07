@@ -154,7 +154,7 @@ function PreviewCard({ label, value, color }: { label: string; value: string; tr
 
 // ── Feature data ───────────────────────────────────────────────────────────────
 
-import { IconIncome, IconCalCheck, IconWorkout, IconBook, IconMeal, IconBell } from '../../lib/icons'
+import { IconIncome, IconCalCheck, IconWorkout, IconBook, IconMeal, IconBell } from '../lib/icons'
 
 const FEATURES = [
   {
