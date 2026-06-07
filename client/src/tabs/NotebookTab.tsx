@@ -1373,6 +1373,25 @@ function strSimilarity(a: string, b: string): number {
   return 1 - dp[m][n] / Math.max(m, n)
 }
 
+// Shows a tooltip after 2s of hover — used on SR rating buttons.
+function RateTooltip({ children, text }: { children: ReactNode; text: string }) {
+  const [show, setShow] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function onEnter() { timer.current = setTimeout(() => setShow(true), 2000) }
+  function onLeave() { if (timer.current) clearTimeout(timer.current); setShow(false) }
+  return (
+    <div className="relative" onMouseEnter={onEnter} onMouseLeave={onLeave}>
+      {children}
+      {show && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-44 bg-gray-900 text-white text-[11px] leading-relaxed rounded-xl px-3 py-2 shadow-xl pointer-events-none text-center">
+          {text}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // SM-2 targets 90% retention at due_at. Solve: 0.9 = e^(-1/k) → k = -1/ln(0.9) ≈ 9.49
 const LN09K = -1 / Math.log(0.9)
 
@@ -1710,14 +1729,16 @@ function VocabView() {
             {!typeMode && flipped && (
               <div className="grid grid-cols-4 gap-2">
                 {[
-                  { q: 0, label: t.again, cls: 'bg-red-100 text-red-700 hover:bg-red-200' },
-                  { q: 2, label: t.hard,  cls: 'bg-amber-100 text-amber-700 hover:bg-amber-200' },
-                  { q: 4, label: t.good,  cls: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
-                  { q: 5, label: t.easy,  cls: 'bg-sky-100 text-sky-700 hover:bg-sky-200' },
-                ].map(({ q, label, cls }) => (
-                  <button key={q} onClick={() => handleRate(q)} className={`text-xs font-semibold rounded-lg py-2.5 transition-colors ${cls}`}>
-                    {label}
-                  </button>
+                  { q: 0, label: t.again, cls: 'bg-red-100 text-red-700 hover:bg-red-200',       tip: 'Failed. Resets to 1 day — you\'ll see it again soon.' },
+                  { q: 2, label: t.hard,  cls: 'bg-amber-100 text-amber-700 hover:bg-amber-200', tip: 'Barely recalled. Resets interval — needs more practice.' },
+                  { q: 4, label: t.good,  cls: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200', tip: 'Recalled correctly. Interval advances normally.' },
+                  { q: 5, label: t.easy,  cls: 'bg-sky-100 text-sky-700 hover:bg-sky-200',       tip: 'Recalled instantly. Longer interval + easier factor.' },
+                ].map(({ q, label, cls, tip }) => (
+                  <RateTooltip key={q} text={tip}>
+                    <button onClick={() => handleRate(q)} className={`w-full text-xs font-semibold rounded-lg py-2.5 transition-colors ${cls}`}>
+                      {label}
+                    </button>
+                  </RateTooltip>
                 ))}
               </div>
             )}
@@ -2945,18 +2966,18 @@ function ReviewSession({
               <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">{current.back ?? '—'}</p>
             </div>
             <div className="flex gap-2 pt-1">
-              <button onClick={() => rate(1)} disabled={loading}
-                className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50">
-                Again
-              </button>
-              <button onClick={() => rate(3)} disabled={loading}
-                className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors disabled:opacity-50">
-                Hard
-              </button>
-              <button onClick={() => rate(5)} disabled={loading}
-                className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50">
-                Easy
-              </button>
+              {[
+                { q: 1, label: 'Again', cls: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30',       tip: 'Failed. Resets to 1 day — you\'ll see it again soon.' },
+                { q: 3, label: 'Hard',  cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30', tip: 'Recalled with difficulty. Small interval advance.' },
+                { q: 5, label: 'Easy',  cls: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30', tip: 'Recalled instantly. Longer interval + easier factor.' },
+              ].map(({ q, label, cls, tip }) => (
+                <RateTooltip key={q} text={tip}>
+                  <button onClick={() => rate(q as ReviewQuality)} disabled={loading}
+                    className={`flex-1 py-2.5 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 ${cls}`}>
+                    {label}
+                  </button>
+                </RateTooltip>
+              ))}
             </div>
           </div>
         )}
