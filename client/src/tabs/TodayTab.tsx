@@ -112,9 +112,6 @@ function PlanPanel({ date }: { date: string }) {
     }
   }, [plan])
 
-  // reset when date changes
-  useEffect(() => { loaded.current = false; setTasks([]); setNotes('') }, [date])
-
   function scheduleSave(ts: PlanTask[], n: string) {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSaving(true)
@@ -310,6 +307,31 @@ function WeekPlanView({
   weekStart, selectedDay, onSelectDay,
 }: { weekStart: string; selectedDay: string | null; onSelectDay: (d: string) => void }) {
   const days = getWeekDays(weekStart)
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+      {days.map(date => (
+        <WeekDayRow
+          key={date}
+          date={date}
+          selected={selectedDay === date}
+          onSelect={() => onSelectDay(date)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function MonthDayListView({
+  year, month, selectedDay, onSelectDay,
+}: {
+  year: number; month: number
+  selectedDay: string | null; onSelectDay: (d: string) => void
+}) {
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const days: string[] = []
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push(`${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`)
+  }
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
       {days.map(date => (
@@ -571,9 +593,7 @@ export function TodayTab() {
     })
   }
 
-  const isCalendarScope     = scope === 'month' || scope === 'year'
-  const showSelectedDayPlan = isCalendarScope && selectedDate !== null
-  const planDate            = selectedDate ?? dayDate
+  const showYearSelectedDay = scope === 'year' && selectedDate !== null
 
   // Week header navigation
   function prevWeek() { up({ weekStart: offsetDay(weekStart, -7), weekDay: null }) }
@@ -592,10 +612,10 @@ export function TodayTab() {
   }
 
   const headerSub =
-    selectedDate      ? fmtFull(selectedDate) :
-    scope === 'week'  ? weekLabel(weekStart) :
-    scope === 'month' ? `${MONTH_NAMES[viewMonthMon - 1]} ${viewMonthYear}` :
-    scope === 'year'  ? String(viewYear) :
+    showYearSelectedDay   ? fmtFull(selectedDate!) :
+    scope === 'week'      ? weekLabel(weekStart) :
+    scope === 'month'     ? `${MONTH_NAMES[viewMonthMon - 1]} ${viewMonthYear}` :
+    scope === 'year'      ? String(viewYear) :
     fmtFull(dayDate)
 
   const SCOPES: { key: PlanScope; label: string }[] = [
@@ -616,34 +636,36 @@ export function TodayTab() {
         onSelectDay={d => up({ weekDay: d })}
       />
     )
-    return <PlanPanel key={planDate} date={scope === 'day' ? dayDate : planDate} />
+    if (scope === 'month') return (
+      <MonthDayListView
+        year={viewMonthYear} month={viewMonthMon - 1}
+        selectedDay={selectedDate}
+        onSelectDay={d => up({ selected: d })}
+      />
+    )
+    return <PlanPanel key={dayDate} date={dayDate} />
   }
 
   // Right panel content based on scope
   function renderRightPanel() {
+    const placeholder = (
+      <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+        <div className="text-center">
+          <p className="text-3xl mb-2">📅</p>
+          <p>Select a day to view its plan</p>
+        </div>
+      </div>
+    )
     if (scope === 'week') {
-      return weekDay
-        ? <PlanPanel key={weekDay} date={weekDay} />
-        : (
-          <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-            <div className="text-center">
-              <p className="text-3xl mb-2">📅</p>
-              <p>Select a day to view its plan</p>
-            </div>
-          </div>
-        )
+      return weekDay ? <PlanPanel key={weekDay} date={weekDay} /> : placeholder
     }
-    return <JournalPanel date={scope === 'day' ? dayDate : undefined} />
+    if (scope === 'month') {
+      return selectedDate ? <PlanPanel key={selectedDate} date={selectedDate} /> : placeholder
+    }
+    return <JournalPanel date={dayDate} />
   }
 
-  function renderCalendarContent() {
-    if (scope === 'month') return (
-      <MonthCalendarView
-        year={viewMonthYear} month={viewMonthMon - 1}
-        onPrev={prevMonth} onNext={nextMonth}
-        selected={selectedDate} onSelect={d => up({ selected: d })}
-      />
-    )
+  function renderYearCalendar() {
     return (
       <YearCalendarView
         year={viewYear} onYearChange={y => up({ viewYear: String(y), selected: null })}
@@ -658,12 +680,12 @@ export function TodayTab() {
       <header className="flex flex-col px-4 md:px-6 py-2.5 bg-white border-b border-xero-border flex-shrink-0 gap-1.5 overflow-hidden">
         {/* Title + back button */}
         <div className="flex items-center gap-2 min-w-0">
-          {showSelectedDayPlan && (
+          {showYearSelectedDay && (
             <button
               onClick={() => up({ selected: null })}
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors flex-shrink-0"
             >
-              ‹ {scope === 'month' ? 'Month' : 'Year'}
+              ‹ Year
             </button>
           )}
           <div className="min-w-0">
@@ -727,7 +749,7 @@ export function TodayTab() {
           )}
 
           {/* Month navigator */}
-          {mode === 'plan' && scope === 'month' && !showSelectedDayPlan && (
+          {mode === 'plan' && scope === 'month' && (
             <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
               <button onClick={prevMonth} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
                 <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
@@ -742,7 +764,7 @@ export function TodayTab() {
           )}
 
           {/* Scope pills (Week / Month / Year) */}
-          {mode === 'plan' && !showSelectedDayPlan && (
+          {mode === 'plan' && (
             <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
               {SCOPES.map(s => (
                 <button
@@ -777,14 +799,14 @@ export function TodayTab() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {mode === 'challenges' ? (
           <ChallengesView scope="general" />
-        ) : isCalendarScope && !showSelectedDayPlan ? (
-          renderCalendarContent()
-        ) : isCalendarScope && showSelectedDayPlan ? (
+        ) : scope === 'year' && !showYearSelectedDay ? (
+          renderYearCalendar()
+        ) : scope === 'year' && showYearSelectedDay ? (
           <div className="h-full bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
-            {renderPlanContent()}
+            <PlanPanel key={selectedDate!} date={selectedDate!} />
           </div>
         ) : (
-          /* Day or Week scope */
+          /* Day / Week / Month — all use split view */
           <>
             <div className="hidden md:flex h-full">
               <div className="flex-1 border-r border-xero-border bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
@@ -796,19 +818,24 @@ export function TodayTab() {
             </div>
             {/* Mobile */}
             <div className="md:hidden h-full bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
-              {scope === 'week' ? (
-                weekDay
-                  ? (
-                    <div className="flex flex-col h-full">
-                      <button onClick={() => up({ weekDay: null })} className="flex items-center gap-1 px-4 py-2.5 text-xs text-gray-400 hover:text-gray-600 border-b border-gray-100">
-                        ‹ Week
-                      </button>
-                      <PlanPanel key={weekDay} date={weekDay} />
-                    </div>
-                  )
-                  : renderPlanContent()
-              ) : (
+              {scope === 'week' && weekDay ? (
+                <div className="flex flex-col h-full">
+                  <button onClick={() => up({ weekDay: null })} className="flex items-center gap-1 px-4 py-2.5 text-xs text-gray-400 hover:text-gray-600 border-b border-gray-100">
+                    ‹ Week
+                  </button>
+                  <PlanPanel key={weekDay} date={weekDay} />
+                </div>
+              ) : scope === 'month' && selectedDate ? (
+                <div className="flex flex-col h-full">
+                  <button onClick={() => up({ selected: null })} className="flex items-center gap-1 px-4 py-2.5 text-xs text-gray-400 hover:text-gray-600 border-b border-gray-100">
+                    ‹ Month
+                  </button>
+                  <PlanPanel key={selectedDate} date={selectedDate} />
+                </div>
+              ) : scope === 'day' ? (
                 mobilePanel === 'plan' ? renderPlanContent() : <JournalPanel date={dayDate} />
+              ) : (
+                renderPlanContent()
               )}
             </div>
           </>
