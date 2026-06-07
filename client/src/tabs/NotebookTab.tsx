@@ -2774,7 +2774,11 @@ function SentenceView() {
   const [reviewMode, setReviewMode]   = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const dueItems = sentences.filter(s => isDueSR(s.due_at))
+  const [langFilter, setLangFilter] = useState<string | null>(() => localStorage.getItem('sent:langFilter') ?? null)
+
+  const langs = [...new Set(sentences.map(s => s.source_lang))].sort()
+  const filtered = langFilter ? sentences.filter(s => s.source_lang === langFilter) : sentences
+  const dueItems = filtered.filter(s => isDueSR(s.due_at))
 
   function openNew() {
     setDraft({ source_text: '', translation: null, source_lang: 'de', target_lang: 'tr', word_links: [], memory_palace: null })
@@ -2944,9 +2948,24 @@ function SentenceView() {
           </button>
         )}
         <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">
-          {sentences.length} sentences
+          {filtered.length}{langFilter ? `/${sentences.length}` : ''} sentences
         </span>
       </div>
+
+      {langs.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <button
+            onClick={() => { setLangFilter(null); localStorage.removeItem('sent:langFilter') }}
+            className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${!langFilter ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+          >🌐 All <span className="opacity-60">({sentences.length})</span></button>
+          {langs.map(lang => (
+            <button key={lang}
+              onClick={() => { const next = langFilter === lang ? null : lang; setLangFilter(next); next ? localStorage.setItem('sent:langFilter', next) : localStorage.removeItem('sent:langFilter') }}
+              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${langFilter === lang ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+            >{LANG_LABELS[lang] ?? lang} <span className="opacity-60">({sentences.filter(s => s.source_lang === lang).length})</span></button>
+          ))}
+        </div>
+      )}
 
       {editingId === 'new' && (
         <div className={cardCls}>
@@ -2955,11 +2974,11 @@ function SentenceView() {
         </div>
       )}
 
-      {sentences.length === 0 && editingId !== 'new' && (
+      {filtered.length === 0 && editingId !== 'new' && (
         <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">{t.noSentencesYet}</p>
       )}
 
-      {sentences.map(s => {
+      {filtered.map(s => {
         const due = isDueSR(s.due_at)
         return (
           <div key={s.id} className={cardCls}>
@@ -3034,8 +3053,12 @@ function ScenarioView() {
   const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [langFilter, setLangFilter] = useState<string | null>(() => localStorage.getItem('scen:langFilter') ?? null)
+
+  const langs = [...new Set(scenarios.map(s => s.source_lang))].sort()
+  const filteredScenarios = langFilter ? scenarios.filter(s => s.source_lang === langFilter) : scenarios
   const active   = scenarios.find(s => s.id === activeId) ?? null
-  const dueItems = scenarios.filter(s => isDueSR(s.due_at))
+  const dueItems = filteredScenarios.filter(s => isDueSR(s.due_at))
 
   async function handleNew() {
     const s = await createScenario()
@@ -3209,14 +3232,31 @@ function ScenarioView() {
             🏛️ Review {dueItems.length} due
           </button>
         )}
-        <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">{scenarios.length} scenarios</span>
+        <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">
+          {filteredScenarios.length}{langFilter ? `/${scenarios.length}` : ''} scenarios
+        </span>
       </div>
 
-      {scenarios.length === 0 && (
+      {langs.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <button
+            onClick={() => { setLangFilter(null); localStorage.removeItem('scen:langFilter') }}
+            className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${!langFilter ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+          >🌐 All <span className="opacity-60">({scenarios.length})</span></button>
+          {langs.map(lang => (
+            <button key={lang}
+              onClick={() => { const next = langFilter === lang ? null : lang; setLangFilter(next); next ? localStorage.setItem('scen:langFilter', next) : localStorage.removeItem('scen:langFilter') }}
+              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${langFilter === lang ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+            >{LANG_LABELS[lang] ?? lang} <span className="opacity-60">({scenarios.filter(s => s.source_lang === lang).length})</span></button>
+          ))}
+        </div>
+      )}
+
+      {filteredScenarios.length === 0 && (
         <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">{t.noScenariosYet}</p>
       )}
       <div className="space-y-2">
-        {scenarios.map(s => {
+        {filteredScenarios.map(s => {
           const due = isDueSR(s.due_at)
           return (
             <button
