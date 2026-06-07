@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useJournalEntry } from '../hooks/useJournal'
 import { useDailyPlan } from '../hooks/useDailyPlan'
@@ -89,7 +89,7 @@ function TagBadge({ tag }: { tag: TaskTag }) {
 
 // ─── Plan panel (single day) ──────────────────────────────────────────────────
 
-function PlanPanel({ date }: { date: string }) {
+function PlanPanel({ date, listOnly = false }: { date: string; listOnly?: boolean }) {
   const { t } = useLanguage()
   const { plan, save } = useDailyPlan(date)
   const { add: addReminder } = useAllReminders()
@@ -101,18 +101,34 @@ function PlanPanel({ date }: { date: string }) {
   const [reminderDt, setReminderDt]     = useState('')
   const [showReminder, setShowReminder] = useState(false)
   const [showTagPicker, setShowTagPicker] = useState(false)
+  const [editingId, setEditingId]       = useState<string | null>(null)
+  const [editText, setEditText]         = useState('')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loaded = useRef(false)
+  const prevTaskIds = useRef('')
 
   useEffect(() => {
-    if (plan !== null && !loaded.current) {
-      setTasks(plan?.tasks ?? [])
-      setNotes(plan?.notes ?? '')
-      loaded.current = true
+    if (plan === null) return
+    if (listOnly) {
+      const ids = (plan.tasks ?? []).map(t => t.id).sort().join(',')
+      if (ids !== prevTaskIds.current) {
+        setTasks(plan.tasks ?? [])
+        prevTaskIds.current = ids
+      }
+    } else {
+      if (!loaded.current) {
+        setTasks(plan?.tasks ?? [])
+        setNotes(plan?.notes ?? '')
+        loaded.current = true
+      }
     }
-  }, [plan])
+  }, [plan, listOnly])
 
   function scheduleSave(ts: PlanTask[], n: string) {
+    if (listOnly) {
+      save(ts, plan?.notes ?? '')
+      return
+    }
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSaving(true)
     saveTimer.current = setTimeout(async () => { await save(ts, n); setSaving(false) }, 600)
@@ -145,7 +161,6 @@ function PlanPanel({ date }: { date: string }) {
     const updated = next.find(tk => tk.id === id)
     setTasks(next)
     scheduleSave(next, notes)
-    // Auto-log workout when a training schedule task is checked off
     if (task && updated?.done && task.trainingScheduleId) {
       const setCount = task.setsCount ?? 0
       const autoSets = setCount > 0
@@ -154,13 +169,7 @@ function PlanPanel({ date }: { date: string }) {
       fetch('/api/sport/logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date,
-          sets:         autoSets,
-          template_id:  task.templateId ?? null,
-          notes:        task.text,
-          duration_min: task.durationMin ?? null,
-        }),
+        body: JSON.stringify({ date, sets: autoSets, template_id: task.templateId ?? null, notes: task.text, duration_min: task.durationMin ?? null }),
       }).catch(() => {})
     }
   }
@@ -168,6 +177,18 @@ function PlanPanel({ date }: { date: string }) {
   function deleteTask(id: string) {
     const next = tasks.filter(tk => tk.id !== id)
     setTasks(next); scheduleSave(next, notes)
+  }
+
+  function startEdit(task: PlanTask) {
+    if (task.done) return
+    setEditingId(task.id); setEditText(task.text)
+  }
+
+  function commitEdit(id: string) {
+    const text = editText.trim()
+    if (!text) { setEditingId(null); return }
+    const next = tasks.map(tk => tk.id === id ? { ...tk, text } : tk)
+    setTasks(next); scheduleSave(next, notes); setEditingId(null)
   }
 
   const done  = tasks.filter(tk => tk.done).length
@@ -192,7 +213,7 @@ function PlanPanel({ date }: { date: string }) {
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
         {tasks.length === 0 && <p className="text-sm text-gray-400 text-center py-6">{t.noTasksYet}</p>}
         {tasks.map(task => (
-          <div key={task.id} className="flex items-center gap-3 group bg-white border border-gray-100 rounded-xl px-4 py-3 hover:border-gray-200 transition-colors">
+          <div key={task.id} className="flex items-center gap-3 group bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 hover:border-gray-200 transition-colors">
             <button
               onClick={() => toggleTask(task.id)}
               className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
@@ -206,74 +227,79 @@ function PlanPanel({ date }: { date: string }) {
               )}
             </button>
             <div className="flex-1 min-w-0">
-              {task.tag && <TagBadge tag={task.tag} />}
-              <span className={`block text-sm ${task.done ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.text}</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {task.tag && <TagBadge tag={task.tag} />}
+                {task.timeOfDay && (
+                  <span className="text-[10px] bg-violet-50 dark:bg-violet-900/20 text-violet-500 px-1.5 py-0.5 rounded-full">
+                    🕐 {task.timeOfDay}
+                  </span>
+                )}
+              </div>
+              {editingId === task.id ? (
+                <input
+                  autoFocus
+                  value={editText}
+                  onChange={e => setEditText(e.target.value)}
+                  onBlur={() => commitEdit(task.id)}
+                  onKeyDown={e => { if (e.key === 'Enter') commitEdit(task.id); if (e.key === 'Escape') setEditingId(null) }}
+                  className="block w-full text-sm border-0 border-b border-xero-green focus:outline-none bg-transparent text-gray-800 dark:text-slate-100 mt-0.5"
+                />
+              ) : (
+                <span
+                  onClick={() => startEdit(task)}
+                  className={`block text-sm mt-0.5 ${task.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-slate-100 cursor-text'}`}
+                >{task.text}</span>
+              )}
             </div>
-            <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs">✕</button>
+            <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0">✕</button>
           </div>
         ))}
       </div>
 
-      <div className="flex-shrink-0 px-6 pb-4 space-y-2">
-        <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2">
-          <input
-            value={input}
-            onChange={e => { setInput(e.target.value); if (e.target.value) setShowTagPicker(true) }}
-            onFocus={() => setShowTagPicker(true)}
-            placeholder={t.addTask}
-            className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300"
+      {!listOnly && (
+        <div className="flex-shrink-0 px-6 pb-4 space-y-2">
+          {showTagPicker && (
+            <div className="flex gap-1.5">
+              {(Object.entries(TAG_META) as [TaskTag, typeof TAG_META[TaskTag]][]).map(([key, m]) => (
+                <button key={key} type="button" onClick={() => setTaskTag(key)}
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1 ${
+                    taskTag === key ? m.color + ' ring-1 ring-offset-1 ring-current' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                  }`}
+                >{m.icon} {m.label}</button>
+              ))}
+            </div>
+          )}
+          <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2">
+            <input
+              value={input}
+              onChange={e => { setInput(e.target.value); if (e.target.value) setShowTagPicker(true) }}
+              onFocus={() => setShowTagPicker(true)}
+              placeholder={t.addTask}
+              className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300"
+            />
+            <button type="button" onClick={toggleReminderInput} title="Set reminder"
+              className={`flex-shrink-0 px-2.5 py-2 rounded-xl transition-colors ${
+                showReminder ? 'bg-amber-100 text-amber-500' : 'bg-gray-100 text-gray-400 hover:text-amber-500 dark:bg-gray-700 dark:text-gray-500'
+              }`}>
+              <IconBell className="w-4 h-4" strokeWidth={2} />
+            </button>
+            <button type="submit" className="text-sm px-3 py-2 bg-gray-900 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
+              {t.add}
+            </button>
+          </form>
+          {showReminder && (
+            <input type="datetime-local" value={reminderDt} onChange={e => setReminderDt(e.target.value)}
+              className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 bg-amber-50/30" />
+          )}
+          <textarea
+            value={notes}
+            onChange={e => { setNotes(e.target.value); scheduleSave(tasks, e.target.value) }}
+            placeholder={t.motivationalNotesPlaceholder}
+            rows={3}
+            className="w-full text-sm border border-amber-100 bg-amber-50/40 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none placeholder-gray-400"
           />
-          <button
-            type="button"
-            onClick={toggleReminderInput}
-            title="Set reminder"
-            className={`flex-shrink-0 px-2.5 py-2 rounded-xl transition-colors ${
-              showReminder
-                ? 'bg-amber-100 text-amber-500 dark:bg-amber-900/30 dark:text-amber-400'
-                : 'bg-gray-100 text-gray-400 hover:text-amber-500 dark:bg-gray-700 dark:text-gray-500'
-            }`}
-          >
-            <IconBell className="w-4 h-4" strokeWidth={2} />
-          </button>
-          <button type="submit" className="text-sm px-3 py-2 bg-gray-900 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
-            {t.add}
-          </button>
-        </form>
-
-        {/* Tag picker — appears when input is focused */}
-        {showTagPicker && (
-          <div className="flex gap-1.5">
-            {(Object.entries(TAG_META) as [TaskTag, typeof TAG_META[TaskTag]][]).map(([key, m]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTaskTag(key)}
-                className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1 ${
-                  taskTag === key ? m.color + ' ring-1 ring-offset-1 ring-current' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                }`}
-              >
-                {m.icon} {m.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {showReminder && (
-          <input
-            type="datetime-local"
-            value={reminderDt}
-            onChange={e => setReminderDt(e.target.value)}
-            className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 bg-amber-50/30"
-          />
-        )}
-        <textarea
-          value={notes}
-          onChange={e => { setNotes(e.target.value); scheduleSave(tasks, e.target.value) }}
-          placeholder={t.motivationalNotesPlaceholder}
-          rows={3}
-          className="w-full text-sm border border-amber-100 bg-amber-50/40 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none placeholder-gray-400"
-        />
-      </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -557,6 +583,167 @@ function YearCalendarView({
 
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
+// ─── Accordion section ────────────────────────────────────────────────────────
+
+function AccordionSection({ title, open, onToggle, children, grow = true }: {
+  title: string; open: boolean; onToggle: () => void
+  children: React.ReactNode; grow?: boolean
+}) {
+  return (
+    <div className={`flex flex-col min-h-0 border-b border-gray-100 dark:border-slate-800 ${open && grow ? 'flex-1' : 'flex-shrink-0'}`}>
+      <button
+        onClick={onToggle}
+        className="flex-shrink-0 flex items-center justify-between px-5 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
+      >
+        <span className="text-xs font-semibold text-amber-500 dark:text-amber-400 uppercase tracking-wide">{title}</span>
+        <IconChevronRight
+          className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+          strokeWidth={2}
+        />
+      </button>
+      {open && (
+        <div className={`min-h-0 ${grow ? 'flex-1 overflow-hidden' : 'overflow-y-auto max-h-64'}`}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Plan entry (add-task form + notes, for day scope right panel) ────────────
+
+function PlanEntry({ date }: { date: string }) {
+  const { t } = useLanguage()
+  const { plan, save } = useDailyPlan(date)
+  const { add: addReminder } = useAllReminders()
+  const [input, setInput]               = useState('')
+  const [taskTag, setTaskTag]           = useState<TaskTag>('task')
+  const [showTagPicker, setShowTagPicker] = useState(false)
+  const [reminderDt, setReminderDt]     = useState('')
+  const [showReminder, setShowReminder] = useState(false)
+  const [notes, setNotes]               = useState('')
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notesLoaded = useRef(false)
+
+  useEffect(() => { notesLoaded.current = false; setNotes('') }, [date])
+  useEffect(() => {
+    if (plan !== null && !notesLoaded.current) {
+      setNotes(plan?.notes ?? '')
+      notesLoaded.current = true
+    }
+  }, [plan])
+
+  function scheduleNotesSave(n: string) {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => { save(plan?.tasks ?? [], n) }, 600)
+  }
+
+  async function addTask() {
+    const text = input.trim()
+    if (!text) return
+    const newTask: PlanTask = {
+      id: crypto.randomUUID(), text, done: false,
+      ...(taskTag !== 'task' ? { tag: taskTag } : {}),
+    }
+    await save([...(plan?.tasks ?? []), newTask], notes)
+    setInput(''); setTaskTag('task'); setShowTagPicker(false)
+    if (reminderDt) {
+      await addReminder({ title: text, due_at: reminderDt })
+      setReminderDt(''); setShowReminder(false)
+    }
+  }
+
+  function toggleReminderInput() {
+    if (showReminder) { setShowReminder(false); setReminderDt('') }
+    else { if (!reminderDt) setReminderDt(`${date}T09:00`); setShowReminder(true) }
+  }
+
+  return (
+    <div className="px-5 py-4 space-y-2">
+      {showTagPicker && (
+        <div className="flex gap-1.5">
+          {(Object.entries(TAG_META) as [TaskTag, typeof TAG_META[TaskTag]][]).map(([key, m]) => (
+            <button key={key} type="button" onClick={() => setTaskTag(key)}
+              className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1 ${
+                taskTag === key ? m.color + ' ring-1 ring-offset-1 ring-current' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+              }`}>{m.icon} {m.label}</button>
+          ))}
+        </div>
+      )}
+      <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2">
+        <input
+          value={input}
+          onChange={e => { setInput(e.target.value); if (e.target.value) setShowTagPicker(true) }}
+          onFocus={() => setShowTagPicker(true)}
+          placeholder={t.addTask}
+          className="flex-1 text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300 dark:bg-slate-800 dark:text-slate-100"
+        />
+        <button type="button" onClick={toggleReminderInput} title="Set reminder"
+          className={`flex-shrink-0 px-2.5 py-2 rounded-xl transition-colors ${
+            showReminder ? 'bg-amber-100 text-amber-500' : 'bg-gray-100 text-gray-400 hover:text-amber-500 dark:bg-slate-700 dark:text-slate-400'
+          }`}>
+          <IconBell className="w-4 h-4" strokeWidth={2} />
+        </button>
+        <button type="submit" className="text-sm px-3 py-2 bg-gray-900 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
+          {t.add}
+        </button>
+      </form>
+      {showReminder && (
+        <input type="datetime-local" value={reminderDt} onChange={e => setReminderDt(e.target.value)}
+          className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 bg-amber-50/30" />
+      )}
+      <textarea
+        value={notes}
+        onChange={e => { setNotes(e.target.value); scheduleNotesSave(e.target.value) }}
+        placeholder={t.motivationalNotesPlaceholder}
+        rows={4}
+        className="w-full text-sm border border-amber-100 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-900/10 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none placeholder-gray-400"
+      />
+    </div>
+  )
+}
+
+// ─── Right panel (accordion Plan + Log) ───────────────────────────────────────
+
+function RightPanel({
+  scope, weekDay, selectedDate, dayDate,
+}: { scope: PlanScope; weekDay: string | null; selectedDate: string | null; dayDate: string }) {
+  const [planOpen, setPlanOpen] = useState(true)
+  const [logOpen, setLogOpen]   = useState(true)
+
+  const placeholder = (
+    <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+      <div className="text-center">
+        <p className="text-3xl mb-2">📅</p>
+        <p>Select a day to view its plan</p>
+      </div>
+    </div>
+  )
+
+  if (scope === 'week' && !weekDay) return placeholder
+  if (scope === 'month' && !selectedDate) return placeholder
+
+  const activeDate = scope === 'week' ? weekDay! : scope === 'month' ? selectedDate! : dayDate
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <AccordionSection title={scope === 'day' ? 'Plan' : 'Plan'} open={planOpen} onToggle={() => setPlanOpen(v => !v)}>
+        {scope === 'day'
+          ? <PlanEntry key={activeDate} date={activeDate} />
+          : <PlanPanel key={activeDate} date={activeDate} />
+        }
+      </AccordionSection>
+      <AccordionSection
+        title={scope === 'day' ? "Today's Log" : "Day's Log"}
+        open={logOpen}
+        onToggle={() => setLogOpen(v => !v)}
+      >
+        <JournalPanel date={activeDate} />
+      </AccordionSection>
+    </div>
+  )
+}
+
 type TodayMode = 'plan' | 'challenges'
 type PlanScope = 'day' | 'week' | 'month' | 'year'
 type Panel     = 'plan' | 'journal'
@@ -616,6 +803,7 @@ export function TodayTab() {
     fmtFull(dayDate)
 
   const SCOPES: { key: PlanScope; label: string }[] = [
+    { key: 'day',   label: 'Today'    },
     { key: 'week',  label: t.thisWeek },
     { key: 'month', label: 'Month'    },
     { key: 'year',  label: 'Year'     },
@@ -640,26 +828,7 @@ export function TodayTab() {
         onSelectDay={d => up({ selected: d })}
       />
     )
-    return <PlanPanel key={dayDate} date={dayDate} />
-  }
-
-  // Right panel content based on scope
-  function renderRightPanel() {
-    const placeholder = (
-      <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-        <div className="text-center">
-          <p className="text-3xl mb-2">📅</p>
-          <p>Select a day to view its plan</p>
-        </div>
-      </div>
-    )
-    if (scope === 'week') {
-      return weekDay ? <PlanPanel key={weekDay} date={weekDay} /> : placeholder
-    }
-    if (scope === 'month') {
-      return selectedDate ? <PlanPanel key={selectedDate} date={selectedDate} /> : placeholder
-    }
-    return <JournalPanel date={dayDate} />
+    return <PlanPanel key={dayDate} date={dayDate} listOnly />
   }
 
   function renderYearCalendar() {
@@ -687,10 +856,10 @@ export function TodayTab() {
           )}
           <div className="min-w-0">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wide leading-none mb-0.5">
-              {mode === 'challenges' ? 'Challenges' : t.planner}
+              {mode === 'challenges' ? 'Routine' : t.planner}
             </p>
             <h1 className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">
-              {mode === 'challenges' ? '🏆 My Challenges' : headerSub}
+              {mode === 'challenges' ? '🔁 My Routines' : headerSub}
             </h1>
           </div>
         </div>
@@ -710,7 +879,7 @@ export function TodayTab() {
               className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                 mode === 'challenges' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
-            >🏆 Challenges</button>
+            >🔁 Routine</button>
           </div>
 
           {/* Day navigator */}
@@ -803,14 +972,19 @@ export function TodayTab() {
             <PlanPanel key={selectedDate!} date={selectedDate!} />
           </div>
         ) : (
-          /* Day / Week / Month — all use split view */
+          /* Day / Week / Month — split view */
           <>
             <div className="hidden md:flex h-full">
               <div className="flex-1 border-r border-xero-border bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
                 {renderPlanContent()}
               </div>
               <div className="flex-1 bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
-                {renderRightPanel()}
+                <RightPanel
+                  scope={scope}
+                  weekDay={weekDay}
+                  selectedDate={selectedDate}
+                  dayDate={dayDate}
+                />
               </div>
             </div>
             {/* Mobile */}

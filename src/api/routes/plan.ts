@@ -12,6 +12,8 @@ export interface PlanTask {
   reps?: number | null
   weightKg?: number | null
   durationMin?: number | null
+  challengeId?: number
+  timeOfDay?: string | null
 }
 
 // 0=Mon..6=Sun from a YYYY-MM-DD string
@@ -27,23 +29,33 @@ export function planRouter(pool: Pool): Router {
     const uid  = (req.user as Express.User).id
     const { date } = req.params
 
-    const [planResult, scheduleResult] = await Promise.all([
+    const dow = dayOfWeek(date)  // 0=Mon..6=Sun
+    const [planResult, scheduleResult, routineResult] = await Promise.all([
       pool.query('SELECT * FROM daily_plans WHERE user_id=$1 AND date=$2', [uid, date]),
       pool.query(
         'SELECT * FROM training_schedules WHERE user_id=$1 AND day_of_week=$2 ORDER BY id',
-        [uid, dayOfWeek(date)]
+        [uid, dow]
+      ),
+      // Active routines: daily always, weekly if dow matches start_date dow
+      pool.query(
+        `SELECT * FROM challenges
+         WHERE user_id=$1 AND status='active'
+           AND repeat_cycle IN ('daily','weekly')
+           AND start_date <= $2
+           AND (end_date IS NULL OR end_date >= $2)`,
+        [uid, date]
       ),
     ])
 
     const plan  = planResult.rows[0] ?? null
     const tasks: PlanTask[] = plan ? plan.tasks : []
 
-    // Inject training tasks not already saved in this plan
-    const savedIds = new Set(
+    // Inject training tasks not already saved
+    const savedTrainingIds = new Set(
       tasks.filter(t => t.trainingScheduleId != null).map(t => t.trainingScheduleId)
     )
-    const extra: PlanTask[] = scheduleResult.rows
-      .filter(s => !savedIds.has(s.id))
+    const trainingExtra: PlanTask[] = scheduleResult.rows
+      .filter(s => !savedTrainingIds.has(s.id))
       .map(s => ({
         id:                 `ts-${s.id}-${date}`,
         text:               s.name,
@@ -57,7 +69,34 @@ export function planRouter(pool: Pool): Router {
         durationMin:        s.duration_min ?? null,
       }))
 
-    const merged = [...tasks, ...extra]
+    // Inject routines (daily always; weekly if start_date dow matches)
+    const savedChallengeIds = new Set(
+      tasks.filter(t => t.challengeId != null).map(t => t.challengeId)
+    )
+    const dateDow = new Date(date + 'T12:00:00').getDay()
+    const routineExtra: PlanTask[] = routineResult.rows
+      .filter(r => {
+        if (savedChallengeIds.has(r.id)) return false
+        if (r.repeat_cycle === 'daily') return true
+        if (r.repeat_cycle === 'weekly') {
+          const startStr = r.start_date instanceof Date
+            ? r.start_date.toISOString().slice(0, 10)
+            : String(r.start_date).slice(0, 10)
+          const startDow = new Date(startStr + 'T12:00:00').getDay()
+          return startDow === dateDow
+        }
+        return false
+      })
+      .map(r => ({
+        id:          `routine-${r.id}-${date}`,
+        text:        r.title,
+        done:        false,
+        tag:         'challenge' as const,
+        challengeId: r.id,
+        timeOfDay:   r.time_of_day ?? null,
+      }))
+
+    const merged = [...tasks, ...trainingExtra, ...routineExtra]
 
     if (plan) {
       res.json({ ...plan, tasks: merged })

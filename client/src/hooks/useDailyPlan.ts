@@ -13,6 +13,8 @@ export interface PlanTask {
   reps?: number | null
   weightKg?: number | null
   durationMin?: number | null
+  challengeId?: number
+  timeOfDay?: string | null
 }
 
 export interface DailyPlan {

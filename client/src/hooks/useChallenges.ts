@@ -28,6 +28,7 @@ export interface Challenge {
   repeat_cycle: RepeatCycle
   status:       ChallengeStatus
   checkpoints:  Checkpoint[]
+  time_of_day:  string | null
   created_at:   string
   updated_at:   string
 }
@@ -42,6 +43,7 @@ type CreatePayload = {
   end_date?:    string
   repeat_cycle: RepeatCycle
   checkpoints:  Checkpoint[]
+  time_of_day?: string | null
 }
 
 export function useChallenges(scope: ChallengeScope) {

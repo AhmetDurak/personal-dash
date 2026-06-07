@@ -263,6 +263,7 @@ CREATE TABLE IF NOT EXISTS challenges (
   updated_at     TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_challenges_user ON challenges(user_id);
+ALTER TABLE challenges ADD COLUMN IF NOT EXISTS time_of_day TEXT;
 
 CREATE TABLE IF NOT EXISTS body_weight (
   id         SERIAL PRIMARY KEY,

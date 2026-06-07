@@ -308,6 +308,7 @@ interface AddFormState {
   start_date:   string
   end_date:     string
   repeat_cycle: RepeatCycle
+  time_of_day:  string
 }
 
 function AddChallengeForm({ onSave, onCancel }: {
@@ -317,41 +318,41 @@ function AddChallengeForm({ onSave, onCancel }: {
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState<AddFormState>({
     title: '', description: '', target_value: '', target_unit: '',
-    start_date: today, end_date: '', repeat_cycle: 'none',
+    start_date: today, end_date: '', repeat_cycle: 'daily', time_of_day: '',
   })
 
   function set<K extends keyof AddFormState>(k: K, v: AddFormState[K]) {
     setForm(p => ({ ...p, [k]: v }))
   }
 
+  const inputCls = 'text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-2 py-2 focus:outline-none focus:ring-1 focus:ring-violet-400 w-full bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100'
+
   return (
     <div className="bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-4 space-y-3">
-      <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">New Challenge</p>
+      <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">New Routine</p>
 
       <input value={form.title} onChange={e => set('title', e.target.value)}
-        placeholder="Title *"
-        className="text-sm w-full border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-violet-400 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+        placeholder="Title *" autoFocus
+        className={inputCls} />
 
       <input value={form.description} onChange={e => set('description', e.target.value)}
         placeholder="Description (optional)"
-        className="text-sm w-full border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-violet-400 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+        className={inputCls} />
 
       <div className="grid grid-cols-2 gap-2">
         <div>
           <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">Target (optional)</p>
           <div className="flex gap-2">
             <input type="number" value={form.target_value} onChange={e => set('target_value', e.target.value)}
-              placeholder="Value" min={0}
-              className="text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-2 py-2 focus:outline-none w-full bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+              placeholder="Value" min={0} className={inputCls} />
             <input value={form.target_unit} onChange={e => set('target_unit', e.target.value)}
-              placeholder="Unit"
-              className="text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-2 py-2 focus:outline-none w-full bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+              placeholder="Unit" className={inputCls} />
           </div>
         </div>
         <div>
           <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">Repeat</p>
           <select value={form.repeat_cycle} onChange={e => set('repeat_cycle', e.target.value as RepeatCycle)}
-            className="text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-2 py-2 focus:outline-none w-full bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100">
+            className={inputCls}>
             {(Object.entries(REPEAT_LABELS) as [RepeatCycle, string][]).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
             ))}
@@ -361,14 +362,21 @@ function AddChallengeForm({ onSave, onCancel }: {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">Start date</p>
-          <input type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)}
-            className="text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-2 py-2 focus:outline-none w-full bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+          <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">Time (optional)</p>
+          <input type="time" value={form.time_of_day} onChange={e => set('time_of_day', e.target.value)}
+            className={inputCls} />
         </div>
-        <div>
-          <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">End date</p>
-          <input type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)}
-            className="text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-2 py-2 focus:outline-none w-full bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">Start date</p>
+            <input type="date" value={form.start_date} onChange={e => set('start_date', e.target.value)}
+              className={inputCls} />
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">End date</p>
+            <input type="date" value={form.end_date} onChange={e => set('end_date', e.target.value)}
+              className={inputCls} />
+          </div>
         </div>
       </div>
 
@@ -416,6 +424,7 @@ export function ChallengesView({ scope }: Props) {
       end_date:     f.end_date     || undefined,
       repeat_cycle: f.repeat_cycle,
       checkpoints:  [],
+      time_of_day:  f.time_of_day  || null,
     })
     setShowAdd(false)
   }
@@ -446,7 +455,7 @@ export function ChallengesView({ scope }: Props) {
           className="flex items-center gap-1.5 text-xs bg-violet-500 text-white px-3 py-2 rounded-xl font-medium hover:bg-violet-600 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
-          New Challenge
+          + New Routine
         </button>
       </div>
 
