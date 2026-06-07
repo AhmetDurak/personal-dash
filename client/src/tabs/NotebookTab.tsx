@@ -3287,17 +3287,14 @@ function ScenarioView() {
 
 // ─── LanguageTab (inner: Vocabulary · Sentence · Scenario) ───────────────────
 
-type LangView = 'vocab' | 'sentence' | 'scenario'
-
 function LanguageTab() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const [view, setView] = useState<LangView>('vocab')
 
-  const LANG_VIEWS: { id: LangView; label: string; icon: ReactNode }[] = [
-    { id: 'vocab',    label: t.vocab,    icon: <IconBook     className="w-3.5 h-3.5" strokeWidth={2} /> },
-    { id: 'sentence', label: t.sentence, icon: <IconMessage  className="w-3.5 h-3.5" strokeWidth={2} /> },
-    { id: 'scenario', label: t.scenario, icon: <IconLayers   className="w-3.5 h-3.5" strokeWidth={2} /> },
+  const LANG_VIEWS = [
+    { path: 'vocab',    label: t.vocab,    icon: <IconBook     className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { path: 'sentence', label: t.sentence, icon: <IconMessage  className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { path: 'scenario', label: t.scenario, icon: <IconLayers   className="w-3.5 h-3.5" strokeWidth={2} /> },
   ]
 
   return (
@@ -3305,24 +3302,29 @@ function LanguageTab() {
       <header className={`flex items-center gap-1 px-4 py-2.5 border-b flex-shrink-0 overflow-hidden ${dark ? 'bg-slate-900 border-slate-700' : 'bg-white border-xero-border'}`}>
         <div className="flex overflow-x-auto gap-1 flex-1" style={{ scrollbarWidth: 'none' }}>
           {LANG_VIEWS.map(v => (
-            <button
-              key={v.id}
-              onClick={() => setView(v.id)}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
-                view === v.id
-                  ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900'
-                  : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
-              }`}
+            <NavLink
+              key={v.path}
+              to={v.path}
+              className={({ isActive }) =>
+                `text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
+                  isActive
+                    ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900'
+                    : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+                }`
+              }
             >
               {v.icon}{v.label}
-            </button>
+            </NavLink>
           ))}
         </div>
       </header>
       <div className="flex-1 overflow-y-auto">
-        {view === 'vocab'    && <VocabView />}
-        {view === 'sentence' && <SentenceView />}
-        {view === 'scenario' && <ScenarioView />}
+        <Routes>
+          <Route path="vocab"    element={<VocabView />} />
+          <Route path="sentence" element={<SentenceView />} />
+          <Route path="scenario" element={<ScenarioView />} />
+          <Route index element={<Navigate to="vocab" replace />} />
+        </Routes>
       </div>
     </div>
   )
