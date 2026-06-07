@@ -523,30 +523,6 @@ function MonthGrid({
 const MONTH_NAMES = ['January','February','March','April','May','June',
                      'July','August','September','October','November','December']
 
-function MonthCalendarView({
-  year, month, onPrev, onNext, selected, onSelect,
-}: {
-  year: number; month: number
-  onPrev: () => void; onNext: () => void
-  selected: string | null; onSelect: (d: string) => void
-}) {
-  const today = todayStr()
-  return (
-    <div className="p-4 md:p-6 max-w-sm mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={onPrev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">
-          <IconChevronLeft className="w-4 h-4" strokeWidth={2} />
-        </button>
-        <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">{MONTH_NAMES[month]} {year}</p>
-        <button onClick={onNext} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">
-          <IconChevronRight className="w-4 h-4" strokeWidth={2} />
-        </button>
-      </div>
-      <MonthGrid year={year} month={month} today={today} selected={selected} onSelect={onSelect} />
-    </div>
-  )
-}
-
 function YearCalendarView({
   year, onYearChange, selected, onSelect,
 }: {
@@ -734,7 +710,7 @@ export function TodayTab() {
           </div>
 
           {/* Day navigator */}
-          {mode === 'plan' && scope === 'day' && !showSelectedDayPlan && (
+          {mode === 'plan' && scope === 'day' && (
             <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
               <button onClick={prevDay} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
                 <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
