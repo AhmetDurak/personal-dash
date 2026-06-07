@@ -89,7 +89,7 @@ function TagBadge({ tag }: { tag: TaskTag }) {
 
 // ─── Plan panel (single day) ──────────────────────────────────────────────────
 
-function PlanPanel({ date, listOnly = false }: { date: string; listOnly?: boolean }) {
+function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string; listOnly?: boolean; noHeader?: boolean }) {
   const { t } = useLanguage()
   const { plan, save } = useDailyPlan(date)
   const { add: addReminder } = useAllReminders()
@@ -196,13 +196,15 @@ function PlanPanel({ date, listOnly = false }: { date: string; listOnly?: boolea
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-        <div>
-          <p className="text-xs font-semibold text-amber-500 uppercase tracking-wide">{t.planLabel}</p>
-          {total > 0 && <p className="text-xs text-gray-400 mt-0.5">{done}/{total} {done === total && total > 0 ? '✓' : ''}</p>}
+      {!noHeader && (
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <p className="text-xs font-semibold text-amber-500 uppercase tracking-wide">{t.planLabel}</p>
+            {total > 0 && <p className="text-xs text-gray-400 mt-0.5">{done}/{total} {done === total && total > 0 ? '✓' : ''}</p>}
+          </div>
+          {saving && <span className="text-xs text-gray-400">{t.saving}</span>}
         </div>
-        {saving && <span className="text-xs text-gray-400">{t.saving}</span>}
-      </div>
+      )}
 
       {total > 0 && (
         <div className="h-1 bg-gray-100 flex-shrink-0">
@@ -439,7 +441,7 @@ function PillList({ items, onChange, max, color, placeholder }: PillListProps) {
   )
 }
 
-function JournalPanel({ date }: { date?: string }) {
+function JournalPanel({ date, noHeader = false }: { date?: string; noHeader?: boolean }) {
   const { t } = useLanguage()
   const d = date ?? todayStr()
   const { entry, save } = useJournalEntry(d)
@@ -471,10 +473,12 @@ function JournalPanel({ date }: { date?: string }) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-        <p className="text-xs font-semibold text-xero-green uppercase tracking-wide">{t.todayLog}</p>
-        {saving && <span className="text-xs text-gray-400">{t.saving}</span>}
-      </div>
+      {!noHeader && (
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <p className="text-xs font-semibold text-xero-green uppercase tracking-wide">{t.todayLog}</p>
+          {saving && <span className="text-xs text-gray-400">{t.saving}</span>}
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         <textarea
           value={content}
@@ -727,10 +731,10 @@ function RightPanel({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <AccordionSection title={scope === 'day' ? 'Plan' : 'Plan'} open={planOpen} onToggle={() => setPlanOpen(v => !v)}>
+      <AccordionSection title="Plan" open={planOpen} onToggle={() => setPlanOpen(v => !v)}>
         {scope === 'day'
           ? <PlanEntry key={activeDate} date={activeDate} />
-          : <PlanPanel key={activeDate} date={activeDate} />
+          : <PlanPanel key={activeDate} date={activeDate} noHeader />
         }
       </AccordionSection>
       <AccordionSection
@@ -738,7 +742,7 @@ function RightPanel({
         open={logOpen}
         onToggle={() => setLogOpen(v => !v)}
       >
-        <JournalPanel date={activeDate} />
+        <JournalPanel date={activeDate} noHeader />
       </AccordionSection>
     </div>
   )
