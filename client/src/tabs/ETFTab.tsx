@@ -151,8 +151,9 @@ function AddTickerPanel({ onAdd }: { onAdd: (t: string) => Promise<void> }) {
 
   function handleEnter() {
     if (!query.trim()) return
-    // If search resolved results (ISIN/WKN/name lookup), use the first ticker
-    const resolved = results?.[0]?.ticker
+    // Only resolve via search for ISIN (12 chars) / WKN (6 chars) / longer queries.
+    // Short inputs are likely direct ticker fragments — add raw to avoid stale results.
+    const resolved = query.trim().length >= 6 ? results?.[0]?.ticker : undefined
     handleAdd(resolved ?? query.trim().toUpperCase())
   }
 
@@ -170,7 +171,7 @@ function AddTickerPanel({ onAdd }: { onAdd: (t: string) => Promise<void> }) {
           {results.slice(0, 6).map(r => (
             <li key={r.ticker}>
               <button disabled={adding} onClick={() => handleAdd(r.ticker)}
-                className="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+                className="w-full text-left px-3 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-50 last:border-0">
                 <span className="text-xs font-bold text-gray-800">{r.ticker}</span>
                 <span className="text-xs text-gray-400 ml-2">{r.name}</span>
               </button>
@@ -753,7 +754,7 @@ function ETFDetailPanel({ ticker, onRemove }: { ticker: string; onRemove: () => 
           <span className="text-lg font-bold text-gray-900">{ticker}</span>
           {snap && <span className="ml-2 text-sm text-gray-400">{snap.name}</span>}
         </div>
-        <button onClick={() => setConfirmRemove(true)} className="text-xs text-red-400 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50">
+        <button onClick={() => setConfirmRemove(true)} className="text-xs text-red-400 hover:text-red-600 active:bg-red-100 transition-colors px-3 py-2.5 rounded-lg hover:bg-red-50">
           {t.etfRemove}
         </button>
         {confirmRemove && (
@@ -875,7 +876,7 @@ export function ETFTab() {
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t.etfWatchlist}</p>
           <button onClick={toggleCompareMode}
-            className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
+            className={`text-xs px-2.5 py-2 rounded-lg font-medium transition-colors ${
               compareMode ? 'bg-blue-500 text-white' : 'text-gray-500 hover:bg-gray-100 border border-gray-200'
             }`}>
             {compareMode ? `${compareList.length}/3 ✓` : t.etfCompare}
