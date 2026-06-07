@@ -413,23 +413,37 @@ interface DragState {
 
 interface CtxMenu { nodeId: string; screenX: number; screenY: number }
 
-function initPositions(raw: MMNode[]): MMNode[] {
-  if (raw.every(n => n.x !== undefined)) return raw
+function computeLayout(raw: MMNode[]): MMNode[] {
   const root = raw.find(n => n.parentId === null)
-  if (!root) return raw.map(n => ({ ...n, x: n.x ?? 100, y: n.y ?? 100 }))
+  if (!root) return raw.map(n => ({ ...n, x: n.x ?? 0, y: n.y ?? 0 }))
   const childrenOf = new Map<string, MMNode[]>()
   raw.forEach(n => { if (n.parentId) { const l = childrenOf.get(n.parentId) ?? []; l.push(n); childrenOf.set(n.parentId, l) } })
   function leafCount(id: string): number { const ch = childrenOf.get(id) ?? []; return ch.length === 0 ? 1 : ch.reduce((s, c) => s + leafCount(c.id), 0) }
+  const SLOT = 100  // vertical slot per leaf — larger avoids crowding
+  const COL_W = 240 // horizontal spacing between depth levels
   const posMap = new Map<string, { x: number; y: number }>()
   const totalLeaves = leafCount(root.id)
-  const startY = -(totalLeaves * 40)
+  const startY = -(totalLeaves * SLOT) / 2
   function place(id: string, depth: number, yFrom: number, yTo: number) {
-    posMap.set(id, { x: 80 + depth * 220, y: (yFrom + yTo) / 2 - NODE_H / 2 })
-    const ch = childrenOf.get(id) ?? []; const total = leafCount(id); let cursor = yFrom
+    const ch = childrenOf.get(id) ?? []
+    const total = leafCount(id)
+    // Place parent at boundary between top-half and bottom-half children.
+    // For odd N, this avoids the middle child landing at exactly the same y as the parent.
+    const topHalfLeaves = ch.slice(0, Math.floor(ch.length / 2)).reduce((s, c) => s + leafCount(c.id), 0)
+    const parentY = ch.length === 0 ? (yFrom + yTo) / 2 : yFrom + (topHalfLeaves / total) * (yTo - yFrom)
+    posMap.set(id, { x: 80 + depth * COL_W, y: parentY - NODE_H / 2 })
+    let cursor = yFrom
     ch.forEach(c => { const sl = (leafCount(c.id) / total) * (yTo - yFrom); place(c.id, depth + 1, cursor, cursor + sl); cursor += sl })
   }
-  place(root.id, 0, startY, startY + totalLeaves * 80)
-  return raw.map(n => ({ ...n, x: n.x ?? (posMap.get(n.id)?.x ?? 100), y: n.y ?? (posMap.get(n.id)?.y ?? 100) }))
+  place(root.id, 0, startY, startY + totalLeaves * SLOT)
+  return raw.map(n => ({ ...n, x: posMap.get(n.id)?.x ?? 0, y: posMap.get(n.id)?.y ?? 0 }))
+}
+
+function initPositions(raw: MMNode[]): MMNode[] {
+  if (raw.every(n => n.x !== undefined)) return raw
+  const laid = computeLayout(raw)
+  const laidMap = new Map(laid.map(n => [n.id, n]))
+  return raw.map(n => ({ ...n, x: n.x ?? (laidMap.get(n.id)?.x ?? 0), y: n.y ?? (laidMap.get(n.id)?.y ?? 0) }))
 }
 
 function MindmapCanvas({ mapId }: { mapId: number }) {
@@ -810,7 +824,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
         back: r.back,
         parentId: r.parentLabel ? (idMap.get(r.parentLabel) ?? null) : null,
       }))
-      const placed = initPositions(newNodes)
+      const placed = computeLayout(newNodes)
       persist(placed, [])
       setImportMmMsg(`Imported ${placed.length} node${placed.length !== 1 ? 's' : ''}.`)
       setTimeout(() => setImportMmMsg(null), 4000)
@@ -1064,6 +1078,16 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
         {importMmMsg && (
           <span className="text-xs text-xero-green font-medium bg-white/90 backdrop-blur rounded-lg px-2.5 py-1.5 shadow-sm">{importMmMsg}</span>
         )}
+        <button
+          onClick={() => {
+            const relaid = computeLayout(nodesRef.current)
+            persist(relaid, edgesRef.current)
+          }}
+          className="text-xs bg-white/90 backdrop-blur border border-xero-border text-gray-600 px-3 py-1.5 rounded-xl font-medium hover:bg-white shadow-sm transition-colors"
+          title="Re-layout all nodes"
+        >
+          Re-layout
+        </button>
         <div className="relative" ref={csvMmTooltipRef}>
           <div className="flex items-center gap-1">
             <button
@@ -2889,7 +2913,7 @@ function ReviewSession({
     const pct = strSimilarity(answer, current.back)
     const correct = pct >= 0.9
     setAnswerResult({ correct, pct })
-    setTimeout(() => rate(correct ? 4 : 1), 1500)
+    setTimeout(() => rate(correct ? 5 : 1), 1500)
   }
 
   return (
