@@ -7,6 +7,7 @@ import { useLanguage } from '../hooks/useLanguage'
 import { useAllReminders } from '../hooks/useNotebook'
 import { ChallengesView } from '../components/web/ChallengesView'
 import { IconClose, IconChevronLeft, IconChevronRight, IconBell } from '../lib/icons'
+import { useRoutineReminders } from '../hooks/useRoutineReminders'
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -758,6 +759,7 @@ export function TodayTab() {
   const [mobilePanel, setMobilePanel] = useState<Panel>('plan')
 
   const today      = todayStr()
+  useRoutineReminders(today)
   const mode       = (searchParams.get('mode')  as TodayMode) ?? 'plan'
   const scope      = (searchParams.get('scope') as PlanScope) ?? 'day'
   const dayDate    = searchParams.get('date')      ?? today
