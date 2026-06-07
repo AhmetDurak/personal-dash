@@ -1076,14 +1076,14 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       {/* Floating CSV import — top-right */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-2" onClick={e => e.stopPropagation()}>
         {importMmMsg && (
-          <span className="text-xs text-xero-green font-medium bg-white/90 backdrop-blur rounded-lg px-2.5 py-1.5 shadow-sm">{importMmMsg}</span>
+          <span className="text-xs text-xero-green font-medium bg-white/90 dark:bg-slate-800/90 backdrop-blur rounded-lg px-2.5 py-1.5 shadow-sm">{importMmMsg}</span>
         )}
         <button
           onClick={() => {
             const relaid = computeLayout(nodesRef.current)
             persist(relaid, edgesRef.current)
           }}
-          className="text-xs bg-white/90 backdrop-blur border border-xero-border text-gray-600 px-3 py-1.5 rounded-xl font-medium hover:bg-white shadow-sm transition-colors"
+          className="text-xs bg-white/90 dark:bg-slate-800/90 backdrop-blur border border-xero-border text-gray-600 px-3 py-3 rounded-xl font-medium hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-colors"
           title="Re-layout all nodes"
         >
           Re-layout
@@ -1091,16 +1091,16 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
         <div className="relative" ref={csvMmTooltipRef}>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => csvMmInputRef.current?.click()}
+              onClick={() => { csvMmInputRef.current?.click(); setCsvMmTooltipOpen(false) }}
               onMouseEnter={() => setCsvMmTooltipOpen(true)}
               onMouseLeave={() => setCsvMmTooltipOpen(false)}
-              className="text-xs bg-white/90 backdrop-blur border border-xero-border text-gray-600 px-3 py-1.5 rounded-xl font-medium hover:bg-white shadow-sm transition-colors"
+              className="text-xs bg-white/90 dark:bg-slate-800/90 backdrop-blur border border-xero-border text-gray-600 px-3 py-3 rounded-xl font-medium hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-colors"
             >
               Import CSV
             </button>
             <button
               onClick={() => setCsvMmTooltipOpen(v => !v)}
-              className="w-5 h-5 rounded-full text-[10px] font-bold bg-white/90 backdrop-blur border border-xero-border text-gray-500 hover:bg-white shadow-sm transition-colors flex items-center justify-center flex-shrink-0"
+              className="w-11 h-11 rounded-full text-[10px] font-bold bg-white/90 dark:bg-slate-800/90 backdrop-blur border border-xero-border text-gray-500 hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-colors flex items-center justify-center flex-shrink-0"
               aria-label="CSV format info"
             >
               ?
@@ -1342,7 +1342,7 @@ function MindmapView() {
         <div className="md:hidden flex items-center gap-2 px-3 py-2 bg-xero-navy border-b border-xero-navy-light flex-shrink-0">
           <button
             onClick={() => setMobileOpen(true)}
-            className="text-gray-400 hover:text-white transition-colors p-1"
+            className="text-gray-400 hover:text-white transition-colors p-2.5"
           >
             <IconMenu className="w-4 h-4" strokeWidth={2} />
           </button>
