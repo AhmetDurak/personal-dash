@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { IconEdit, IconClose, IconDashboard, IconWorkout, IconClipboard, IconTarget, IconTrophy, IconScale } from '../lib/icons'
+import { IconEdit, IconClose, IconDashboard, IconWorkout, IconClipboard, IconTarget, IconTrophy, IconScale, IconCalendarDay } from '../lib/icons'
 import type { ReactNode } from 'react'
 import { useExercises, useTemplates, useWorkoutLogs, useFitnessTargets, useBodyWeight } from '../hooks/useSport'
 import type { ExerciseType, MuscleGroup, WorkoutSetGroup, SetEntry } from '../hooks/useSport'
@@ -841,7 +841,7 @@ export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
   function setView(v: View) { setSearchParams({ view: v }) }
   const VIEWS: { id: View; label: string; icon: ReactNode }[] = [
     { id: 'dashboard',  label: t.sportDashboard, icon: <IconDashboard className="w-3.5 h-3.5" strokeWidth={2} /> },
-    { id: 'plan',       label: 'Plan',           icon: <span className="text-[13px] leading-none">📅</span> },
+    { id: 'plan',       label: 'Plan',           icon: <IconCalendarDay className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'log',        label: t.logWorkout,     icon: <IconClipboard className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'targets',    label: t.targets,        icon: <IconTarget    className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'challenges', label: 'Challenges',     icon: <IconTrophy    className="w-3.5 h-3.5" strokeWidth={2} /> },

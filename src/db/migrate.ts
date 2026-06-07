@@ -299,6 +299,8 @@ ALTER TABLE transactions        ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAUL
 ALTER TABLE recurring_templates ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT NULL;
 
 -- Weekly training schedule (day_of_week: 0=Mon..6=Sun)
+ALTER TABLE training_schedules ADD COLUMN IF NOT EXISTS exercise_id INTEGER REFERENCES exercises(id);
+
 CREATE TABLE IF NOT EXISTS training_schedules (
   id           SERIAL PRIMARY KEY,
   user_id      INTEGER REFERENCES users(id),

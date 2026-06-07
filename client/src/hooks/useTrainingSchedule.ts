@@ -7,6 +7,7 @@ export interface TrainingScheduleEntry {
   user_id:      number
   day_of_week:  number   // 0=Mon..6=Sun
   name:         string
+  exercise_id:  number | null
   template_id:  number | null
   duration_min: number | null
   notes:        string | null
@@ -16,6 +17,7 @@ export interface TrainingScheduleEntry {
 export type CreateSchedulePayload = {
   day_of_week:  number
   name:         string
+  exercise_id?: number | null
   template_id?: number | null
   duration_min?: number | null
   notes?:       string | null
