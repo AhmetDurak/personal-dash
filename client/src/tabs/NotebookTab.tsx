@@ -407,6 +407,8 @@ interface DragState {
   offsetY: number
   startSvgX: number
   startSvgY: number
+  prevX: number
+  prevY: number
   moved: boolean
   pointerType: string
 }
@@ -476,6 +478,10 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   const [csvMmTooltipOpen, setCsvMmTooltipOpen] = useState(false)
   const csvMmInputRef = useRef<HTMLInputElement>(null)
   const csvMmTooltipRef = useRef<HTMLDivElement>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const selectedIdsRef = useRef<Set<string>>(new Set())
+  const [selBox, setSelBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const selBoxRef = useRef<{ startX: number; startY: number } | null>(null)
   const initialized = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -500,6 +506,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   useEffect(() => { edgesRef.current = edges }, [edges])
   useEffect(() => { titleRef.current = mmTitle }, [mmTitle])
   useEffect(() => { scaleRef.current = scale }, [scale])
+  useEffect(() => { selectedIdsRef.current = selectedIds }, [selectedIds])
 
   // Wheel zoom (desktop + trackpad) and two-finger pinch zoom (mobile)
   useEffect(() => {
@@ -621,12 +628,21 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
 
   function handleNodePointerDown(e: React.PointerEvent, id: string) {
     e.stopPropagation()
-    // Right-click is handled by onContextMenu — skip all drag/flip logic
     if (e.button === 2) return
+    // Ctrl/Meta+click: toggle this node in the multi-selection (no drag)
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        if (next.has(id)) next.delete(id); else next.add(id)
+        selectedIdsRef.current = next
+        return next
+      })
+      return
+    }
     const node = nodesRef.current.find(n => n.id === id)
     if (!node) return
     const { x, y } = clientToSvg(e.clientX, e.clientY)
-    dragRef.current = { id, offsetX: x - (node.x ?? 0), offsetY: y - (node.y ?? 0), startSvgX: x, startSvgY: y, moved: false, pointerType: e.pointerType }
+    dragRef.current = { id, offsetX: x - (node.x ?? 0), offsetY: y - (node.y ?? 0), startSvgX: x, startSvgY: y, prevX: x, prevY: y, moved: false, pointerType: e.pointerType }
     setCtxMenu(null)
     // Long-press → context menu (touch substitute for right-click)
     if (e.pointerType === 'touch') {
@@ -643,7 +659,6 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   }
 
   function handleSvgPointerMove(e: React.PointerEvent) {
-    // Only cancel long-press if finger moved beyond drag threshold — timer's own check handles the rest
     if (longPressTimer.current) {
       const d = dragRef.current
       if (d) {
@@ -654,6 +669,13 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       } else {
         clearTimeout(longPressTimer.current); longPressTimer.current = null
       }
+    }
+    // Selection box (desktop mouse drag on background)
+    const sb = selBoxRef.current
+    if (sb) {
+      const { x, y } = clientToSvg(e.clientX, e.clientY)
+      setSelBox({ x: Math.min(x, sb.startX), y: Math.min(y, sb.startY), w: Math.abs(x - sb.startX), h: Math.abs(y - sb.startY) })
+      return
     }
     const p = panRef.current
     if (p) {
@@ -668,7 +690,16 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
     const d = dragRef.current
     if (d) {
       if (!d.moved && Math.hypot(x - d.startSvgX, y - d.startSvgY) > 4) dragRef.current = { ...d, moved: true }
-      const moved = nodesRef.current.map(n => n.id === d.id ? { ...n, x: x - d.offsetX, y: y - d.offsetY } : n)
+      const dx = x - d.prevX
+      const dy = y - d.prevY
+      dragRef.current = { ...dragRef.current!, prevX: x, prevY: y }
+      const sel = selectedIdsRef.current
+      const isMultiDrag = sel.size > 1 && sel.has(d.id)
+      const moved = nodesRef.current.map(n =>
+        (n.id === d.id || (isMultiDrag && sel.has(n.id)))
+          ? { ...n, x: (n.x ?? 0) + dx, y: (n.y ?? 0) + dy }
+          : n
+      )
       nodesRef.current = moved
       setNodes(moved)
       return
@@ -683,8 +714,26 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
   }
 
   function handleSvgPointerUp(e: React.PointerEvent) {
-    // Right-click is handled by onContextMenu — skip flip/select logic
     if (e.button === 2) { dragRef.current = null; return }
+    // Finalize rubber-band selection (desktop)
+    if (selBoxRef.current) {
+      const box = selBox
+      selBoxRef.current = null
+      setSelBox(null)
+      if (box && (box.w > 6 || box.h > 6)) {
+        const hit = new Set(nodesRef.current.filter(n =>
+          (n.x ?? 0) + NODE_W > box.x && (n.x ?? 0) < box.x + box.w &&
+          (n.y ?? 0) + NODE_H > box.y && (n.y ?? 0) < box.y + box.h
+        ).map(n => n.id))
+        setSelectedIds(hit)
+        selectedIdsRef.current = hit
+      } else {
+        // plain click on background = clear selection
+        setSelectedIds(new Set())
+        selectedIdsRef.current = new Set()
+      }
+      return
+    }
     if (panRef.current) {
       panRef.current = null
       setIsPanning(false)
@@ -873,10 +922,17 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
           {/* Background — full viewport, infinite feel */}
           <rect
             x="-10000" y="-10000" width="20000" height="20000" fill="url(#dots)"
-            style={{ cursor: 'grab' }}
+            style={{ cursor: selBoxRef.current ? 'crosshair' : 'grab' }}
             onPointerDown={e => {
               if (dragRef.current || connectRef.current) return
-              panRef.current = { startX: e.clientX, startY: e.clientY, tx: panStateRef.current.x, ty: panStateRef.current.y }
+              if (e.pointerType === 'touch') {
+                panRef.current = { startX: e.clientX, startY: e.clientY, tx: panStateRef.current.x, ty: panStateRef.current.y }
+              } else {
+                const { x, y } = clientToSvg(e.clientX, e.clientY)
+                selBoxRef.current = { startX: x, startY: y }
+                setSelBox({ x, y, w: 0, h: 0 })
+                setCtxMenu(null)
+              }
             }}
           />
           {/* World transform — all content pans + zooms together */}
@@ -958,6 +1014,16 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             )
           })()}
 
+          {/* Rubber-band selection box */}
+          {selBox && selBox.w + selBox.h > 2 && (
+            <rect
+              x={selBox.x} y={selBox.y} width={selBox.w} height={selBox.h}
+              fill="rgba(59,130,246,0.08)" stroke="#3B82F6" strokeWidth={1 / scale}
+              strokeDasharray={`${5 / scale},${3 / scale}`}
+              style={{ pointerEvents: 'none' }}
+            />
+          )}
+
           {/* Nodes */}
           {nodes.map(n => {
             const x = n.x ?? 0, y = n.y ?? 0
@@ -966,6 +1032,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             const isDragging = dragRef.current?.id === n.id
             const isRenaming = renaming?.id === n.id
             const isTarget = connectLine?.targetId === n.id
+            const isSelected = selectedIds.has(n.id)
             const showPin = hoveredId === n.id || connectLine?.sourceId === n.id || selectedForConnect === n.id
             const isFlipped = flippedNodes.has(n.id)
             const displayText = isFlipped ? (n.back || '+ add notes') : n.label
@@ -993,6 +1060,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
                 <rect x={x+2} y={y+2} width={NODE_W} height={NODE_H} rx={10} fill="rgba(0,0,0,0.06)" />
                 {/* Target highlight ring */}
                 {isTarget && <rect x={x-3} y={y-3} width={NODE_W+6} height={NODE_H+6} rx={13} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.6} strokeDasharray="4 3" />}
+                {/* Selection ring */}
+                {isSelected && <rect x={x-3} y={y-3} width={NODE_W+6} height={NODE_H+6} rx={13} fill="rgba(59,130,246,0.08)" stroke="#3B82F6" strokeWidth={1.5} />}
                 {/* Card — slate tint on back face */}
                 <rect x={x} y={y} width={NODE_W} height={NODE_H} rx={10} fill={isFlipped ? (dark ? '#162032' : '#F1F5F9') : (dark ? '#1E293B' : 'white')} stroke={color} strokeWidth={isRoot ? 2 : 1.5} />
                 {/* Color accent bar */}
@@ -1076,14 +1145,14 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       {/* Floating CSV import — top-right */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-2" onClick={e => e.stopPropagation()}>
         {importMmMsg && (
-          <span className="text-xs text-xero-green font-medium bg-white/90 dark:bg-slate-800/90 backdrop-blur rounded-lg px-2.5 py-1.5 shadow-sm">{importMmMsg}</span>
+          <span className={`text-xs font-medium rounded-lg px-2.5 py-1.5 shadow-sm ${dark ? 'bg-slate-700 text-emerald-400' : 'bg-white/90 text-xero-green'}`}>{importMmMsg}</span>
         )}
         <button
           onClick={() => {
             const relaid = computeLayout(nodesRef.current)
             persist(relaid, edgesRef.current)
           }}
-          className="text-xs bg-white/90 dark:bg-slate-800/90 backdrop-blur border border-xero-border text-gray-600 px-3 py-3 rounded-xl font-medium hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-colors"
+          className={`text-xs px-3 py-3 rounded-xl font-medium shadow-sm transition-colors border ${dark ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600' : 'bg-white/90 border-xero-border text-gray-600 hover:bg-white'}`}
           title="Re-layout all nodes"
         >
           Re-layout
@@ -1094,13 +1163,13 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
               onClick={() => csvMmInputRef.current?.click()}
               onMouseEnter={() => setCsvMmTooltipOpen(true)}
               onMouseLeave={() => setCsvMmTooltipOpen(false)}
-              className="text-xs bg-white/90 dark:bg-slate-800/90 backdrop-blur border border-xero-border text-gray-600 px-3 py-3 rounded-xl font-medium hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-colors"
+              className={`text-xs px-3 py-3 rounded-xl font-medium shadow-sm transition-colors border ${dark ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600' : 'bg-white/90 border-xero-border text-gray-600 hover:bg-white'}`}
             >
               Import CSV
             </button>
             <button
               onClick={() => setCsvMmTooltipOpen(v => !v)}
-              className="w-11 h-11 rounded-full text-[10px] font-bold bg-white/90 dark:bg-slate-800/90 backdrop-blur border border-xero-border text-gray-500 hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-colors flex items-center justify-center flex-shrink-0"
+              className={`w-11 h-11 rounded-full text-[10px] font-bold shadow-sm transition-colors border flex items-center justify-center flex-shrink-0 ${dark ? 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600' : 'bg-white/90 border-xero-border text-gray-500 hover:bg-white'}`}
               aria-label="CSV format info"
             >
               ?
@@ -1169,6 +1238,15 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
               const id = ctxMenu.nodeId
               setCtxMenu(null)
               persist(nodesRef.current.map(n => n.id === id ? { ...n, parentId: null } : n), edgesRef.current.filter(e => e.from !== id && e.to !== id))
+            }},
+            { icon: <IconLayers className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Select subtree', onClick: () => {
+              const id = ctxMenu.nodeId
+              function descendants(pid: string): string[] {
+                return [pid, ...nodesRef.current.filter(n => n.parentId === pid).flatMap(c => descendants(c.id))]
+              }
+              const ids = new Set(descendants(id))
+              setSelectedIds(ids); selectedIdsRef.current = ids
+              setCtxMenu(null)
             }},
           ].map(item => (
             <button key={item.label} onClick={item.onClick}
@@ -3556,7 +3634,7 @@ function LanguageTab() {
           {LANG_VIEWS.map(v => (
             <NavLink
               key={v.path}
-              to={v.path}
+              to={`/learn/language/${v.path}`}
               className={({ isActive }) =>
                 `text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
                   isActive
