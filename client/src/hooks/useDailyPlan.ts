@@ -6,6 +6,7 @@ export interface PlanTask {
   id: string
   text: string
   done: boolean
+  tag?: 'sport' | 'challenge'
 }
 
 export interface DailyPlan {

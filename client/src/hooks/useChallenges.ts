@@ -4,7 +4,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 export type ChallengeScope   = 'sport' | 'general'
 export type ChallengeStatus  = 'active' | 'completed' | 'abandoned'
-export type RepeatCycle      = 'none' | 'weekly' | 'monthly' | 'yearly'
+export type RepeatCycle      = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
 
 export interface Checkpoint {
   id:           string

@@ -840,11 +840,11 @@ export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
   function setView(v: View) { setSearchParams({ view: v }) }
   const VIEWS: { id: View; label: string; icon: ReactNode }[] = [
     { id: 'dashboard',  label: t.sportDashboard, icon: <IconDashboard className="w-3.5 h-3.5" strokeWidth={2} /> },
-    { id: 'exercises',  label: t.exercises,      icon: <IconWorkout   className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'log',        label: t.logWorkout,     icon: <IconClipboard className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'targets',    label: t.targets,        icon: <IconTarget    className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'challenges', label: 'Challenges',     icon: <IconTrophy    className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'weight',     label: 'Weight',         icon: <IconScale     className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'exercises',  label: t.exercises,      icon: <IconWorkout   className="w-3.5 h-3.5" strokeWidth={2} /> },
   ]
 
   return (

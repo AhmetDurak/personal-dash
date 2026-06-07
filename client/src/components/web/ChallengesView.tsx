@@ -19,7 +19,7 @@ function newCpId() {
 }
 
 const REPEAT_LABELS: Record<RepeatCycle, string> = {
-  none: 'No repeat', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly',
+  none: 'No repeat', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly',
 }
 
 // ─── Checkpoint item ──────────────────────────────────────────────────────────

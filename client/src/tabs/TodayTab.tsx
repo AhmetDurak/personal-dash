@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useJournalEntry } from '../hooks/useJournal'
-import { useDailyPlan, PlanTask } from '../hooks/useDailyPlan'
+import { useDailyPlan } from '../hooks/useDailyPlan'
+import type { PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
 import { useAllReminders } from '../hooks/useNotebook'
 import { ChallengesView } from '../components/web/ChallengesView'
 import { IconClose, IconChevronLeft, IconChevronRight, IconBell } from '../lib/icons'
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -17,23 +20,40 @@ function offsetDay(base: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+function currentWeekMonday(): string {
+  const today = new Date()
+  const dow = today.getDay()
+  const monday = new Date(today)
+  monday.setDate(today.getDate() - ((dow + 6) % 7))
+  return monday.toISOString().slice(0, 10)
+}
+
+function getWeekDays(weekStart?: string): string[] {
+  const base = weekStart
+    ? new Date(weekStart + 'T00:00:00')
+    : new Date(currentWeekMonday() + 'T00:00:00')
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(base)
+    d.setDate(base.getDate() + i)
+    return d.toISOString().slice(0, 10)
+  })
+}
+
+function weekLabel(weekStart: string): string {
+  const thisMonday = currentWeekMonday()
+  if (weekStart === thisMonday) return 'This Week'
+  const days = getWeekDays(weekStart)
+  const s = new Date(days[0] + 'T00:00:00')
+  const e = new Date(days[6] + 'T00:00:00')
+  const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' }
+  return `${s.toLocaleDateString('en-GB', opts)} – ${e.toLocaleDateString('en-GB', opts)}`
+}
+
 function dayLabel(date: string, today: string): string {
   if (date === today) return 'Today'
   if (date === offsetDay(today, -1)) return 'Yesterday'
   if (date === offsetDay(today,  1)) return 'Tomorrow'
   return new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })
-}
-
-function getWeekDays(): string[] {
-  const today = new Date()
-  const dow = today.getDay()
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - ((dow + 6) % 7))
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() + i)
-    return d.toISOString().slice(0, 10)
-  })
 }
 
 function fmtFull(date: string) {
@@ -48,18 +68,39 @@ function fmtShort(date: string) {
   })
 }
 
+// ─── Task tag UI ──────────────────────────────────────────────────────────────
+
+type TaskTag = 'task' | 'sport' | 'challenge'
+
+const TAG_META: Record<TaskTag, { label: string; icon: string; color: string }> = {
+  task:      { label: 'Task',      icon: '📋', color: 'bg-gray-100 text-gray-600' },
+  sport:     { label: 'Sport',     icon: '🏋️', color: 'bg-blue-50 text-blue-600' },
+  challenge: { label: 'Challenge', icon: '🏆', color: 'bg-amber-50 text-amber-600' },
+}
+
+function TagBadge({ tag }: { tag: TaskTag }) {
+  const m = TAG_META[tag]
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${m.color}`}>
+      {m.icon} {m.label}
+    </span>
+  )
+}
+
 // ─── Plan panel (single day) ──────────────────────────────────────────────────
 
 function PlanPanel({ date }: { date: string }) {
   const { t } = useLanguage()
   const { plan, save } = useDailyPlan(date)
   const { add: addReminder } = useAllReminders()
-  const [tasks, setTasks]       = useState<PlanTask[]>([])
-  const [notes, setNotes]       = useState('')
-  const [input, setInput]       = useState('')
-  const [saving, setSaving]     = useState(false)
+  const [tasks, setTasks]               = useState<PlanTask[]>([])
+  const [notes, setNotes]               = useState('')
+  const [input, setInput]               = useState('')
+  const [taskTag, setTaskTag]           = useState<TaskTag>('task')
+  const [saving, setSaving]             = useState(false)
   const [reminderDt, setReminderDt]     = useState('')
   const [showReminder, setShowReminder] = useState(false)
+  const [showTagPicker, setShowTagPicker] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loaded = useRef(false)
 
@@ -71,6 +112,9 @@ function PlanPanel({ date }: { date: string }) {
     }
   }, [plan])
 
+  // reset when date changes
+  useEffect(() => { loaded.current = false; setTasks([]); setNotes('') }, [date])
+
   function scheduleSave(ts: PlanTask[], n: string) {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSaving(true)
@@ -80,8 +124,12 @@ function PlanPanel({ date }: { date: string }) {
   async function addTask() {
     const text = input.trim()
     if (!text) return
-    const next: PlanTask[] = [...tasks, { id: crypto.randomUUID(), text, done: false }]
-    setTasks(next); setInput('')
+    const newTask: PlanTask = {
+      id: crypto.randomUUID(), text, done: false,
+      ...(taskTag !== 'task' ? { tag: taskTag } : {}),
+    }
+    const next: PlanTask[] = [...tasks, newTask]
+    setTasks(next); setInput(''); setTaskTag('task'); setShowTagPicker(false)
     scheduleSave(next, notes)
     if (reminderDt) {
       await addReminder({ title: text, due_at: reminderDt })
@@ -90,8 +138,8 @@ function PlanPanel({ date }: { date: string }) {
   }
 
   function toggleReminderInput() {
-    if (!showReminder && !reminderDt) setReminderDt(`${date}T09:00`)
-    setShowReminder(v => !v)
+    if (showReminder) { setShowReminder(false); setReminderDt('') }
+    else { if (!reminderDt) setReminderDt(`${date}T09:00`); setShowReminder(true) }
   }
 
   function toggleTask(id: string) {
@@ -139,7 +187,10 @@ function PlanPanel({ date }: { date: string }) {
                 </svg>
               )}
             </button>
-            <span className={`flex-1 text-sm ${task.done ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.text}</span>
+            <div className="flex-1 min-w-0">
+              {task.tag && <TagBadge tag={task.tag} />}
+              <span className={`block text-sm ${task.done ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.text}</span>
+            </div>
             <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs">✕</button>
           </div>
         ))}
@@ -149,7 +200,8 @@ function PlanPanel({ date }: { date: string }) {
         <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2">
           <input
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={e => { setInput(e.target.value); if (e.target.value) setShowTagPicker(true) }}
+            onFocus={() => setShowTagPicker(true)}
             placeholder={t.addTask}
             className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300"
           />
@@ -158,7 +210,7 @@ function PlanPanel({ date }: { date: string }) {
             onClick={toggleReminderInput}
             title="Set reminder"
             className={`flex-shrink-0 px-2.5 py-2 rounded-xl transition-colors ${
-              showReminder || reminderDt
+              showReminder
                 ? 'bg-amber-100 text-amber-500 dark:bg-amber-900/30 dark:text-amber-400'
                 : 'bg-gray-100 text-gray-400 hover:text-amber-500 dark:bg-gray-700 dark:text-gray-500'
             }`}
@@ -169,6 +221,25 @@ function PlanPanel({ date }: { date: string }) {
             {t.add}
           </button>
         </form>
+
+        {/* Tag picker — appears when input is focused */}
+        {showTagPicker && (
+          <div className="flex gap-1.5">
+            {(Object.entries(TAG_META) as [TaskTag, typeof TAG_META[TaskTag]][]).map(([key, m]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTaskTag(key)}
+                className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1 ${
+                  taskTag === key ? m.color + ' ring-1 ring-offset-1 ring-current' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                }`}
+              >
+                {m.icon} {m.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {showReminder && (
           <input
             type="datetime-local"
@@ -189,155 +260,66 @@ function PlanPanel({ date }: { date: string }) {
   )
 }
 
-// ─── Week view ────────────────────────────────────────────────────────────────
+// ─── Week day row (compact, no accordion) ─────────────────────────────────────
 
-function DayRow({ date }: { date: string }) {
+function WeekDayRow({
+  date, selected, onSelect,
+}: { date: string; selected: boolean; onSelect: () => void }) {
   const { t } = useLanguage()
-  const { add: addReminder } = useAllReminders()
-  const today     = date === todayStr()
-  const tomorrow  = date === offsetDay(todayStr(), 1)
-  const [expanded, setExpanded]         = useState(today)
-  const [input, setInput]               = useState('')
-  const [saving, setSaving]             = useState(false)
-  const [reminderDt, setReminderDt]     = useState('')
-  const [showReminder, setShowReminder] = useState(false)
-  const { plan, save } = useDailyPlan(date)
-  const [tasks, setTasks] = useState<PlanTask[]>([])
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const loaded = useRef(false)
-
-  useEffect(() => {
-    if (plan !== null && !loaded.current) {
-      setTasks(plan?.tasks ?? [])
-      loaded.current = true
-    }
-  }, [plan])
-
-  function scheduleSave(ts: PlanTask[]) {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    setSaving(true)
-    saveTimer.current = setTimeout(async () => { await save(ts, plan?.notes ?? ''); setSaving(false) }, 600)
-  }
-
-  async function addTask() {
-    const text = input.trim()
-    if (!text) return
-    const next: PlanTask[] = [...tasks, { id: crypto.randomUUID(), text, done: false }]
-    setTasks(next); setInput('')
-    scheduleSave(next)
-    if (reminderDt) {
-      await addReminder({ title: text, due_at: reminderDt })
-      setReminderDt(''); setShowReminder(false)
-    }
-  }
-
-  function toggleReminderInput() {
-    if (!showReminder && !reminderDt) setReminderDt(`${date}T09:00`)
-    setShowReminder(v => !v)
-  }
-
-  function toggleTask(id: string) {
-    const next = tasks.map(tk => tk.id === id ? { ...tk, done: !tk.done } : tk)
-    setTasks(next); scheduleSave(next)
-  }
-
-  function deleteTask(id: string) {
-    const next = tasks.filter(tk => tk.id !== id)
-    setTasks(next); scheduleSave(next)
-  }
-
+  const today    = date === todayStr()
+  const tomorrow = date === offsetDay(todayStr(), 1)
+  const { plan } = useDailyPlan(date)
+  const tasks = plan?.tasks ?? []
   const done  = tasks.filter(tk => tk.done).length
   const total = tasks.length
 
   return (
-    <div className={`rounded-xl border overflow-hidden ${today ? 'border-xero-green/40' : 'border-gray-100'}`}>
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${today ? 'bg-emerald-50/60' : 'bg-white hover:bg-gray-50'}`}
-      >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-sm font-semibold ${today ? 'text-xero-green' : 'text-gray-700'}`}>{fmtShort(date)}</span>
-            {today     && <span className="text-[10px] bg-xero-green text-white px-1.5 py-0.5 rounded-full font-semibold">{t.todayLabel}</span>}
-            {tomorrow  && <span className="text-[10px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-semibold">{t.tomorrow}</span>}
-            {saving    && <span className="text-[10px] text-gray-400">{t.saving}</span>}
-          </div>
-          {total > 0 ? (
-            <div className="flex items-center gap-2 mt-1.5">
-              <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-xero-green transition-all" style={{ width: `${(done / total) * 100}%` }} />
-              </div>
-              <span className="text-[10px] text-gray-400 flex-shrink-0">{done}/{total}</span>
-            </div>
-          ) : (
-            <p className="text-xs text-gray-400 mt-0.5">{t.noTasksYet}</p>
-          )}
+    <button
+      onClick={onSelect}
+      className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${
+        selected
+          ? 'border-xero-green bg-emerald-50/60 dark:bg-emerald-900/20'
+          : today
+          ? 'border-xero-green/30 bg-white hover:bg-emerald-50/30'
+          : 'border-gray-100 bg-white hover:bg-gray-50'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-sm font-semibold ${selected ? 'text-xero-green' : today ? 'text-xero-green' : 'text-gray-700'}`}>
+            {fmtShort(date)}
+          </span>
+          {today    && <span className="text-[10px] bg-xero-green text-white px-1.5 py-0.5 rounded-full font-semibold">{t.todayLabel}</span>}
+          {tomorrow && <span className="text-[10px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-semibold">{t.tomorrow}</span>}
         </div>
-        <svg className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {expanded && (
-        <div className="border-t border-gray-100 px-4 py-3 bg-white space-y-2">
-          {tasks.map(task => (
-            <div key={task.id} className="flex items-center gap-2 group">
-              <button
-                onClick={() => toggleTask(task.id)}
-                className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                  task.done ? 'bg-xero-green border-xero-green' : 'border-gray-300 hover:border-xero-green'
-                }`}
-              >
-                {task.done && (
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </button>
-              <span className={`flex-1 text-sm ${task.done ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.text}</span>
-              <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs">✕</button>
-            </div>
-          ))}
-          <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-1.5 pt-1">
-            <input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder={t.addTask}
-              className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green placeholder-gray-300"
-            />
-            <button
-              type="button"
-              onClick={toggleReminderInput}
-              title="Set reminder"
-              className={`flex-shrink-0 px-2 py-1.5 rounded-lg transition-colors ${
-                showReminder || reminderDt
-                  ? 'bg-amber-100 text-amber-500 dark:bg-amber-900/30 dark:text-amber-400'
-                  : 'bg-gray-100 text-gray-400 hover:text-amber-500 dark:bg-gray-700 dark:text-gray-500'
-              }`}
-            >
-              <IconBell className="w-3.5 h-3.5" strokeWidth={2} />
-            </button>
-            <button type="submit" className="text-xs px-2.5 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium">+</button>
-          </form>
-          {showReminder && (
-            <input
-              type="datetime-local"
-              value={reminderDt}
-              onChange={e => setReminderDt(e.target.value)}
-              className="w-full text-xs border border-amber-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-300 bg-amber-50/30"
-            />
-          )}
+        {total > 0
+          ? <span className="text-xs text-gray-400 flex-shrink-0">{done}/{total}</span>
+          : <span className="text-xs text-gray-300 flex-shrink-0">{t.noTasksYet}</span>
+        }
+      </div>
+      {total > 0 && (
+        <div className="h-1 bg-gray-100 rounded-full overflow-hidden mt-2">
+          <div className="h-full bg-xero-green transition-all" style={{ width: `${(done / total) * 100}%` }} />
         </div>
       )}
-    </div>
+    </button>
   )
 }
 
-function WeekPlanView() {
-  const days = getWeekDays()
+function WeekPlanView({
+  weekStart, selectedDay, onSelectDay,
+}: { weekStart: string; selectedDay: string | null; onSelectDay: (d: string) => void }) {
+  const days = getWeekDays(weekStart)
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
-      {days.map(date => <DayRow key={date} date={date} />)}
+    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+      {days.map(date => (
+        <WeekDayRow
+          key={date}
+          date={date}
+          selected={selectedDay === date}
+          onSelect={() => onSelectDay(date)}
+        />
+      ))}
     </div>
   )
 }
@@ -388,16 +370,20 @@ function PillList({ items, onChange, max, color, placeholder }: PillListProps) {
   )
 }
 
-function JournalPanel() {
+function JournalPanel({ date }: { date?: string }) {
   const { t } = useLanguage()
-  const date = todayStr()
-  const { entry, save } = useJournalEntry(date)
+  const d = date ?? todayStr()
+  const { entry, save } = useJournalEntry(d)
   const [content, setContent]   = useState('')
   const [wentWell, setWentWell] = useState<string[]>([])
   const [wentBad, setWentBad]   = useState<string[]>([])
   const [saving, setSaving]     = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loaded = useRef(false)
+
+  useEffect(() => {
+    loaded.current = false; setContent(''); setWentWell([]); setWentBad([])
+  }, [d])
 
   useEffect(() => {
     if (entry !== null && entry !== undefined && !loaded.current) {
@@ -443,8 +429,8 @@ function JournalPanel() {
 // ─── Month calendar ───────────────────────────────────────────────────────────
 
 function getMonthDays(year: number, month: number): (string | null)[] {
-  const firstDow = new Date(year, month, 1).getDay() // 0=Sun
-  const startOffset = (firstDow + 6) % 7             // Mon=0
+  const firstDow = new Date(year, month, 1).getDay()
+  const startOffset = (firstDow + 6) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const cells: (string | null)[] = Array(startOffset).fill(null)
   for (let d = 1; d <= daysInMonth; d++) {
@@ -495,45 +481,51 @@ function MonthGrid({
   )
 }
 
-function MonthCalendarView({ selected, onSelect }: { selected: string | null; onSelect: (d: string) => void }) {
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December']
+
+function MonthCalendarView({
+  year, month, onPrev, onNext, selected, onSelect,
+}: {
+  year: number; month: number
+  onPrev: () => void; onNext: () => void
+  selected: string | null; onSelect: (d: string) => void
+}) {
   const today = todayStr()
-  const initYear  = today.slice(0, 4)
-  const initMonth = today.slice(5, 7)
-  const [year, setYear]   = useState(Number(initYear))
-  const [month, setMonth] = useState(Number(initMonth) - 1)
-
-  const MONTH_NAMES = ['January','February','March','April','May','June',
-                       'July','August','September','October','November','December']
-
-  function prev() { if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1) }
-  function next() { if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1) }
-
   return (
     <div className="p-4 md:p-6 max-w-sm mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronLeft  className="w-4 h-4" strokeWidth={2} /></button>
+        <button onClick={onPrev} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">
+          <IconChevronLeft className="w-4 h-4" strokeWidth={2} />
+        </button>
         <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">{MONTH_NAMES[month]} {year}</p>
-        <button onClick={next} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronRight className="w-4 h-4" strokeWidth={2} /></button>
+        <button onClick={onNext} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors">
+          <IconChevronRight className="w-4 h-4" strokeWidth={2} />
+        </button>
       </div>
       <MonthGrid year={year} month={month} today={today} selected={selected} onSelect={onSelect} />
     </div>
   )
 }
 
-function YearCalendarView({ selected, onSelect }: { selected: string | null; onSelect: (d: string) => void }) {
+function YearCalendarView({
+  year, onYearChange, selected, onSelect,
+}: {
+  year: number; onYearChange: (y: number) => void
+  selected: string | null; onSelect: (d: string) => void
+}) {
   const today = todayStr()
-  const [year, setYear] = useState(Number(today.slice(0, 4)))
-  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
   return (
     <div className="p-4 md:p-6">
       <div className="flex items-center justify-center gap-4 mb-6">
-        <button onClick={() => setYear(y => y - 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronLeft  className="w-4 h-4" strokeWidth={2} /></button>
+        <button onClick={() => onYearChange(year - 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronLeft  className="w-4 h-4" strokeWidth={2} /></button>
         <p className="text-base font-bold text-gray-800 dark:text-slate-100">{year}</p>
-        <button onClick={() => setYear(y => y + 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronRight className="w-4 h-4" strokeWidth={2} /></button>
+        <button onClick={() => onYearChange(year + 1)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"><IconChevronRight className="w-4 h-4" strokeWidth={2} /></button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-        {MONTH_NAMES.map((name, mi) => (
+        {SHORT_MONTHS.map((name, mi) => (
           <div key={mi} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 p-3">
             <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2 uppercase tracking-wide">{name}</p>
             <MonthGrid year={year} month={mi} today={today} selected={selected} onSelect={onSelect} />
@@ -555,11 +547,22 @@ export function TodayTab() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [mobilePanel, setMobilePanel] = useState<Panel>('plan')
 
-  const today    = todayStr()
-  const mode     = (searchParams.get('mode')  as TodayMode) ?? 'plan'
-  const scope    = (searchParams.get('scope') as PlanScope) ?? 'day'
-  const dayDate  = searchParams.get('date') ?? today
+  const today      = todayStr()
+  const mode       = (searchParams.get('mode')  as TodayMode) ?? 'plan'
+  const scope      = (searchParams.get('scope') as PlanScope) ?? 'day'
+  const dayDate    = searchParams.get('date')      ?? today
   const selectedDate = searchParams.get('selected')
+
+  // week scope
+  const weekStart  = searchParams.get('weekStart') ?? currentWeekMonday()
+  const weekDay    = searchParams.get('weekDay')   // selected day within week view
+
+  // month scope
+  const viewMonthStr = searchParams.get('viewMonth') ?? today.slice(0, 7)
+  const [viewMonthYear, viewMonthMon] = viewMonthStr.split('-').map(Number)
+
+  // year scope
+  const viewYear = Number(searchParams.get('viewYear') ?? today.slice(0, 4))
 
   function up(updates: Record<string, string | null>) {
     setSearchParams(p => {
@@ -568,15 +571,31 @@ export function TodayTab() {
     })
   }
 
-  const isCalendarScope   = scope === 'month' || scope === 'year'
+  const isCalendarScope     = scope === 'month' || scope === 'year'
   const showSelectedDayPlan = isCalendarScope && selectedDate !== null
-  const planDate = selectedDate ?? dayDate
+  const planDate            = selectedDate ?? dayDate
+
+  // Week header navigation
+  function prevWeek() { up({ weekStart: offsetDay(weekStart, -7), weekDay: null }) }
+  function nextWeek() { up({ weekStart: offsetDay(weekStart,  7), weekDay: null }) }
+
+  // Month header navigation
+  function prevMonth() {
+    let y = viewMonthYear, m = viewMonthMon - 2 // 0-indexed
+    if (m < 0) { m = 11; y-- }
+    up({ viewMonth: `${y}-${String(m + 1).padStart(2, '0')}`, selected: null })
+  }
+  function nextMonth() {
+    let y = viewMonthYear, m = viewMonthMon // 0-indexed (already +1 from string)
+    if (m > 11) { m = 0; y++ }
+    up({ viewMonth: `${y}-${String(m + 1).padStart(2, '0')}`, selected: null })
+  }
 
   const headerSub =
     selectedDate      ? fmtFull(selectedDate) :
-    scope === 'week'  ? t.thisWeek :
-    scope === 'month' ? new Date(today + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) :
-    scope === 'year'  ? String(new Date().getFullYear()) :
+    scope === 'week'  ? weekLabel(weekStart) :
+    scope === 'month' ? `${MONTH_NAMES[viewMonthMon - 1]} ${viewMonthYear}` :
+    scope === 'year'  ? String(viewYear) :
     fmtFull(dayDate)
 
   const SCOPES: { key: PlanScope; label: string }[] = [
@@ -588,17 +607,49 @@ export function TodayTab() {
   function handleScopeChange(s: PlanScope) { up({ scope: s, selected: null }) }
   function prevDay() { up({ scope: 'day', date: offsetDay(dayDate, -1), selected: null }) }
   function nextDay() { up({ scope: 'day', date: offsetDay(dayDate,  1), selected: null }) }
-  function handleCalendarSelect(date: string) { up({ selected: date }) }
-  function backToCalendar() { up({ selected: null }) }
 
   function renderPlanContent() {
-    if (scope === 'week' && !selectedDate) return <WeekPlanView />
+    if (scope === 'week') return (
+      <WeekPlanView
+        weekStart={weekStart}
+        selectedDay={weekDay}
+        onSelectDay={d => up({ weekDay: d })}
+      />
+    )
     return <PlanPanel key={planDate} date={scope === 'day' ? dayDate : planDate} />
   }
 
+  // Right panel content based on scope
+  function renderRightPanel() {
+    if (scope === 'week') {
+      return weekDay
+        ? <PlanPanel key={weekDay} date={weekDay} />
+        : (
+          <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+            <div className="text-center">
+              <p className="text-3xl mb-2">📅</p>
+              <p>Select a day to view its plan</p>
+            </div>
+          </div>
+        )
+    }
+    return <JournalPanel date={scope === 'day' ? dayDate : undefined} />
+  }
+
   function renderCalendarContent() {
-    if (scope === 'month') return <MonthCalendarView selected={selectedDate} onSelect={handleCalendarSelect} />
-    return <YearCalendarView selected={selectedDate} onSelect={handleCalendarSelect} />
+    if (scope === 'month') return (
+      <MonthCalendarView
+        year={viewMonthYear} month={viewMonthMon - 1}
+        onPrev={prevMonth} onNext={nextMonth}
+        selected={selectedDate} onSelect={d => up({ selected: d })}
+      />
+    )
+    return (
+      <YearCalendarView
+        year={viewYear} onYearChange={y => up({ viewYear: String(y), selected: null })}
+        selected={selectedDate} onSelect={d => up({ selected: d })}
+      />
+    )
   }
 
   return (
@@ -609,7 +660,7 @@ export function TodayTab() {
         <div className="flex items-center gap-2 min-w-0">
           {showSelectedDayPlan && (
             <button
-              onClick={backToCalendar}
+              onClick={() => up({ selected: null })}
               className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors flex-shrink-0"
             >
               ‹ {scope === 'month' ? 'Month' : 'Year'}
@@ -625,7 +676,7 @@ export function TodayTab() {
           </div>
         </div>
 
-        {/* All controls in one horizontally scrollable row */}
+        {/* Controls row */}
         <div className="flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {/* Mode switcher */}
           <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
@@ -643,27 +694,54 @@ export function TodayTab() {
             >🏆 Challenges</button>
           </div>
 
-          {/* Day navigator — ‹ date › */}
-          {mode === 'plan' && !showSelectedDayPlan && (
-            <div className={`flex items-center gap-0.5 rounded-xl p-1 flex-shrink-0 ${scope === 'day' ? 'bg-gray-100 dark:bg-slate-700' : 'bg-gray-100/50 dark:bg-slate-700/50'}`}>
+          {/* Day navigator */}
+          {mode === 'plan' && scope === 'day' && !showSelectedDayPlan && (
+            <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
+              <button onClick={prevDay} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+                <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
               <button
-                onClick={prevDay}
-                className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors"
-              ><IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} /></button>
-              <button
-                onClick={() => up({ scope: 'day', selected: null })}
-                className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors whitespace-nowrap min-w-[72px] text-center ${
-                  scope === 'day' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
-                }`}
+                onClick={() => up({ scope: 'day', date: today, selected: null })}
+                className="text-xs px-2 py-1 rounded-lg font-medium transition-colors whitespace-nowrap min-w-[72px] text-center bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm"
               >{dayLabel(dayDate, today)}</button>
-              <button
-                onClick={nextDay}
-                className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors"
-              ><IconChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} /></button>
+              <button onClick={nextDay} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+                <IconChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
             </div>
           )}
 
-          {/* Week / Month / Year scope pills */}
+          {/* Week navigator */}
+          {mode === 'plan' && scope === 'week' && (
+            <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
+              <button onClick={prevWeek} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+                <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
+              <button
+                onClick={() => up({ weekStart: currentWeekMonday(), weekDay: null })}
+                className="text-xs px-2 py-1 rounded-lg font-medium whitespace-nowrap min-w-[80px] text-center bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm"
+              >{weekLabel(weekStart)}</button>
+              <button onClick={nextWeek} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+                <IconChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
+
+          {/* Month navigator */}
+          {mode === 'plan' && scope === 'month' && !showSelectedDayPlan && (
+            <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
+              <button onClick={prevMonth} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+                <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
+              <span className="text-xs px-2 py-1 rounded-lg font-medium whitespace-nowrap bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm">
+                {MONTH_NAMES[viewMonthMon - 1].slice(0, 3)} {viewMonthYear}
+              </span>
+              <button onClick={nextMonth} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+                <IconChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
+
+          {/* Scope pills (Week / Month / Year) */}
           {mode === 'plan' && !showSelectedDayPlan && (
             <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
               {SCOPES.map(s => (
@@ -678,8 +756,8 @@ export function TodayTab() {
             </div>
           )}
 
-          {/* Mobile plan/journal switcher */}
-          {mode === 'plan' && !isCalendarScope && (
+          {/* Mobile plan/journal switcher (day scope only) */}
+          {mode === 'plan' && scope === 'day' && (
             <div className="flex md:hidden gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
               {(['plan', 'journal'] as Panel[]).map(p => (
                 <button
@@ -700,26 +778,38 @@ export function TodayTab() {
         {mode === 'challenges' ? (
           <ChallengesView scope="general" />
         ) : isCalendarScope && !showSelectedDayPlan ? (
-          /* Calendar view (month or year) */
           renderCalendarContent()
         ) : isCalendarScope && showSelectedDayPlan ? (
-          /* Selected day from calendar — show plan only (no journal split) */
           <div className="h-full bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
             {renderPlanContent()}
           </div>
         ) : (
-          /* Normal day/tomorrow/week plan + journal */
+          /* Day or Week scope */
           <>
             <div className="hidden md:flex h-full">
               <div className="flex-1 border-r border-xero-border bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
                 {renderPlanContent()}
               </div>
-              <div className="flex-1 bg-white dark:bg-slate-900 overflow-hidden">
-                <JournalPanel />
+              <div className="flex-1 bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
+                {renderRightPanel()}
               </div>
             </div>
+            {/* Mobile */}
             <div className="md:hidden h-full bg-white dark:bg-slate-900 overflow-hidden flex flex-col">
-              {mobilePanel === 'plan' ? renderPlanContent() : <JournalPanel />}
+              {scope === 'week' ? (
+                weekDay
+                  ? (
+                    <div className="flex flex-col h-full">
+                      <button onClick={() => up({ weekDay: null })} className="flex items-center gap-1 px-4 py-2.5 text-xs text-gray-400 hover:text-gray-600 border-b border-gray-100">
+                        ‹ Week
+                      </button>
+                      <PlanPanel key={weekDay} date={weekDay} />
+                    </div>
+                  )
+                  : renderPlanContent()
+              ) : (
+                mobilePanel === 'plan' ? renderPlanContent() : <JournalPanel date={dayDate} />
+              )}
             </div>
           </>
         )}
