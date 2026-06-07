@@ -1357,6 +1357,22 @@ type NewWord = { word: string; translation: string; language: string; translatio
 
 type EditCard = { id: number; word: string; translation: string; language: string; translation_language: string; example: string; image_url: string }
 
+// Levenshtein-based string similarity [0, 1]. Used for 90%-correct auto-rating.
+function strSimilarity(a: string, b: string): number {
+  const norm = (s: string) => s.toLowerCase().trim().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ')
+  const s1 = norm(a), s2 = norm(b)
+  if (s1 === s2) return 1
+  if (!s1 || !s2) return 0
+  const m = s1.length, n = s2.length
+  const dp = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0)
+  )
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = s1[i-1] === s2[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
+  return 1 - dp[m][n] / Math.max(m, n)
+}
+
 // SM-2 targets 90% retention at due_at. Solve: 0.9 = e^(-1/k) → k = -1/ln(0.9) ≈ 9.49
 const LN09K = -1 / Math.log(0.9)
 
@@ -1451,6 +1467,10 @@ function VocabView() {
   const [reviewMode, setReviewMode] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [reviewIdx, setReviewIdx] = useState(0)
+  const [typeMode, setTypeMode]   = useState(false)
+  const [answer, setAnswer]       = useState('')
+  const [answerResult, setAnswerResult] = useState<{ correct: boolean; pct: number } | null>(null)
+  const answerRef = useRef<HTMLInputElement>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [newWord, setNewWord] = useState<NewWord>({ word: '', translation: '', language: 'de', translation_language: 'tr', example: '' })
   const [deConj, setDeConj] = useState<DeConjugation | null | 'loading' | 'none'>(null)
@@ -1532,7 +1552,21 @@ function VocabView() {
     await review(reviewCard.id, quality)
     setFlipped(false)
     setReviewIdx(i => i + 1)
+    setAnswer('')
+    setAnswerResult(null)
   }
+
+  function submitVocabAnswer() {
+    if (!reviewCard || !answer.trim() || answerResult) return
+    const pct = strSimilarity(answer, reviewCard.translation)
+    const correct = pct >= 0.9
+    setAnswerResult({ correct, pct })
+    setTimeout(() => handleRate(correct ? 4 : 0), 1500)
+  }
+
+  useEffect(() => {
+    if (typeMode && reviewMode) answerRef.current?.focus()
+  }, [typeMode, reviewIdx, reviewMode])
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -1599,7 +1633,13 @@ function VocabView() {
       <div className="flex flex-col items-center justify-center gap-6 p-6 h-full">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => { setReviewMode(false); setReviewIdx(0); setFlipped(false) }}
+            onClick={() => { setTypeMode(m => !m); setAnswer(''); setAnswerResult(null); setFlipped(false) }}
+            className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${typeMode ? 'bg-gray-900 text-white' : 'text-gray-400 hover:bg-gray-100'}`}
+          >
+            ⌨️ Type
+          </button>
+          <button
+            onClick={() => { setReviewMode(false); setReviewIdx(0); setFlipped(false); setTypeMode(false); setAnswer(''); setAnswerResult(null) }}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
             {t.exitReview}
@@ -1620,36 +1660,62 @@ function VocabView() {
             </button>
           </div>
         ) : reviewCard && (
-          <div className="w-full max-w-sm">
-            <div
-              onClick={() => setFlipped(f => !f)}
-              className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm cursor-pointer min-h-[180px] flex flex-col items-center justify-center gap-3 select-none hover:shadow-md transition-shadow"
-            >
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-                {flipped ? 'Translation' : 'Word'}
-              </p>
-              <p className="text-2xl font-bold text-gray-900 text-center">
-                {flipped ? reviewCard.translation : reviewCard.word}
-              </p>
-              {flipped && reviewCard.example && (
-                <p className="text-xs text-gray-400 text-center italic">"{reviewCard.example}"</p>
+          <div className="w-full max-w-sm space-y-3">
+            {/* Card face */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm min-h-[160px] flex flex-col items-center justify-center gap-3 select-none">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Word</p>
+              <p className="text-2xl font-bold text-gray-900 text-center">{reviewCard.word}</p>
+              {!typeMode && !flipped && (
+                <p className="text-xs text-gray-300 mt-1 cursor-pointer" onClick={() => setFlipped(true)}>Tap to reveal translation</p>
               )}
-              {!flipped && <p className="text-xs text-gray-300 mt-2">Tap to reveal translation</p>}
+              {!typeMode && flipped && (
+                <>
+                  <p className="text-lg font-semibold text-gray-600 text-center">{reviewCard.translation}</p>
+                  {reviewCard.example && <p className="text-xs text-gray-400 text-center italic">"{reviewCard.example}"</p>}
+                </>
+              )}
             </div>
 
-            {flipped && (
-              <div className="grid grid-cols-4 gap-2 mt-4">
+            {/* Type mode input / result */}
+            {typeMode && (
+              answerResult ? (
+                <div className={`rounded-xl p-3.5 ${answerResult.correct ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                  <p className={`text-sm font-bold ${answerResult.correct ? 'text-emerald-700' : 'text-red-600'}`}>
+                    {answerResult.correct ? `✓ Correct  ${Math.round(answerResult.pct * 100)}%` : `✗ Wrong  ${Math.round(answerResult.pct * 100)}%`}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1.5">Answer: <span className="font-medium text-gray-800">{reviewCard.translation}</span></p>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    ref={answerRef}
+                    value={answer}
+                    onChange={e => setAnswer(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') submitVocabAnswer() }}
+                    placeholder="Type the translation…"
+                    className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-xero-green/30 focus:border-xero-green"
+                  />
+                  <button
+                    onClick={submitVocabAnswer}
+                    disabled={!answer.trim()}
+                    className="px-4 py-2.5 bg-xero-green text-white rounded-xl text-sm font-semibold hover:bg-xero-green-dark disabled:opacity-40 transition-colors"
+                  >
+                    Check
+                  </button>
+                </div>
+              )
+            )}
+
+            {/* Flip mode rating buttons */}
+            {!typeMode && flipped && (
+              <div className="grid grid-cols-4 gap-2">
                 {[
                   { q: 0, label: t.again, cls: 'bg-red-100 text-red-700 hover:bg-red-200' },
                   { q: 2, label: t.hard,  cls: 'bg-amber-100 text-amber-700 hover:bg-amber-200' },
                   { q: 4, label: t.good,  cls: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
                   { q: 5, label: t.easy,  cls: 'bg-sky-100 text-sky-700 hover:bg-sky-200' },
                 ].map(({ q, label, cls }) => (
-                  <button
-                    key={q}
-                    onClick={() => handleRate(q)}
-                    className={`text-xs font-semibold rounded-lg py-2.5 transition-colors ${cls}`}
-                  >
+                  <button key={q} onClick={() => handleRate(q)} className={`text-xs font-semibold rounded-lg py-2.5 transition-colors ${cls}`}>
                     {label}
                   </button>
                 ))}
@@ -2758,14 +2824,23 @@ type ReviewItem = { id: number; front: string; back: string | null; palace: stri
 type ReviewQuality = 1 | 3 | 5   // again | good | easy
 
 function ReviewSession({
-  items, onRate, onDone,
-}: { items: ReviewItem[]; onRate: (id: number, q: ReviewQuality) => Promise<void>; onDone: () => void }) {
-  const [idx, setIdx]         = useState(0)
-  const [revealed, setRevealed] = useState(false)
-  const [loading, setLoading]   = useState(false)
-  const [reviewed, setReviewed] = useState(0)
+  items, onRate, onDone, allowTyping = false,
+}: { items: ReviewItem[]; onRate: (id: number, q: ReviewQuality) => Promise<void>; onDone: () => void; allowTyping?: boolean }) {
+  const [idx, setIdx]               = useState(0)
+  const [revealed, setRevealed]     = useState(false)
+  const [loading, setLoading]       = useState(false)
+  const [reviewed, setReviewed]     = useState(0)
+  const [typeMode, setTypeMode]     = useState(false)
+  const [answer, setAnswer]         = useState('')
+  const [answerResult, setAnswerResult] = useState<{ correct: boolean; pct: number } | null>(null)
+  const answerRef = useRef<HTMLInputElement>(null)
 
   const current = items[idx]
+
+  useEffect(() => {
+    if (typeMode) answerRef.current?.focus()
+  }, [typeMode, idx])
+
   if (!current) return (
     <div className="flex flex-col items-center justify-center py-20 space-y-4">
       <p className="text-4xl">🎉</p>
@@ -2783,7 +2858,17 @@ function ReviewSession({
     setReviewed(r => r + 1)
     setIdx(i => i + 1)
     setRevealed(false)
+    setAnswer('')
+    setAnswerResult(null)
     setLoading(false)
+  }
+
+  function submitAnswer() {
+    if (!answer.trim() || !current.back || answerResult || loading) return
+    const pct = strSimilarity(answer, current.back)
+    const correct = pct >= 0.9
+    setAnswerResult({ correct, pct })
+    setTimeout(() => rate(correct ? 4 : 1), 1500)
   }
 
   return (
@@ -2791,7 +2876,17 @@ function ReviewSession({
       {/* Progress */}
       <div className="flex items-center justify-between">
         <span className="text-xs text-gray-400 dark:text-slate-500">{idx + 1} / {items.length}</span>
-        <button onClick={onDone} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Exit review</button>
+        <div className="flex items-center gap-2">
+          {allowTyping && (
+            <button
+              onClick={() => { setTypeMode(m => !m); setAnswer(''); setAnswerResult(null); setRevealed(false) }}
+              className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${typeMode ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900' : 'text-gray-400 dark:text-slate-500 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+            >
+              ⌨️ Type
+            </button>
+          )}
+          <button onClick={onDone} className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Exit review</button>
+        </div>
       </div>
       <div className="h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
         <div className="h-full bg-xero-green rounded-full transition-all duration-300" style={{ width: `${(idx / items.length) * 100}%` }} />
@@ -2801,14 +2896,43 @@ function ReviewSession({
       <div className="rounded-2xl border bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 p-6 space-y-4 min-h-[200px]">
         {current.palace && (
           <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2.5 py-1 rounded-full">
-            <span>🏛️</span>
-            <span>{current.palace}</span>
+            <span>🏛️</span><span>{current.palace}</span>
           </div>
         )}
 
         <p className="text-lg font-semibold text-gray-900 dark:text-slate-100 leading-relaxed">{current.front}</p>
 
-        {!revealed ? (
+        {typeMode ? (
+          answerResult ? (
+            <div className={`rounded-xl p-3.5 ${answerResult.correct ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+              <p className={`text-sm font-bold ${answerResult.correct ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                {answerResult.correct ? `✓ Correct  ${Math.round(answerResult.pct * 100)}%` : `✗ Wrong  ${Math.round(answerResult.pct * 100)}%`}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1.5">
+                Answer: <span className="font-medium text-gray-800 dark:text-slate-200">{current.back}</span>
+              </p>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                ref={answerRef}
+                value={answer}
+                onChange={e => setAnswer(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') submitAnswer() }}
+                placeholder="Type your answer…"
+                disabled={loading}
+                className="flex-1 text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-xero-green/30 focus:border-xero-green"
+              />
+              <button
+                onClick={submitAnswer}
+                disabled={!answer.trim() || loading}
+                className="px-4 py-2.5 bg-xero-green text-white rounded-xl text-sm font-semibold hover:bg-xero-green-dark disabled:opacity-40 transition-colors"
+              >
+                Check
+              </button>
+            </div>
+          )
+        ) : !revealed ? (
           <button
             onClick={() => setRevealed(true)}
             className="w-full py-2.5 text-sm font-medium rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-600 text-gray-400 dark:text-slate-500 hover:border-xero-green hover:text-xero-green transition-colors"
@@ -2820,8 +2944,6 @@ function ReviewSession({
             <div className="pt-2 border-t border-gray-100 dark:border-slate-700">
               <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">{current.back ?? '—'}</p>
             </div>
-
-            {/* Rating */}
             <div className="flex gap-2 pt-1">
               <button onClick={() => rate(1)} disabled={loading}
                 className="flex-1 py-2.5 text-sm font-semibold rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50">
@@ -3007,6 +3129,7 @@ function SentenceView() {
         items={dueItems.map(s => ({ id: s.id, front: s.source_text, back: s.translation, palace: s.memory_palace }))}
         onRate={async (id, q) => { await reviewSentence(id, q) }}
         onDone={() => setReviewMode(false)}
+        allowTyping
       />
     )
   }
