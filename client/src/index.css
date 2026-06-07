@@ -27,6 +27,11 @@ html, body {
 /* Tabular numbers everywhere financial values appear */
 .tabular-nums, input[type="number"] { font-variant-numeric: tabular-nums; }
 
+/* Prevent iOS Safari from zooming in on input focus (triggers when font-size < 16px) */
+@media (max-width: 768px) {
+  input, textarea, select { font-size: 16px !important; }
+}
+
 /* ── Dark mode overrides ────────────────────────────────────────────────────────
    .dark is set on <html>. Using ".dark .<class>" beats the single-class
    specificity of Tailwind utilities (0,2,0 vs 0,1,0), so no !important needed.
