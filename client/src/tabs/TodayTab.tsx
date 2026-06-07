@@ -75,7 +75,7 @@ type TaskTag = 'task' | 'sport' | 'challenge'
 const TAG_META: Record<TaskTag, { label: string; icon: string; color: string }> = {
   task:      { label: 'Task',      icon: '📋', color: 'bg-gray-100 text-gray-600' },
   sport:     { label: 'Sport',     icon: '🏋️', color: 'bg-blue-50 text-blue-600' },
-  challenge: { label: 'Challenge', icon: '🏆', color: 'bg-amber-50 text-amber-600' },
+  challenge: { label: 'Routine', icon: '🔁', color: 'bg-amber-50 text-amber-600' },
 }
 
 function TagBadge({ tag }: { tag: TaskTag }) {
