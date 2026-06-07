@@ -309,6 +309,7 @@ interface AddFormState {
   end_date:     string
   repeat_cycle: RepeatCycle
   time_of_day:  string
+  repeat_days:  number[]
 }
 
 function AddChallengeForm({ onSave, onCancel }: {
@@ -318,8 +319,17 @@ function AddChallengeForm({ onSave, onCancel }: {
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState<AddFormState>({
     title: '', description: '', target_value: '', target_unit: '',
-    start_date: today, end_date: '', repeat_cycle: 'daily', time_of_day: '',
+    start_date: today, end_date: '', repeat_cycle: 'daily', time_of_day: '', repeat_days: [],
   })
+
+  function toggleDay(day: number) {
+    setForm(p => ({
+      ...p,
+      repeat_days: p.repeat_days.includes(day)
+        ? p.repeat_days.filter(d => d !== day)
+        : [...p.repeat_days, day],
+    }))
+  }
 
   function set<K extends keyof AddFormState>(k: K, v: AddFormState[K]) {
     setForm(p => ({ ...p, [k]: v }))
@@ -351,14 +361,57 @@ function AddChallengeForm({ onSave, onCancel }: {
         </div>
         <div>
           <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">Repeat</p>
-          <select value={form.repeat_cycle} onChange={e => set('repeat_cycle', e.target.value as RepeatCycle)}
-            className={inputCls}>
+          <select
+            value={form.repeat_cycle}
+            onChange={e => setForm(p => ({ ...p, repeat_cycle: e.target.value as RepeatCycle, repeat_days: [] }))}
+            className={inputCls}
+          >
             {(Object.entries(REPEAT_LABELS) as [RepeatCycle, string][]).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
         </div>
       </div>
+
+      {form.repeat_cycle === 'weekly' && (
+        <div>
+          <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1.5">Days of week</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {['Mo','Tu','We','Th','Fr','Sa','Su'].map((label, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => toggleDay(i)}
+                className={`w-9 h-9 rounded-lg text-xs font-semibold transition-colors ${
+                  form.repeat_days.includes(i)
+                    ? 'bg-violet-500 text-white'
+                    : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-violet-100 dark:hover:bg-violet-900/30'
+                }`}
+              >{label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {form.repeat_cycle === 'monthly' && (
+        <div>
+          <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1.5">Days of month</p>
+          <div className="flex gap-1 flex-wrap">
+            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+              <button
+                key={day}
+                type="button"
+                onClick={() => toggleDay(day)}
+                className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
+                  form.repeat_days.includes(day)
+                    ? 'bg-violet-500 text-white'
+                    : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-violet-100 dark:hover:bg-violet-900/30'
+                }`}
+              >{day}</button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <div>
@@ -425,6 +478,7 @@ export function ChallengesView({ scope }: Props) {
       repeat_cycle: f.repeat_cycle,
       checkpoints:  [],
       time_of_day:  f.time_of_day  || null,
+      repeat_days:  f.repeat_days.length > 0 ? f.repeat_days : null,
     })
     setShowAdd(false)
   }

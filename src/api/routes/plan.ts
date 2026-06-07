@@ -69,21 +69,22 @@ export function planRouter(pool: Pool): Router {
         durationMin:        s.duration_min ?? null,
       }))
 
-    // Inject routines (daily always; weekly if start_date dow matches)
+    // Inject routines: daily always; weekly/monthly if repeat_days matches
     const savedChallengeIds = new Set(
       tasks.filter(t => t.challengeId != null).map(t => t.challengeId)
     )
-    const dateDow = new Date(date + 'T12:00:00').getDay()
+    const dayOfMonth = new Date(date + 'T12:00:00').getDate()
     const routineExtra: PlanTask[] = routineResult.rows
       .filter(r => {
         if (savedChallengeIds.has(r.id)) return false
         if (r.repeat_cycle === 'daily') return true
         if (r.repeat_cycle === 'weekly') {
-          const startStr = r.start_date instanceof Date
-            ? r.start_date.toISOString().slice(0, 10)
-            : String(r.start_date).slice(0, 10)
-          const startDow = new Date(startStr + 'T12:00:00').getDay()
-          return startDow === dateDow
+          const days: number[] = r.repeat_days ? JSON.parse(r.repeat_days) : []
+          return days.length > 0 && days.includes(dow)
+        }
+        if (r.repeat_cycle === 'monthly') {
+          const days: number[] = r.repeat_days ? JSON.parse(r.repeat_days) : []
+          return days.length > 0 && days.includes(dayOfMonth)
         }
         return false
       })

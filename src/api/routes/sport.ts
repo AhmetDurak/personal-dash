@@ -176,15 +176,16 @@ export function sportRouter(pool: Pool): Router {
   router.post('/challenges', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { scope = 'general', title, description, target_value, target_unit,
-            start_date, end_date, repeat_cycle = 'none', checkpoints = [], time_of_day } = req.body
+            start_date, end_date, repeat_cycle = 'none', checkpoints = [], time_of_day, repeat_days } = req.body
     const { rows } = await pool.query(
       `INSERT INTO challenges
         (user_id, scope, title, description, target_value, target_unit,
-         start_date, end_date, repeat_cycle, checkpoints, time_of_day)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+         start_date, end_date, repeat_cycle, checkpoints, time_of_day, repeat_days)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [uid, scope, title, description ?? null, target_value ?? null, target_unit ?? null,
        start_date ?? new Date().toISOString().slice(0, 10),
-       end_date ?? null, repeat_cycle, JSON.stringify(checkpoints), time_of_day ?? null]
+       end_date ?? null, repeat_cycle, JSON.stringify(checkpoints), time_of_day ?? null,
+       repeat_days ? JSON.stringify(repeat_days) : null]
     )
     res.json(rows[0])
   })
@@ -192,16 +193,17 @@ export function sportRouter(pool: Pool): Router {
   router.put('/challenges/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { title, description, target_value, target_unit, start_date, end_date,
-            repeat_cycle, status, checkpoints, time_of_day } = req.body
+            repeat_cycle, status, checkpoints, time_of_day, repeat_days } = req.body
     const { rows } = await pool.query(
       `UPDATE challenges SET
         title=$1, description=$2, target_value=$3, target_unit=$4,
         start_date=$5, end_date=$6, repeat_cycle=$7, status=$8,
-        checkpoints=$9, time_of_day=$10, updated_at=now()
-       WHERE id=$11 AND user_id=$12 RETURNING *`,
+        checkpoints=$9, time_of_day=$10, repeat_days=$11, updated_at=now()
+       WHERE id=$12 AND user_id=$13 RETURNING *`,
       [title, description ?? null, target_value ?? null, target_unit ?? null,
        start_date, end_date ?? null, repeat_cycle, status,
-       JSON.stringify(checkpoints), time_of_day ?? null, req.params.id, uid]
+       JSON.stringify(checkpoints), time_of_day ?? null,
+       repeat_days ? JSON.stringify(repeat_days) : null, req.params.id, uid]
     )
     res.json(rows[0])
   })

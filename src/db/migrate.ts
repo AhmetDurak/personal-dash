@@ -264,6 +264,7 @@ CREATE TABLE IF NOT EXISTS challenges (
 );
 CREATE INDEX IF NOT EXISTS idx_challenges_user ON challenges(user_id);
 ALTER TABLE challenges ADD COLUMN IF NOT EXISTS time_of_day TEXT;
+ALTER TABLE challenges ADD COLUMN IF NOT EXISTS repeat_days TEXT;
 
 CREATE TABLE IF NOT EXISTS body_weight (
   id         SERIAL PRIMARY KEY,
