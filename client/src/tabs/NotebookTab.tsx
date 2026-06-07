@@ -235,7 +235,7 @@ function NotesView() {
           <div className="flex overflow-x-auto gap-1" style={{ scrollbarWidth: 'none' }}>
             <button
               onClick={() => setActiveFolder(null)}
-              className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap flex-shrink-0 transition-colors ${activeFolder === null ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+              className={`text-xs px-2.5 py-2 rounded-full font-medium whitespace-nowrap flex-shrink-0 transition-colors ${activeFolder === null ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
             >All</button>
             {folders.map(f => (
               <button
@@ -1344,7 +1344,7 @@ function MindmapView() {
               <input autoFocus value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleNewInFolder(newFolderName); if (e.key === 'Escape') { setNewFolderInput(false); setNewFolderName('') } }}
                 placeholder="Folder name…"
-                className="flex-1 text-[10px] bg-xero-navy-light border border-xero-navy-light rounded px-2 py-1 text-gray-200 outline-none focus:ring-1 focus:ring-xero-green" />
+                className="flex-1 text-[10px] bg-xero-navy-light border border-xero-navy-light rounded px-2 py-2 text-gray-200 outline-none focus:ring-1 focus:ring-xero-green" />
               <button onClick={() => handleNewInFolder(newFolderName)} className="text-[10px] bg-xero-green text-white px-1.5 rounded font-medium">✓</button>
               <button onClick={() => { setNewFolderInput(false); setNewFolderName('') }} className="text-gray-500 hover:text-gray-300 text-[10px] px-1">✕</button>
             </div>
