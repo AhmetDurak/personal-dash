@@ -458,6 +458,10 @@ function MindmapCanvas({ mapId }: { mapId: number }) {
   })
   const [scale, setScale] = useState(1)
   const [isPanning, setIsPanning] = useState(false)
+  const [importMmMsg, setImportMmMsg] = useState<string | null>(null)
+  const [csvMmTooltipOpen, setCsvMmTooltipOpen] = useState(false)
+  const csvMmInputRef = useRef<HTMLInputElement>(null)
+  const csvMmTooltipRef = useRef<HTMLDivElement>(null)
   const initialized = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -775,6 +779,45 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
 
   const ctxNode = ctxMenu ? nodes.find(n => n.id === ctxMenu.nodeId) ?? null : null
 
+  useEffect(() => {
+    if (!csvMmTooltipOpen) return
+    function handleClick(e: MouseEvent) {
+      if (!csvMmTooltipRef.current?.contains(e.target as Node)) setCsvMmTooltipOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [csvMmTooltipOpen])
+
+  function handleMmCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    file.text().then(text => {
+      const lines = text.trim().split('\n').filter(Boolean)
+      const isHeader = /label|parent/i.test(lines[0] ?? '')
+      const rows = isHeader ? lines.slice(1) : lines
+      const parsed = rows.map(row => {
+        const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+        return { label: cols[0] ?? '', parentLabel: cols[1] ?? '', back: cols[2] || undefined }
+      }).filter(r => r.label)
+      if (!parsed.length) { setImportMmMsg('No valid rows found.'); return }
+
+      // Build nodes with stable IDs, resolve parent labels → IDs
+      const idMap = new Map<string, string>()
+      parsed.forEach(r => idMap.set(r.label, crypto.randomUUID()))
+      const newNodes: MMNode[] = parsed.map(r => ({
+        id: idMap.get(r.label)!,
+        label: r.label,
+        back: r.back,
+        parentId: r.parentLabel ? (idMap.get(r.parentLabel) ?? null) : null,
+      }))
+      const placed = initPositions(newNodes)
+      persist(placed, [])
+      setImportMmMsg(`Imported ${placed.length} node${placed.length !== 1 ? 's' : ''}.`)
+      setTimeout(() => setImportMmMsg(null), 4000)
+    })
+    e.target.value = ''
+  }
+
   return (
     <div className="flex-1 min-w-0 h-full relative overflow-hidden">
       {/* Canvas */}
@@ -1014,6 +1057,47 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
           placeholder="Map title…"
           className="text-sm font-semibold bg-white/90 backdrop-blur border border-xero-border rounded-xl px-3 py-1.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-xero-green w-44"
         />
+      </div>
+
+      {/* Floating CSV import — top-right */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+        {importMmMsg && (
+          <span className="text-xs text-xero-green font-medium bg-white/90 backdrop-blur rounded-lg px-2.5 py-1.5 shadow-sm">{importMmMsg}</span>
+        )}
+        <div className="relative" ref={csvMmTooltipRef}>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => csvMmInputRef.current?.click()}
+              onMouseEnter={() => setCsvMmTooltipOpen(true)}
+              onMouseLeave={() => setCsvMmTooltipOpen(false)}
+              className="text-xs bg-white/90 backdrop-blur border border-xero-border text-gray-600 px-3 py-1.5 rounded-xl font-medium hover:bg-white shadow-sm transition-colors"
+            >
+              Import CSV
+            </button>
+            <button
+              onClick={() => setCsvMmTooltipOpen(v => !v)}
+              className="w-5 h-5 rounded-full text-[10px] font-bold bg-white/90 backdrop-blur border border-xero-border text-gray-500 hover:bg-white shadow-sm transition-colors flex items-center justify-center flex-shrink-0"
+              aria-label="CSV format info"
+            >
+              ?
+            </button>
+          </div>
+          {csvMmTooltipOpen && (
+            <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
+              <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
+                <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`label,parent,back\nFinance Concepts,,\nBudgeting,Finance Concepts,\nIncome,Budgeting,Money coming in\nSavings,Finance Concepts,`}</code>
+                <div className="mt-2 space-y-0.5">
+                  <p className="text-[10px] text-gray-300"><span className="text-white font-medium">label</span> — node text (required)</p>
+                  <p className="text-[10px] text-gray-300"><span className="text-white font-medium">parent</span> — parent node label, empty = root</p>
+                  <p className="text-[10px] text-gray-300"><span className="text-white font-medium">back</span> — flip-side text (optional)</p>
+                </div>
+                <div className="absolute bottom-full right-4 border-4 border-transparent border-b-gray-900" />
+              </div>
+            </div>
+          )}
+        </div>
+        <input ref={csvMmInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleMmCsvImport} />
       </div>
 
       {/* Context menu — smart positioning, proper icons */}
