@@ -9,6 +9,10 @@ export interface PlanTask {
   tag?: 'sport' | 'challenge'
   trainingScheduleId?: number
   templateId?: number | null
+  setsCount?: number | null
+  reps?: number | null
+  weightKg?: number | null
+  durationMin?: number | null
 }
 
 export interface DailyPlan {

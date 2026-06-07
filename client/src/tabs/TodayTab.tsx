@@ -147,15 +147,19 @@ function PlanPanel({ date }: { date: string }) {
     scheduleSave(next, notes)
     // Auto-log workout when a training schedule task is checked off
     if (task && updated?.done && task.trainingScheduleId) {
+      const setCount = task.setsCount ?? 0
+      const autoSets = setCount > 0
+        ? [{ exercise_name: task.text, sets: Array.from({ length: setCount }, () => ({ reps: task.reps ?? 0, weight_kg: task.weightKg ?? null })) }]
+        : []
       fetch('/api/sport/logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date,
-          sets:         [],
+          sets:         autoSets,
           template_id:  task.templateId ?? null,
           notes:        task.text,
-          duration_min: null,
+          duration_min: task.durationMin ?? null,
         }),
       }).catch(() => {})
     }

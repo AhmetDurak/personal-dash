@@ -255,23 +255,26 @@ export function sportRouter(pool: Pool): Router {
 
   router.post('/schedule', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { day_of_week, name, exercise_id, template_id, duration_min, notes } = req.body
+    const { day_of_week, name, exercise_id, template_id, duration_min, notes, sets_count, reps, weight_kg } = req.body
     const { rows } = await pool.query(
-      `INSERT INTO training_schedules (user_id, day_of_week, name, exercise_id, template_id, duration_min, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [uid, day_of_week, name, exercise_id ?? null, template_id ?? null, duration_min ?? null, notes ?? null]
+      `INSERT INTO training_schedules (user_id, day_of_week, name, exercise_id, template_id, duration_min, notes, sets_count, reps, weight_kg)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [uid, day_of_week, name, exercise_id ?? null, template_id ?? null, duration_min ?? null, notes ?? null,
+       sets_count ?? null, reps ?? null, weight_kg ?? null]
     )
     res.json(rows[0])
   })
 
   router.put('/schedule/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { day_of_week, name, exercise_id, template_id, duration_min, notes } = req.body
+    const { day_of_week, name, exercise_id, template_id, duration_min, notes, sets_count, reps, weight_kg } = req.body
     const { rows } = await pool.query(
       `UPDATE training_schedules
-         SET day_of_week=$1, name=$2, exercise_id=$3, template_id=$4, duration_min=$5, notes=$6
-       WHERE id=$7 AND user_id=$8 RETURNING *`,
-      [day_of_week, name, exercise_id ?? null, template_id ?? null, duration_min ?? null, notes ?? null, req.params.id, uid]
+         SET day_of_week=$1, name=$2, exercise_id=$3, template_id=$4, duration_min=$5, notes=$6,
+             sets_count=$7, reps=$8, weight_kg=$9
+       WHERE id=$10 AND user_id=$11 RETURNING *`,
+      [day_of_week, name, exercise_id ?? null, template_id ?? null, duration_min ?? null, notes ?? null,
+       sets_count ?? null, reps ?? null, weight_kg ?? null, req.params.id, uid]
     )
     res.json(rows[0] ?? {})
   })

@@ -8,6 +8,10 @@ export interface PlanTask {
   tag?: 'sport' | 'challenge'
   trainingScheduleId?: number
   templateId?: number | null
+  setsCount?: number | null
+  reps?: number | null
+  weightKg?: number | null
+  durationMin?: number | null
 }
 
 // 0=Mon..6=Sun from a YYYY-MM-DD string
@@ -47,6 +51,10 @@ export function planRouter(pool: Pool): Router {
         tag:                'sport' as const,
         trainingScheduleId: s.id,
         templateId:         s.template_id ?? null,
+        setsCount:          s.sets_count ?? null,
+        reps:               s.reps ?? null,
+        weightKg:           s.weight_kg != null ? Number(s.weight_kg) : null,
+        durationMin:        s.duration_min ?? null,
       }))
 
     const merged = [...tasks, ...extra]

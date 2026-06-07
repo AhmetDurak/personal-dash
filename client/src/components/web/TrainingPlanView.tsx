@@ -26,10 +26,13 @@ const TYPE_ORDER: ExerciseType[] = ['weights', 'calisthenics', 'cardio', 'flexib
 interface FormState {
   exercise_id:  string   // '' = none
   duration_min: string
+  sets_count:   string
+  reps:         string
+  weight_kg:    string
   notes:        string
 }
 
-const EMPTY_FORM: FormState = { exercise_id: '', duration_min: '', notes: '' }
+const EMPTY_FORM: FormState = { exercise_id: '', duration_min: '', sets_count: '', reps: '', weight_kg: '', notes: '' }
 
 export function TrainingPlanView() {
   const { byDay, addEntry, updateEntry, deleteEntry } = useTrainingSchedule()
@@ -49,6 +52,9 @@ export function TrainingPlanView() {
     setForm({
       exercise_id:  e.exercise_id != null ? String(e.exercise_id) : '',
       duration_min: e.duration_min != null ? String(e.duration_min) : '',
+      sets_count:   e.sets_count != null ? String(e.sets_count) : '',
+      reps:         e.reps != null ? String(e.reps) : '',
+      weight_kg:    e.weight_kg != null ? String(e.weight_kg) : '',
       notes:        e.notes ?? '',
     })
   }
@@ -68,10 +74,12 @@ export function TrainingPlanView() {
       name:         exerciseName(form.exercise_id),
       exercise_id:  Number(form.exercise_id),
       duration_min: form.duration_min ? Number(form.duration_min) : null,
+      sets_count:   form.sets_count ? Number(form.sets_count) : null,
+      reps:         form.reps ? Number(form.reps) : null,
+      weight_kg:    form.weight_kg ? Number(form.weight_kg) : null,
       notes:        form.notes.trim() || null,
     })
     setSaving(false)
-    // keep form open for adding another exercise to same day
     setForm(EMPTY_FORM)
   }
 
@@ -82,6 +90,9 @@ export function TrainingPlanView() {
       name:         exerciseName(form.exercise_id),
       exercise_id:  Number(form.exercise_id),
       duration_min: form.duration_min ? Number(form.duration_min) : null,
+      sets_count:   form.sets_count ? Number(form.sets_count) : null,
+      reps:         form.reps ? Number(form.reps) : null,
+      weight_kg:    form.weight_kg ? Number(form.weight_kg) : null,
       notes:        form.notes.trim() || null,
     })
     setSaving(false)
@@ -234,6 +245,17 @@ function SessionCard({
           {exercise?.muscle_groups.map(mg => (
             <span key={mg} className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full capitalize">{mg}</span>
           ))}
+          {entry.sets_count && entry.reps && (
+            <span className="text-[11px] font-medium text-gray-500 dark:text-slate-400">
+              {entry.sets_count} × {entry.reps} reps
+            </span>
+          )}
+          {!entry.sets_count && entry.reps && (
+            <span className="text-[11px] text-gray-400 dark:text-slate-500">{entry.reps} reps</span>
+          )}
+          {entry.weight_kg && (
+            <span className="text-[11px] text-gray-400 dark:text-slate-500">{entry.weight_kg} kg</span>
+          )}
           {entry.duration_min && (
             <span className="text-[11px] text-gray-400 dark:text-slate-500">{entry.duration_min} min</span>
           )}
@@ -264,7 +286,6 @@ function EntryForm({
   onDelete?: () => void
   isEdit:    boolean
 }) {
-  // Group exercises by type
   const grouped = TYPE_ORDER.reduce<Record<ExerciseType, Exercise[]>>((acc, type) => {
     acc[type] = exercises.filter(e => e.type === type)
     return acc
@@ -272,43 +293,60 @@ function EntryForm({
 
   const canSubmit = !!form.exercise_id && !saving
 
+  const inputCls = 'text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green bg-transparent text-gray-800 dark:text-slate-100 placeholder-gray-300 dark:placeholder-slate-600'
+
   return (
     <div className="bg-white dark:bg-slate-800 border border-xero-green/30 rounded-xl px-4 py-3 space-y-2.5">
-      <div className="flex gap-2">
-        <select
-          autoFocus
-          value={form.exercise_id}
-          onChange={e => onChange('exercise_id', e.target.value)}
-          className="flex-1 text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200"
-        >
-          <option value="">Select exercise…</option>
-          {TYPE_ORDER.map(type => {
-            const group = grouped[type]
-            if (group.length === 0) return null
-            return (
-              <optgroup key={type} label={`${TYPE_ICON[type]} ${TYPE_LABEL[type]}`}>
-                {group.map(ex => (
-                  <option key={ex.id} value={ex.id}>{ex.name}</option>
-                ))}
-              </optgroup>
-            )
-          })}
-        </select>
-        <input
-          type="number"
-          value={form.duration_min}
-          onChange={e => onChange('duration_min', e.target.value)}
-          placeholder="min"
-          min={1}
-          className="w-20 text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green bg-transparent text-gray-800 dark:text-slate-100 placeholder-gray-300 dark:placeholder-slate-600"
-        />
+      {/* Exercise picker */}
+      <select
+        autoFocus
+        value={form.exercise_id}
+        onChange={e => onChange('exercise_id', e.target.value)}
+        className={`w-full ${inputCls} bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200`}
+      >
+        <option value="">Select exercise…</option>
+        {TYPE_ORDER.map(type => {
+          const group = grouped[type]
+          if (group.length === 0) return null
+          return (
+            <optgroup key={type} label={`${TYPE_ICON[type]} ${TYPE_LABEL[type]}`}>
+              {group.map(ex => (
+                <option key={ex.id} value={ex.id}>{ex.name}</option>
+              ))}
+            </optgroup>
+          )
+        })}
+      </select>
+
+      {/* Sets / Reps / Weight / Duration */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sets</p>
+          <input type="number" value={form.sets_count} onChange={e => onChange('sets_count', e.target.value)}
+            placeholder="—" min={1} className={`w-full ${inputCls}`} />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Reps</p>
+          <input type="number" value={form.reps} onChange={e => onChange('reps', e.target.value)}
+            placeholder="—" min={1} className={`w-full ${inputCls}`} />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Weight (kg)</p>
+          <input type="number" value={form.weight_kg} onChange={e => onChange('weight_kg', e.target.value)}
+            placeholder="—" min={0} step={0.5} className={`w-full ${inputCls}`} />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Duration (min)</p>
+          <input type="number" value={form.duration_min} onChange={e => onChange('duration_min', e.target.value)}
+            placeholder="—" min={1} className={`w-full ${inputCls}`} />
+        </div>
       </div>
 
       <input
         value={form.notes}
         onChange={e => onChange('notes', e.target.value)}
         placeholder="Notes (optional)"
-        className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green bg-transparent text-gray-800 dark:text-slate-100 placeholder-gray-300 dark:placeholder-slate-600"
+        className={`w-full ${inputCls}`}
       />
 
       <div className="flex items-center gap-2">

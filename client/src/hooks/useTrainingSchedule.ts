@@ -11,6 +11,9 @@ export interface TrainingScheduleEntry {
   template_id:  number | null
   duration_min: number | null
   notes:        string | null
+  sets_count:   number | null
+  reps:         number | null
+  weight_kg:    number | null
   created_at:   string
 }
 
@@ -21,6 +24,9 @@ export type CreateSchedulePayload = {
   template_id?: number | null
   duration_min?: number | null
   notes?:       string | null
+  sets_count?:  number | null
+  reps?:        number | null
+  weight_kg?:   number | null
 }
 
 export function useTrainingSchedule() {
