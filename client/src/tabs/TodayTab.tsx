@@ -97,11 +97,9 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
   const [tasks, setTasks]               = useState<PlanTask[]>([])
   const [notes, setNotes]               = useState('')
   const [input, setInput]               = useState('')
-  const [taskTag, setTaskTag]           = useState<TaskTag>('task')
   const [saving, setSaving]             = useState(false)
   const [reminderDt, setReminderDt]     = useState('')
   const [showReminder, setShowReminder] = useState(false)
-  const [showTagPicker, setShowTagPicker] = useState(false)
   const [editingId, setEditingId]       = useState<string | null>(null)
   const [editText, setEditText]         = useState('')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -138,12 +136,9 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
   async function addTask() {
     const text = input.trim()
     if (!text) return
-    const newTask: PlanTask = {
-      id: crypto.randomUUID(), text, done: false,
-      ...(taskTag !== 'task' ? { tag: taskTag } : {}),
-    }
+    const newTask: PlanTask = { id: crypto.randomUUID(), text, done: false }
     const next: PlanTask[] = [...tasks, newTask]
-    setTasks(next); setInput(''); setTaskTag('task'); setShowTagPicker(false)
+    setTasks(next); setInput('')
     scheduleSave(next, notes)
     if (reminderDt) {
       await addReminder({ title: text, due_at: reminderDt })
@@ -261,22 +256,10 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
 
       {!listOnly && (
         <div className="flex-shrink-0 px-6 pb-4 space-y-2">
-          {showTagPicker && (
-            <div className="flex gap-1.5">
-              {(Object.entries(TAG_META) as [TaskTag, typeof TAG_META[TaskTag]][]).map(([key, m]) => (
-                <button key={key} type="button" onClick={() => setTaskTag(key)}
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1 ${
-                    taskTag === key ? m.color + ' ring-1 ring-offset-1 ring-current' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-                  }`}
-                >{m.icon} {m.label}</button>
-              ))}
-            </div>
-          )}
           <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2">
             <input
               value={input}
-              onChange={e => { setInput(e.target.value); if (e.target.value) setShowTagPicker(true) }}
-              onFocus={() => setShowTagPicker(true)}
+              onChange={e => setInput(e.target.value)}
               placeholder={t.addTask}
               className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300"
             />
@@ -632,8 +615,6 @@ function PlanEntry({ date }: { date: string }) {
   const { plan, save } = useDailyPlan(date)
   const { add: addReminder } = useAllReminders()
   const [input, setInput]               = useState('')
-  const [taskTag, setTaskTag]           = useState<TaskTag>('task')
-  const [showTagPicker, setShowTagPicker] = useState(false)
   const [reminderDt, setReminderDt]     = useState('')
   const [showReminder, setShowReminder] = useState(false)
   const [notes, setNotes]               = useState('')
@@ -656,12 +637,9 @@ function PlanEntry({ date }: { date: string }) {
   async function addTask() {
     const text = input.trim()
     if (!text) return
-    const newTask: PlanTask = {
-      id: crypto.randomUUID(), text, done: false,
-      ...(taskTag !== 'task' ? { tag: taskTag } : {}),
-    }
+    const newTask: PlanTask = { id: crypto.randomUUID(), text, done: false }
     await save([...(plan?.tasks ?? []), newTask], notes)
-    setInput(''); setTaskTag('task'); setShowTagPicker(false)
+    setInput('')
     if (reminderDt) {
       await addReminder({ title: text, due_at: reminderDt })
       setReminderDt(''); setShowReminder(false)
@@ -675,21 +653,10 @@ function PlanEntry({ date }: { date: string }) {
 
   return (
     <div className="px-5 py-4 space-y-2">
-      {showTagPicker && (
-        <div className="flex gap-1.5">
-          {(Object.entries(TAG_META) as [TaskTag, typeof TAG_META[TaskTag]][]).map(([key, m]) => (
-            <button key={key} type="button" onClick={() => setTaskTag(key)}
-              className={`text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1 ${
-                taskTag === key ? m.color + ' ring-1 ring-offset-1 ring-current' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
-              }`}>{m.icon} {m.label}</button>
-          ))}
-        </div>
-      )}
       <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2">
         <input
           value={input}
-          onChange={e => { setInput(e.target.value); if (e.target.value) setShowTagPicker(true) }}
-          onFocus={() => setShowTagPicker(true)}
+          onChange={e => setInput(e.target.value)}
           placeholder={t.addTask}
           className="flex-1 text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300 dark:bg-slate-800 dark:text-slate-100"
         />
