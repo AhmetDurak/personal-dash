@@ -197,7 +197,8 @@ function ChallengeCard({
                     ))}
                   </div>
                 )}
-                <div className="flex gap-2">
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setEditing(false)} className="text-xs text-gray-400 hover:text-gray-600 px-2">Cancel</button>
                   <button onClick={() => {
                     onUpdate({
                       title: editTitle,
@@ -208,7 +209,6 @@ function ChallengeCard({
                     })
                     setEditing(false)
                   }} className="text-xs bg-violet-500 text-white px-3 py-1 rounded-lg font-medium">Save</button>
-                  <button onClick={() => setEditing(false)} className="text-xs text-gray-400 hover:text-gray-600 px-2">Cancel</button>
                 </div>
               </div>
             ) : (
