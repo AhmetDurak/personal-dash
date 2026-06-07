@@ -1091,7 +1091,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
         <div className="relative" ref={csvMmTooltipRef}>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => { csvMmInputRef.current?.click(); setCsvMmTooltipOpen(false) }}
+              onClick={() => csvMmInputRef.current?.click()}
               onMouseEnter={() => setCsvMmTooltipOpen(true)}
               onMouseLeave={() => setCsvMmTooltipOpen(false)}
               className="text-xs bg-white/90 dark:bg-slate-800/90 backdrop-blur border border-xero-border text-gray-600 px-3 py-3 rounded-xl font-medium hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-colors"
