@@ -149,13 +149,20 @@ function AddTickerPanel({ onAdd }: { onAdd: (t: string) => Promise<void> }) {
     try { await onAdd(ticker) } finally { setAdding(false); setQuery('') }
   }
 
+  function handleEnter() {
+    if (!query.trim()) return
+    // If search resolved results (ISIN/WKN/name lookup), use the first ticker
+    const resolved = results?.[0]?.ticker
+    handleAdd(resolved ?? query.trim().toUpperCase())
+  }
+
   return (
     <div className="p-3 border-b border-gray-100">
       <input
         value={query}
         onChange={e => setQuery(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter' && query.trim()) handleAdd(query.trim().toUpperCase()) }}
-        placeholder="z.B. EUNL.DE, VWCE.DE…"
+        onKeyDown={e => { if (e.key === 'Enter') handleEnter() }}
+        placeholder="Ticker, ISIN or WKN…"
         className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green/30 focus:border-xero-green"
       />
       {results && results.length > 0 && query.length > 1 && (
