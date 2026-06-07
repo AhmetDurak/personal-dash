@@ -340,13 +340,23 @@ function WeekDayRow({
           {tomorrow && <span className="text-[10px] bg-amber-400 text-white px-1.5 py-0.5 rounded-full font-semibold">{t.tomorrow}</span>}
         </div>
         {total > 0
-          ? <span className="text-xs text-gray-400 flex-shrink-0">{done}/{total}</span>
+          ? done === total
+            ? <span className="flex items-center gap-1 text-xs font-semibold text-emerald-500 flex-shrink-0">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+                All done
+              </span>
+            : <span className="text-xs text-gray-400 flex-shrink-0">{done}/{total}</span>
           : <span className="text-xs text-gray-300 flex-shrink-0">{t.noTasksYet}</span>
         }
       </div>
       {total > 0 && (
-        <div className="h-1 bg-gray-100 rounded-full overflow-hidden mt-2">
-          <div className="h-full bg-xero-green transition-all" style={{ width: `${(done / total) * 100}%` }} />
+        <div className={`h-1 rounded-full overflow-hidden mt-2 ${done === total ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-gray-100'}`}>
+          <div
+            className={`h-full transition-all ${done === total ? 'bg-emerald-500' : 'bg-xero-green'}`}
+            style={{ width: `${(done / total) * 100}%` }}
+          />
         </div>
       )}
     </button>
