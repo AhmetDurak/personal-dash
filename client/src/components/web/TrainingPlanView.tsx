@@ -185,7 +185,7 @@ export function TrainingPlanView() {
                   exercise={s.exercise_id != null ? exerciseById[s.exercise_id] : undefined}
                   onEdit={() => openEdit(s)}
                   onDelete={() => handleDelete(s.id)}
-                  dimmed={editingId !== null || isAddingHere}
+                  dimmed={editingId !== null}
                 />
               )
             )}
