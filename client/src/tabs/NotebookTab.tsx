@@ -925,7 +925,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             style={{ cursor: selBoxRef.current ? 'crosshair' : 'grab' }}
             onPointerDown={e => {
               if (dragRef.current || connectRef.current) return
-              if (e.pointerType === 'touch') {
+              if (e.pointerType === 'touch' || e.ctrlKey || e.metaKey) {
                 panRef.current = { startX: e.clientX, startY: e.clientY, tx: panStateRef.current.x, ty: panStateRef.current.y }
               } else {
                 const { x, y } = clientToSvg(e.clientX, e.clientY)
