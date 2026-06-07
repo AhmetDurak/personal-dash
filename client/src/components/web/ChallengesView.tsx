@@ -86,8 +86,15 @@ function ChallengeCard({
   const [cpForm, setCpForm] = useState({ label: '', target_date: '', target_value: '' })
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [editTitle, setEditTitle] = useState(challenge.title)
-  const [editDesc, setEditDesc] = useState(challenge.description ?? '')
+  const [editTitle, setEditTitle]         = useState(challenge.title)
+  const [editDesc, setEditDesc]           = useState(challenge.description ?? '')
+  const [editCycle, setEditCycle]         = useState(challenge.repeat_cycle)
+  const [editTime, setEditTime]           = useState(challenge.time_of_day ?? '')
+  const [editDays, setEditDays]           = useState<number[]>(challenge.repeat_days ?? [])
+
+  function toggleEditDay(day: number) {
+    setEditDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
+  }
 
   const done  = challenge.checkpoints.filter(c => c.completed).length
   const total = challenge.checkpoints.length
@@ -148,8 +155,59 @@ function ChallengeCard({
                   className="text-xs w-full border border-gray-200 dark:border-slate-600 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-400 bg-white dark:bg-slate-700 text-gray-700 dark:text-slate-300"
                 />
                 <div className="flex gap-2">
-                  <button onClick={() => { onUpdate({ title: editTitle, description: editDesc || null }); setEditing(false) }}
-                    className="text-xs bg-violet-500 text-white px-3 py-1 rounded-lg font-medium">Save</button>
+                  <div className="flex-1">
+                    <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">Repeat</p>
+                    <select
+                      value={editCycle}
+                      onChange={e => { setEditCycle(e.target.value as RepeatCycle); setEditDays([]) }}
+                      className="text-xs w-full border border-gray-200 dark:border-slate-600 rounded-lg px-2 py-1 focus:outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100"
+                    >
+                      {(Object.entries(REPEAT_LABELS) as [RepeatCycle, string][]).map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] text-gray-400 dark:text-slate-500 uppercase tracking-wide mb-1">Time</p>
+                    <input type="time" value={editTime} onChange={e => setEditTime(e.target.value)}
+                      className="text-xs w-full border border-gray-200 dark:border-slate-600 rounded-lg px-2 py-1 focus:outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100" />
+                  </div>
+                </div>
+                {editCycle === 'weekly' && (
+                  <div className="flex gap-1 flex-wrap">
+                    {['Mo','Tu','We','Th','Fr','Sa','Su'].map((label, i) => (
+                      <button key={i} type="button" onClick={() => toggleEditDay(i)}
+                        className={`w-8 h-8 rounded-lg text-xs font-semibold transition-colors ${
+                          editDays.includes(i)
+                            ? 'bg-violet-500 text-white'
+                            : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-violet-100 dark:hover:bg-violet-900/30'
+                        }`}>{label}</button>
+                    ))}
+                  </div>
+                )}
+                {editCycle === 'monthly' && (
+                  <div className="flex gap-1 flex-wrap">
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                      <button key={day} type="button" onClick={() => toggleEditDay(day)}
+                        className={`w-7 h-7 rounded-lg text-[11px] font-semibold transition-colors ${
+                          editDays.includes(day)
+                            ? 'bg-violet-500 text-white'
+                            : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 hover:bg-violet-100 dark:hover:bg-violet-900/30'
+                        }`}>{day}</button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                    onUpdate({
+                      title: editTitle,
+                      description: editDesc || null,
+                      repeat_cycle: editCycle,
+                      time_of_day: editTime || null,
+                      repeat_days: editDays.length > 0 ? editDays : null,
+                    })
+                    setEditing(false)
+                  }} className="text-xs bg-violet-500 text-white px-3 py-1 rounded-lg font-medium">Save</button>
                   <button onClick={() => setEditing(false)} className="text-xs text-gray-400 hover:text-gray-600 px-2">Cancel</button>
                 </div>
               </div>
