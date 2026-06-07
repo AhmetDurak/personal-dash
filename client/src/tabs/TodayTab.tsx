@@ -140,8 +140,25 @@ function PlanPanel({ date }: { date: string }) {
   }
 
   function toggleTask(id: string) {
-    const next = tasks.map(tk => tk.id === id ? { ...tk, done: !tk.done } : tk)
-    setTasks(next); scheduleSave(next, notes)
+    const task    = tasks.find(tk => tk.id === id)
+    const next    = tasks.map(tk => tk.id === id ? { ...tk, done: !tk.done } : tk)
+    const updated = next.find(tk => tk.id === id)
+    setTasks(next)
+    scheduleSave(next, notes)
+    // Auto-log workout when a training schedule task is checked off
+    if (task && updated?.done && task.trainingScheduleId) {
+      fetch('/api/sport/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date,
+          sets:         [],
+          template_id:  task.templateId ?? null,
+          notes:        task.text,
+          duration_min: null,
+        }),
+      }).catch(() => {})
+    }
   }
 
   function deleteTask(id: string) {

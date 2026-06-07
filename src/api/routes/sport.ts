@@ -242,5 +242,45 @@ export function sportRouter(pool: Pool): Router {
     res.json({ ok: true })
   })
 
+  // ─── Training schedule ────────────────────────────────────────────────────
+
+  router.get('/schedule', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      'SELECT * FROM training_schedules WHERE user_id=$1 ORDER BY day_of_week, id',
+      [uid]
+    )
+    res.json(rows)
+  })
+
+  router.post('/schedule', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { day_of_week, name, template_id, duration_min, notes } = req.body
+    const { rows } = await pool.query(
+      `INSERT INTO training_schedules (user_id, day_of_week, name, template_id, duration_min, notes)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [uid, day_of_week, name, template_id ?? null, duration_min ?? null, notes ?? null]
+    )
+    res.json(rows[0])
+  })
+
+  router.put('/schedule/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { day_of_week, name, template_id, duration_min, notes } = req.body
+    const { rows } = await pool.query(
+      `UPDATE training_schedules
+         SET day_of_week=$1, name=$2, template_id=$3, duration_min=$4, notes=$5
+       WHERE id=$6 AND user_id=$7 RETURNING *`,
+      [day_of_week, name, template_id ?? null, duration_min ?? null, notes ?? null, req.params.id, uid]
+    )
+    res.json(rows[0] ?? {})
+  })
+
+  router.delete('/schedule/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    await pool.query('DELETE FROM training_schedules WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
+  })
+
   return router
 }

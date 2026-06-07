@@ -7,6 +7,7 @@ import { useExercises, useTemplates, useWorkoutLogs, useFitnessTargets, useBodyW
 import type { ExerciseType, MuscleGroup, WorkoutSetGroup, SetEntry } from '../hooks/useSport'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChallengesView } from '../components/web/ChallengesView'
+import { TrainingPlanView } from '../components/web/TrainingPlanView'
 import { useLanguage } from '../hooks/useLanguage'
 import { useDarkMode } from '../hooks/useDarkMode'
 
@@ -831,7 +832,7 @@ function WeightView() {
 
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
-type View = 'dashboard' | 'exercises' | 'log' | 'targets' | 'challenges' | 'weight'
+type View = 'dashboard' | 'log' | 'targets' | 'challenges' | 'weight' | 'exercises' | 'plan'
 
 export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const { t } = useLanguage()
@@ -840,6 +841,7 @@ export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
   function setView(v: View) { setSearchParams({ view: v }) }
   const VIEWS: { id: View; label: string; icon: ReactNode }[] = [
     { id: 'dashboard',  label: t.sportDashboard, icon: <IconDashboard className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { id: 'plan',       label: 'Plan',           icon: <span className="text-[13px] leading-none">📅</span> },
     { id: 'log',        label: t.logWorkout,     icon: <IconClipboard className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'targets',    label: t.targets,        icon: <IconTarget    className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'challenges', label: 'Challenges',     icon: <IconTrophy    className="w-3.5 h-3.5" strokeWidth={2} /> },
@@ -872,11 +874,12 @@ export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
       </header>
       <div className="flex-1 overflow-y-auto">
         {view === 'dashboard'  && <Dashboard />}
-        {view === 'exercises'  && <ExercisesView />}
+        {view === 'plan'       && <TrainingPlanView />}
         {view === 'log'        && <LogWorkout />}
         {view === 'targets'    && <TargetsView />}
         {view === 'challenges' && <ChallengesView scope="sport" />}
         {view === 'weight'     && <WeightView />}
+        {view === 'exercises'  && <ExercisesView />}
       </div>
     </div>
   )

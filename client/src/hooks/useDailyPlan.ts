@@ -7,6 +7,8 @@ export interface PlanTask {
   text: string
   done: boolean
   tag?: 'sport' | 'challenge'
+  trainingScheduleId?: number
+  templateId?: number | null
 }
 
 export interface DailyPlan {

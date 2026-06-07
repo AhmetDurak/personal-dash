@@ -298,6 +298,19 @@ ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
 ALTER TABLE transactions        ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT NULL;
 ALTER TABLE recurring_templates ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT NULL;
 
+-- Weekly training schedule (day_of_week: 0=Mon..6=Sun)
+CREATE TABLE IF NOT EXISTS training_schedules (
+  id           SERIAL PRIMARY KEY,
+  user_id      INTEGER REFERENCES users(id),
+  day_of_week  SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  name         TEXT NOT NULL,
+  template_id  INTEGER REFERENCES workout_templates(id),
+  duration_min INTEGER,
+  notes        TEXT,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_training_schedules_user ON training_schedules(user_id);
+
 -- Migrate old category values to new German parent categories
 UPDATE transactions SET category = CASE category
   WHEN 'Income'            THEN 'Einkommen'
