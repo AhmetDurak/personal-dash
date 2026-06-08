@@ -183,9 +183,9 @@ function CalendarView({ onSelectDate }: { onSelectDate: (d: string) => void }) {
   return (
     <div className="max-w-sm mx-auto p-6">
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prev} className="p-1 text-gray-400 hover:text-gray-700 rounded"><IconChevronLeft  className="w-4 h-4" strokeWidth={2} /></button>
+        <button onClick={prev} className="p-2 text-gray-400 hover:text-gray-700 rounded"><IconChevronLeft  className="w-4 h-4" strokeWidth={2} /></button>
         <p className="text-sm font-semibold text-gray-800">{monthLabel}</p>
-        <button onClick={next} className="p-1 text-gray-400 hover:text-gray-700 rounded"><IconChevronRight className="w-4 h-4" strokeWidth={2} /></button>
+        <button onClick={next} className="p-2 text-gray-400 hover:text-gray-700 rounded"><IconChevronRight className="w-4 h-4" strokeWidth={2} /></button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center mb-2">
         {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
@@ -346,7 +346,7 @@ export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
             <button
               key={v.id}
               onClick={() => nav({ view: v.id, date: null })}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
+              className={`text-xs px-3 py-2.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
                 view === v.id && !selectedDate ? 'bg-xero-green text-white' : 'text-gray-500 hover:bg-gray-100'
               }`}
             >
