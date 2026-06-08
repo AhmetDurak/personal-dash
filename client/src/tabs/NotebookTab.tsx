@@ -2057,14 +2057,6 @@ function VocabView() {
                   >
                     ×
                   </button>
-                  {confirmDeleteVocabId === card.id && (
-                    <ConfirmDialog
-                      message={`"${card.word}" will be permanently deleted.`}
-                      confirmLabel="Delete"
-                      onConfirm={() => { deleteWord(card.id); setConfirmDeleteVocabId(null) }}
-                      onCancel={() => setConfirmDeleteVocabId(null)}
-                    />
-                  )}
                 </>
               )}
             </div>
@@ -2154,7 +2146,7 @@ function VocabView() {
 
       {/* Selection bottom bar */}
       {selectMode && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 z-40 shadow-lg">
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3 z-40 shadow-lg">
           <span className="text-sm text-gray-700 dark:text-slate-300 flex-shrink-0">
             {selectedIds.size} selected
           </span>
@@ -3160,6 +3152,15 @@ function ReviewSession({
           </div>
         )}
       </div>
+
+      {confirmDeleteVocabId !== null && (
+        <ConfirmDialog
+          message={`"${vocab.find(c => c.id === confirmDeleteVocabId)?.word ?? ''}" will be permanently deleted.`}
+          confirmLabel="Delete"
+          onConfirm={() => { deleteWord(confirmDeleteVocabId); setConfirmDeleteVocabId(null) }}
+          onCancel={() => setConfirmDeleteVocabId(null)}
+        />
+      )}
     </div>
   )
 }
@@ -3525,7 +3526,7 @@ function SentenceView() {
       )}
 
       {selectMode && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 z-40 shadow-lg">
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3 z-40 shadow-lg">
           <span className="text-sm text-gray-700 dark:text-slate-300 flex-shrink-0">{selectedIds.size} selected</span>
           <button
             onClick={() => selectedIds.size === filtered.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(filtered.map(s => s.id)))}
@@ -3537,7 +3538,7 @@ function SentenceView() {
               Delete {selectedIds.size}
             </button>
           )}
-          <button onClick={() => { setSelectMode(false); setSelectedIds(new Set()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
+          <button onClick={() => { setSelectMode(false); setSelectedIds(new Set()); setConfirmBulkDelete(false) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
         </div>
       )}
 
@@ -3876,7 +3877,7 @@ function ScenarioView() {
       </div>
 
       {scenSelectMode && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 z-40 shadow-lg">
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3 z-40 shadow-lg">
           <span className="text-sm text-gray-700 dark:text-slate-300 flex-shrink-0">{scenSelectedIds.size} selected</span>
           <button
             onClick={() => scenSelectedIds.size === filteredScenarios.length ? setScenSelectedIds(new Set()) : setScenSelectedIds(new Set(filteredScenarios.map(s => s.id)))}
@@ -3888,7 +3889,7 @@ function ScenarioView() {
               Delete {scenSelectedIds.size}
             </button>
           )}
-          <button onClick={() => { setScenSelectMode(false); setScenSelectedIds(new Set()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
+          <button onClick={() => { setScenSelectMode(false); setScenSelectedIds(new Set()); setConfirmScenBulkDelete(false) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
         </div>
       )}
 
