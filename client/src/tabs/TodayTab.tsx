@@ -93,7 +93,7 @@ function TagBadge({ tag }: { tag: TaskTag }) {
 function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string; listOnly?: boolean; noHeader?: boolean }) {
   const { t } = useLanguage()
   const { plan, save } = useDailyPlan(date)
-  const { add: addReminder, reminders } = useAllReminders()
+  const { add: addReminder, reminders, toggle: toggleReminder } = useAllReminders()
   const activeReminderTitles = new Set(reminders.filter(r => !r.done).map(r => r.title.toLowerCase()))
   const [tasks, setTasks]               = useState<PlanTask[]>([])
   const [notes, setNotes]               = useState('')
@@ -157,6 +157,12 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
     const updated = next.find(tk => tk.id === id)
     setTasks(next)
     scheduleSave(next, notes)
+    if (task && updated !== undefined) {
+      const matchingReminder = reminders.find(r => r.title.toLowerCase() === task.text.toLowerCase())
+      if (matchingReminder && matchingReminder.done !== updated.done) {
+        toggleReminder(matchingReminder.id).catch(() => {})
+      }
+    }
     if (task && updated?.done && task.trainingScheduleId) {
       const setCount = task.setsCount ?? 0
       const autoSets = setCount > 0
