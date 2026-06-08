@@ -215,13 +215,13 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
           <div key={task.id} className="flex items-center gap-3 group bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 hover:border-gray-200 transition-colors">
             <button
               onClick={() => toggleTask(task.id)}
-              className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                task.done ? 'bg-xero-green border-xero-green' : 'border-gray-300 hover:border-xero-green'
-              }`}
+              className={`-m-2 p-2 flex-shrink-0 flex items-center justify-center`}
             >
-              {task.done && (
-                <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />
-              )}
+              <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                task.done ? 'bg-xero-green border-xero-green' : 'border-gray-300 hover:border-xero-green'
+              }`}>
+                {task.done && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
+              </span>
             </button>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -261,7 +261,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                 <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
               )}
             </div>
-            <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0">✕</button>
+            <button onClick={() => deleteTask(task.id)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0 p-1">✕</button>
           </div>
         ))}
       </div>
@@ -272,8 +272,9 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
+              onFocus={e => e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
               placeholder={t.addTask}
-              className="flex-1 text-sm border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300"
+              className="flex-1 text-sm border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300"
             />
             <button type="button" onClick={toggleReminderInput} title="Set reminder"
               className={`flex-shrink-0 px-2.5 py-2 rounded-xl transition-colors ${
@@ -294,7 +295,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
             onChange={e => { setNotes(e.target.value); scheduleSave(tasks, e.target.value) }}
             placeholder={t.motivationalNotesPlaceholder}
             rows={3}
-            className="w-full text-sm border border-amber-100 bg-amber-50/40 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none placeholder-gray-400"
+            className="w-full text-sm border border-amber-100 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-900/10 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none placeholder-gray-400"
           />
         </div>
       )}
