@@ -3189,6 +3189,7 @@ function SentenceView() {
   }, [sentCsvTooltipOpen])
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
 
   function toggleSelect(id: number) {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -3196,7 +3197,7 @@ function SentenceView() {
 
   async function deleteSelected() {
     for (const id of selectedIds) await deleteSentence(id)
-    setSelectedIds(new Set()); setSelectMode(false)
+    setSelectedIds(new Set()); setSelectMode(false); setConfirmBulkDelete(false)
   }
 
   async function handleSentCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -3532,12 +3533,20 @@ function SentenceView() {
           >{selectedIds.size === filtered.length ? 'Deselect All' : 'Select All'}</button>
           <div className="flex-1" />
           {selectedIds.size > 0 && (
-            <button onClick={deleteSelected} className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors">
+            <button onClick={() => setConfirmBulkDelete(true)} className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors">
               Delete {selectedIds.size}
             </button>
           )}
           <button onClick={() => { setSelectMode(false); setSelectedIds(new Set()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
         </div>
+      )}
+
+      {confirmBulkDelete && (
+        <ConfirmDialog
+          message={`Delete ${selectedIds.size} sentence${selectedIds.size !== 1 ? 's' : ''}?`}
+          onConfirm={deleteSelected}
+          onCancel={() => setConfirmBulkDelete(false)}
+        />
       )}
     </div>
   )
@@ -3569,6 +3578,7 @@ function ScenarioView() {
   }, [scenCsvTooltipOpen])
   const [scenSelectMode, setScenSelectMode] = useState(false)
   const [scenSelectedIds, setScenSelectedIds] = useState<Set<number>>(new Set())
+  const [confirmScenBulkDelete, setConfirmScenBulkDelete] = useState(false)
 
   function toggleScenSelect(id: number) {
     setScenSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -3576,7 +3586,7 @@ function ScenarioView() {
 
   async function deleteScenSelected() {
     for (const id of scenSelectedIds) await deleteScenario(id)
-    setScenSelectedIds(new Set()); setScenSelectMode(false)
+    setScenSelectedIds(new Set()); setScenSelectMode(false); setConfirmScenBulkDelete(false)
   }
 
   async function handleScenCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -3622,7 +3632,7 @@ function ScenarioView() {
 
   function scheduleContent(id: number, content: string) {
     if (contentTimer.current) clearTimeout(contentTimer.current)
-    contentTimer.current = setTimeout(() => { saveScenario(id, { content }); setIsEditingContent(false) }, 1200)
+    contentTimer.current = setTimeout(() => saveScenario(id, { content }), 1200)
   }
 
   async function handleTranslate() {
@@ -3708,7 +3718,7 @@ function ScenarioView() {
           </button>
         </div>
 
-        <div className={`rounded-xl border p-3 min-h-32 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'}`}>
+        <div className={`rounded-xl border p-3 min-h-32 ${dark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-gray-100 text-gray-800'}`}>
           {isEditingContent ? (
             <textarea
               autoFocus
@@ -3874,12 +3884,20 @@ function ScenarioView() {
           >{scenSelectedIds.size === filteredScenarios.length ? 'Deselect All' : 'Select All'}</button>
           <div className="flex-1" />
           {scenSelectedIds.size > 0 && (
-            <button onClick={deleteScenSelected} className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors">
+            <button onClick={() => setConfirmScenBulkDelete(true)} className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors">
               Delete {scenSelectedIds.size}
             </button>
           )}
           <button onClick={() => { setScenSelectMode(false); setScenSelectedIds(new Set()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
         </div>
+      )}
+
+      {confirmScenBulkDelete && (
+        <ConfirmDialog
+          message={`Delete ${scenSelectedIds.size} scenario${scenSelectedIds.size !== 1 ? 's' : ''}?`}
+          onConfirm={deleteScenSelected}
+          onCancel={() => setConfirmScenBulkDelete(false)}
+        />
       )}
     </div>
   )
