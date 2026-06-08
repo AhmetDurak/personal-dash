@@ -1879,6 +1879,20 @@ function VocabView() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {/* Search */}
+            <div className="relative">
+              <input
+                value={vocabSearch}
+                onChange={e => setVocabSearch(e.target.value)}
+                placeholder="Search…"
+                className="text-xs border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 pr-6 w-36 focus:outline-none focus:ring-1 focus:ring-xero-green bg-white dark:bg-slate-800 dark:text-slate-100 placeholder-gray-400"
+              />
+              {vocabSearch && (
+                <button onClick={() => setVocabSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+                  <IconClose className="w-3 h-3" strokeWidth={2} />
+                </button>
+              )}
+            </div>
             {/* Sort */}
             <select
               value={sortBy}
@@ -1945,21 +1959,6 @@ function VocabView() {
               <span className="text-xs text-xero-green font-medium">{importMsg}</span>
             )}
           </div>
-        </div>
-
-        {/* Search */}
-        <div className="relative">
-          <input
-            value={vocabSearch}
-            onChange={e => setVocabSearch(e.target.value)}
-            placeholder="Search word, translation, example…"
-            className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-xero-green bg-white dark:bg-slate-800 dark:text-slate-100 placeholder-gray-400"
-          />
-          {vocabSearch && (
-            <button onClick={() => setVocabSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
-              <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
-            </button>
-          )}
         </div>
 
         {/* Folder strip */}
@@ -3181,6 +3180,13 @@ function SentenceView() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sentImportMsg, setSentImportMsg] = useState<string | null>(null)
   const sentCsvRef = useRef<HTMLInputElement>(null)
+  const [sentCsvTooltipOpen, setSentCsvTooltipOpen] = useState(false)
+  const sentCsvTooltipRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!sentCsvTooltipOpen) return
+    function h(e: MouseEvent) { if (!sentCsvTooltipRef.current?.contains(e.target as Node)) setSentCsvTooltipOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [sentCsvTooltipOpen])
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
@@ -3389,11 +3395,33 @@ function SentenceView() {
         )}
         <div className="flex items-center gap-2 ml-auto">
           {sentImportMsg && <span className="text-xs text-xero-green font-medium">{sentImportMsg}</span>}
-          <button
-            onClick={() => sentCsvRef.current?.click()}
-            className="text-xs px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors font-medium"
-            title="source_text, translation, source_lang, target_lang"
-          >↑ CSV</button>
+          <div className="relative" ref={sentCsvTooltipRef}>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => sentCsvRef.current?.click()}
+                onMouseEnter={() => setSentCsvTooltipOpen(true)}
+                onMouseLeave={() => setSentCsvTooltipOpen(false)}
+                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              >Import CSV</button>
+              <button
+                onClick={() => setSentCsvTooltipOpen(v => !v)}
+                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
+              >?</button>
+            </div>
+            {sentCsvTooltipOpen && (
+              <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
+                <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
+                  <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`source_text,translation,source_lang,target_lang\nIch laufe jeden Tag.,I run every day.,de,en\nDaijoubu desu.,I'm fine.,ja,en`}</code>
+                  <div className="mt-2 space-y-0.5">
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">source_text</span> — required</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">translation</span> — optional</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">source_lang / target_lang</span> — <code className="text-green-300">de</code> / <code className="text-green-300">en</code> / <code className="text-green-300">tr</code> / <code className="text-green-300">ja</code></p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <input ref={sentCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleSentCsvImport} />
           <span className="text-xs text-gray-400 dark:text-slate-500">
             {filtered.length}{langFilter ? `/${sentences.length}` : ''} sentences
@@ -3532,6 +3560,13 @@ function ScenarioView() {
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [scenImportMsg, setScenImportMsg] = useState<string | null>(null)
   const scenCsvRef = useRef<HTMLInputElement>(null)
+  const [scenCsvTooltipOpen, setScenCsvTooltipOpen] = useState(false)
+  const scenCsvTooltipRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!scenCsvTooltipOpen) return
+    function h(e: MouseEvent) { if (!scenCsvTooltipRef.current?.contains(e.target as Node)) setScenCsvTooltipOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [scenCsvTooltipOpen])
   const [scenSelectMode, setScenSelectMode] = useState(false)
   const [scenSelectedIds, setScenSelectedIds] = useState<Set<number>>(new Set())
 
@@ -3745,11 +3780,33 @@ function ScenarioView() {
         )}
         <div className="flex items-center gap-2 ml-auto">
           {scenImportMsg && <span className="text-xs text-xero-green font-medium">{scenImportMsg}</span>}
-          <button
-            onClick={() => scenCsvRef.current?.click()}
-            className="text-xs px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors font-medium"
-            title="title, content, source_lang, target_lang"
-          >↑ CSV</button>
+          <div className="relative" ref={scenCsvTooltipRef}>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => scenCsvRef.current?.click()}
+                onMouseEnter={() => setScenCsvTooltipOpen(true)}
+                onMouseLeave={() => setScenCsvTooltipOpen(false)}
+                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              >Import CSV</button>
+              <button
+                onClick={() => setScenCsvTooltipOpen(v => !v)}
+                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
+              >?</button>
+            </div>
+            {scenCsvTooltipOpen && (
+              <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
+                <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
+                  <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`title,content,source_lang,target_lang\nAt the café,"Einen Kaffee, bitte.",de,en\nAt the doctor,,de,tr`}</code>
+                  <div className="mt-2 space-y-0.5">
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">title</span> — required</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">content</span> — optional (use quotes if it contains commas)</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">source_lang / target_lang</span> — <code className="text-green-300">de</code> / <code className="text-green-300">en</code> / <code className="text-green-300">tr</code> / <code className="text-green-300">ja</code></p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <input ref={scenCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleScenCsvImport} />
           <span className="text-xs text-gray-400 dark:text-slate-500">
             {filteredScenarios.length}{langFilter ? `/${scenarios.length}` : ''} scenarios
