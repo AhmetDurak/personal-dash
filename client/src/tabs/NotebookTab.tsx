@@ -925,13 +925,15 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
             style={{ cursor: selBoxRef.current ? 'crosshair' : 'grab' }}
             onPointerDown={e => {
               if (dragRef.current || connectRef.current) return
-              if (e.pointerType === 'touch' || e.ctrlKey || e.metaKey) {
-                panRef.current = { startX: e.clientX, startY: e.clientY, tx: panStateRef.current.x, ty: panStateRef.current.y }
-              } else {
+              if (e.ctrlKey || e.metaKey) {
+                // Ctrl+drag = rubber-band selection
                 const { x, y } = clientToSvg(e.clientX, e.clientY)
                 selBoxRef.current = { startX: x, startY: y }
                 setSelBox({ x, y, w: 0, h: 0 })
                 setCtxMenu(null)
+              } else {
+                // Plain drag (mouse or touch) = pan
+                panRef.current = { startX: e.clientX, startY: e.clientY, tx: panStateRef.current.x, ty: panStateRef.current.y }
               }
             }}
           />
