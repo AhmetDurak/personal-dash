@@ -997,7 +997,7 @@ export function TodayTab() {
                   <PlanPanel key={selectedDate} date={selectedDate} />
                 </div>
               ) : scope === 'day' ? (
-                mobilePanel === 'plan' ? renderPlanContent() : <JournalPanel date={dayDate} />
+                mobilePanel === 'plan' ? <PlanPanel key={dayDate} date={dayDate} /> : <JournalPanel date={dayDate} />
               ) : (
                 renderPlanContent()
               )}
