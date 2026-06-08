@@ -93,7 +93,8 @@ function TagBadge({ tag }: { tag: TaskTag }) {
 function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string; listOnly?: boolean; noHeader?: boolean }) {
   const { t } = useLanguage()
   const { plan, save } = useDailyPlan(date)
-  const { add: addReminder } = useAllReminders()
+  const { add: addReminder, reminders } = useAllReminders()
+  const activeReminderTitles = new Set(reminders.filter(r => !r.done).map(r => r.title.toLowerCase()))
   const [tasks, setTasks]               = useState<PlanTask[]>([])
   const [notes, setNotes]               = useState('')
   const [input, setInput]               = useState('')
@@ -255,6 +256,9 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                 <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
               )}
             </div>
+            {activeReminderTitles.has(task.text.toLowerCase()) && (
+              <span className="text-amber-400 flex-shrink-0 text-sm">🔔</span>
+            )}
             <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0">✕</button>
           </div>
         ))}
