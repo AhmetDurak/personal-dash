@@ -133,6 +133,16 @@ CREATE TABLE IF NOT EXISTS foods (
 ALTER TABLE foods ADD COLUMN IF NOT EXISTS name_de TEXT;
 ALTER TABLE foods ADD COLUMN IF NOT EXISTS name_tr TEXT;
 
+-- Deduplicate global foods before adding unique index
+DELETE FROM foods
+WHERE user_id IS NULL
+  AND id NOT IN (
+    SELECT MIN(id) FROM foods WHERE user_id IS NULL GROUP BY name
+  );
+
+CREATE UNIQUE INDEX IF NOT EXISTS foods_global_name_unique ON foods(name) WHERE user_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS foods_user_name_unique   ON foods(name, user_id) WHERE user_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS meal_logs (
   id         SERIAL PRIMARY KEY,
   user_id    INTEGER REFERENCES users(id),
@@ -431,14 +441,9 @@ export async function migrate() {
     await pool.query(
       `INSERT INTO foods (name, category, calories_per_100g, emoji, name_de, name_tr, user_id)
        VALUES ($1,$2,$3,$4,$5,$6,NULL)
-       ON CONFLICT DO NOTHING`,
+       ON CONFLICT (name) WHERE user_id IS NULL DO UPDATE
+         SET name_de = EXCLUDED.name_de, name_tr = EXCLUDED.name_tr`,
       [name, category, calories, emoji, name_de, name_tr]
-    )
-    // Backfill translations on existing rows that have no conflict key
-    await pool.query(
-      `UPDATE foods SET name_de=$1, name_tr=$2
-       WHERE name=$3 AND user_id IS NULL AND (name_de IS NULL OR name_tr IS NULL)`,
-      [name_de, name_tr, name]
     )
   }
   console.log('Global foods seeded')
