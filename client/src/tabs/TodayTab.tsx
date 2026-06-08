@@ -234,23 +234,6 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                   onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditDraft(null) }}
                   className="w-full text-sm border-0 border-b border-xero-green focus:outline-none bg-transparent text-gray-800 dark:text-slate-100 pb-0.5"
                 />
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] text-gray-400 dark:text-slate-400">Tag:</span>
-                  {(['task', 'sport', 'challenge'] as const).map(tg => (
-                    <button key={tg} type="button"
-                      onClick={() => setEditDraft(d => d && { ...d, tag: d.tag === tg ? undefined : tg })}
-                      className={`text-[10px] px-3 py-2 rounded-full capitalize transition-colors ${editDraft.tag === tg ? TAG_META[tg].color : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-400'}`}>
-                      {TAG_META[tg].icon} {TAG_META[tg].label}
-                    </button>
-                  ))}
-                  <span className="text-[10px] text-gray-400 dark:text-slate-400 ml-2">Time:</span>
-                  <input
-                    type="time"
-                    value={editDraft.timeOfDay}
-                    onChange={e => setEditDraft(d => d && { ...d, timeOfDay: e.target.value })}
-                    className="text-[11px] border border-gray-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
-                  />
-                </div>
                 <div className="flex gap-2 pt-0.5">
                   <button onClick={commitEdit} className="text-xs px-4 py-2.5 bg-xero-green text-white rounded-lg font-medium">Save</button>
                   <button onClick={() => setEditDraft(null)} className="text-xs px-4 py-2.5 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-lg">Cancel</button>
@@ -649,83 +632,6 @@ function AccordionSection({ title, open, onToggle, children, grow = true }: {
   )
 }
 
-// ─── Plan entry (add-task form + notes, for day scope right panel) ────────────
-
-function PlanEntry({ date }: { date: string }) {
-  const { t } = useLanguage()
-  const { plan, save } = useDailyPlan(date)
-  const { add: addReminder } = useAllReminders()
-  const [input, setInput]               = useState('')
-  const [reminderDt, setReminderDt]     = useState('')
-  const [showReminder, setShowReminder] = useState(false)
-  const [notes, setNotes]               = useState('')
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const notesLoaded = useRef(false)
-
-  useEffect(() => { notesLoaded.current = false; setNotes('') }, [date])
-  useEffect(() => {
-    if (plan !== null && !notesLoaded.current) {
-      setNotes(plan?.notes ?? '')
-      notesLoaded.current = true
-    }
-  }, [plan])
-
-  function scheduleNotesSave(n: string) {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => { save(plan?.tasks ?? [], n) }, 600)
-  }
-
-  async function addTask() {
-    const text = input.trim()
-    if (!text) return
-    const newTask: PlanTask = { id: crypto.randomUUID(), text, done: false }
-    await save([...(plan?.tasks ?? []), newTask], notes)
-    setInput('')
-    if (reminderDt) {
-      await addReminder({ title: text, due_at: reminderDt })
-      setReminderDt(''); setShowReminder(false)
-    }
-  }
-
-  function toggleReminderInput() {
-    if (showReminder) { setShowReminder(false); setReminderDt('') }
-    else { if (!reminderDt) setReminderDt(`${date}T09:00`); setShowReminder(true) }
-  }
-
-  return (
-    <div className="px-5 py-4 space-y-2">
-      <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2">
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          placeholder={t.addTask}
-          className="flex-1 text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300 dark:bg-slate-800 dark:text-slate-100"
-        />
-        <button type="button" onClick={toggleReminderInput} title="Set reminder"
-          className={`flex-shrink-0 px-2.5 py-2 rounded-xl transition-colors ${
-            showReminder ? 'bg-amber-100 text-amber-500' : 'bg-gray-100 text-gray-400 hover:text-amber-500 dark:bg-slate-700 dark:text-slate-400'
-          }`}>
-          <IconBell className="w-4 h-4" strokeWidth={2} />
-        </button>
-        <button type="submit" className="text-sm px-3 py-2 bg-gray-900 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
-          {t.add}
-        </button>
-      </form>
-      {showReminder && (
-        <input type="datetime-local" value={reminderDt} onChange={e => setReminderDt(e.target.value)}
-          className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 bg-amber-50/30" />
-      )}
-      <textarea
-        value={notes}
-        onChange={e => { setNotes(e.target.value); scheduleNotesSave(e.target.value) }}
-        placeholder={t.motivationalNotesPlaceholder}
-        rows={4}
-        className="w-full text-sm border border-amber-100 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-900/10 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none placeholder-gray-400"
-      />
-    </div>
-  )
-}
-
 // ─── Right panel (accordion Plan + Log) ───────────────────────────────────────
 
 function RightPanel({
@@ -751,10 +657,7 @@ function RightPanel({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <AccordionSection title="Plan" open={planOpen} onToggle={() => setPlanOpen(v => !v)}>
-        {scope === 'day'
-          ? <PlanEntry key={activeDate} date={activeDate} />
-          : <PlanPanel key={activeDate} date={activeDate} noHeader />
-        }
+        <PlanPanel key={activeDate} date={activeDate} noHeader />
       </AccordionSection>
       <AccordionSection
         title={scope === 'day' ? "Today's Log" : "Day's Log"}
