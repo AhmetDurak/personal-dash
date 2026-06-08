@@ -31,7 +31,7 @@ function PillList({ items, onChange, max, color, placeholder }: PillListProps) {
 
   function add() {
     const v = input.trim()
-    if (!v || items.includes(v) || items.length >= max) return
+    if (!v || items.some(i => i.toLowerCase() === v.toLowerCase()) || items.length >= max) return
     onChange([...items, v])
     setInput('')
   }
