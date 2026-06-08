@@ -101,7 +101,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
   const [saving, setSaving]             = useState(false)
   const [reminderDt, setReminderDt]     = useState('')
   const [showReminder, setShowReminder] = useState(false)
-  const [editDraft, setEditDraft] = useState<{ id: string; text: string; tag: PlanTask['tag']; timeOfDay: string } | null>(null)
+  const [editDraft, setEditDraft] = useState<{ id: string; text: string; description: string; tag: PlanTask['tag']; timeOfDay: string } | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loaded = useRef(false)
   const prevTaskIds = useRef('')
@@ -183,7 +183,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
 
   function startEdit(task: PlanTask) {
     if (task.done) return
-    setEditDraft({ id: task.id, text: task.text, tag: task.tag, timeOfDay: task.timeOfDay ?? '' })
+    setEditDraft({ id: task.id, text: task.text, description: task.description ?? '', tag: task.tag, timeOfDay: task.timeOfDay ?? '' })
   }
 
   function commitEdit() {
@@ -191,7 +191,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
     const text = editDraft.text.trim()
     if (!text) { setEditDraft(null); return }
     const next = tasks.map(tk => tk.id === editDraft.id
-      ? { ...tk, text, tag: editDraft.tag, timeOfDay: editDraft.timeOfDay || null }
+      ? { ...tk, text, description: editDraft.description.trim() || null, tag: editDraft.tag, timeOfDay: editDraft.timeOfDay || null }
       : tk)
     setTasks(next); scheduleSave(next, notes); setEditDraft(null)
   }
@@ -231,8 +231,15 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                   value={editDraft.text}
                   onChange={e => setEditDraft(d => d && { ...d, text: e.target.value })}
                   onFocus={e => e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
-                  onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditDraft(null) }}
+                  onKeyDown={e => { if (e.key === 'Escape') setEditDraft(null) }}
                   className="w-full text-sm border-0 border-b border-xero-green focus:outline-none bg-transparent text-gray-800 dark:text-slate-100 pb-0.5"
+                />
+                <textarea
+                  value={editDraft.description}
+                  onChange={e => setEditDraft(d => d && { ...d, description: e.target.value })}
+                  placeholder="Details (optional)"
+                  rows={2}
+                  className="w-full text-xs border-0 border-b border-gray-200 dark:border-slate-600 focus:outline-none bg-transparent text-gray-500 dark:text-slate-400 resize-none pb-0.5 placeholder-gray-300"
                 />
                 <div className="flex gap-2 pt-0.5">
                   <button onClick={commitEdit} className="text-xs px-4 py-2.5 bg-xero-green text-white rounded-lg font-medium">Save</button>
@@ -267,7 +274,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                     )}
                   </div>
                   <span className={`block text-sm mt-0.5 ${task.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-slate-100 cursor-text'}`}>{task.text}</span>
-                  {task.tag === 'challenge' && task.description && (
+                  {task.description && (
                     <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
                   )}
                 </button>
@@ -632,6 +639,64 @@ function AccordionSection({ title, open, onToggle, children, grow = true }: {
   )
 }
 
+// ─── Plan add form (right panel, day scope) ───────────────────────────────────
+
+function PlanAddForm({ date }: { date: string }) {
+  const { t } = useLanguage()
+  const { plan, save } = useDailyPlan(date)
+  const { add: addReminder } = useAllReminders()
+  const [input, setInput]         = useState('')
+  const [description, setDesc]    = useState('')
+  const [reminderDt, setReminderDt] = useState('')
+  const [showReminder, setShowReminder] = useState(false)
+
+  async function addTask() {
+    const text = input.trim()
+    if (!text) return
+    const newTask: PlanTask = { id: crypto.randomUUID(), text, description: description.trim() || null, done: false }
+    await save([...(plan?.tasks ?? []), newTask], plan?.notes ?? '')
+    setInput(''); setDesc('')
+    if (reminderDt) {
+      await addReminder({ title: text, due_at: reminderDt })
+      setReminderDt(''); setShowReminder(false)
+    }
+  }
+
+  return (
+    <div className="px-5 py-4 space-y-2">
+      <div className="flex gap-2">
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') addTask() }}
+          placeholder={t.addTask}
+          className="flex-1 text-sm border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300"
+        />
+        <button type="button" onClick={() => {
+          if (showReminder) { setShowReminder(false); setReminderDt('') }
+          else { setReminderDt(`${date}T09:00`); setShowReminder(true) }
+        }} title="Set reminder" className={`flex-shrink-0 px-2.5 py-2 rounded-xl transition-colors ${showReminder ? 'bg-amber-100 text-amber-500' : 'bg-gray-100 text-gray-400 hover:text-amber-500 dark:bg-gray-700 dark:text-gray-500'}`}>
+          <IconBell className="w-4 h-4" strokeWidth={2} />
+        </button>
+        <button onClick={addTask} className="text-sm px-3 py-2 bg-gray-900 dark:bg-slate-200 dark:text-slate-900 text-white rounded-xl hover:bg-gray-700 transition-colors font-medium">
+          {t.add}
+        </button>
+      </div>
+      <textarea
+        value={description}
+        onChange={e => setDesc(e.target.value)}
+        placeholder="Details (optional)"
+        rows={2}
+        className="w-full text-sm border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300 resize-none"
+      />
+      {showReminder && (
+        <input type="datetime-local" value={reminderDt} onChange={e => setReminderDt(e.target.value)}
+          className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 bg-amber-50/30" />
+      )}
+    </div>
+  )
+}
+
 // ─── Right panel (accordion Plan + Log) ───────────────────────────────────────
 
 function RightPanel({
@@ -657,7 +722,10 @@ function RightPanel({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <AccordionSection title="Plan" open={planOpen} onToggle={() => setPlanOpen(v => !v)}>
-        <PlanPanel key={activeDate} date={activeDate} noHeader />
+        {scope === 'day'
+          ? <PlanAddForm key={activeDate} date={activeDate} />
+          : <PlanPanel key={activeDate} date={activeDate} noHeader />
+        }
       </AccordionSection>
       <AccordionSection
         title={scope === 'day' ? "Today's Log" : "Day's Log"}
