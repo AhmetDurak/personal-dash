@@ -101,8 +101,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
   const [saving, setSaving]             = useState(false)
   const [reminderDt, setReminderDt]     = useState('')
   const [showReminder, setShowReminder] = useState(false)
-  const [editingId, setEditingId]       = useState<string | null>(null)
-  const [editText, setEditText]         = useState('')
+  const [editDraft, setEditDraft] = useState<{ id: string; text: string; tag: PlanTask['tag']; timeOfDay: string } | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loaded = useRef(false)
   const prevTaskIds = useRef('')
@@ -178,14 +177,17 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
 
   function startEdit(task: PlanTask) {
     if (task.done) return
-    setEditingId(task.id); setEditText(task.text)
+    setEditDraft({ id: task.id, text: task.text, tag: task.tag, timeOfDay: task.timeOfDay ?? '' })
   }
 
-  function commitEdit(id: string) {
-    const text = editText.trim()
-    if (!text) { setEditingId(null); return }
-    const next = tasks.map(tk => tk.id === id ? { ...tk, text } : tk)
-    setTasks(next); scheduleSave(next, notes); setEditingId(null)
+  function commitEdit() {
+    if (!editDraft) return
+    const text = editDraft.text.trim()
+    if (!text) { setEditDraft(null); return }
+    const next = tasks.map(tk => tk.id === editDraft.id
+      ? { ...tk, text, tag: editDraft.tag, timeOfDay: editDraft.timeOfDay || null }
+      : tk)
+    setTasks(next); scheduleSave(next, notes); setEditDraft(null)
   }
 
   const done  = tasks.filter(tk => tk.done).length
@@ -211,59 +213,80 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
 
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
         {tasks.length === 0 && <p className="text-sm text-gray-400 text-center py-6">{t.noTasksYet}</p>}
-        {tasks.map(task => (
-          <div key={task.id} className="flex items-center gap-3 group bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl px-4 py-3 hover:border-gray-200 transition-colors">
-            <button
-              onClick={() => toggleTask(task.id)}
-              className={`-m-2 p-2 flex-shrink-0 flex items-center justify-center`}
-            >
-              <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                task.done ? 'bg-xero-green border-xero-green' : 'border-gray-300 hover:border-xero-green'
-              }`}>
-                {task.done && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
-              </span>
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {task.tag && <TagBadge tag={task.tag} />}
-                {task.timeOfDay && (
-                  <span className="text-[10px] bg-violet-50 dark:bg-violet-900/20 text-violet-500 px-1.5 py-0.5 rounded-full">
-                    🕐 {task.timeOfDay}
-                  </span>
-                )}
-                {task.chain != null && task.chain > 0 && (
-                  <span className="text-[10px] bg-orange-50 dark:bg-orange-900/20 text-orange-500 px-1.5 py-0.5 rounded-full font-medium">
-                    🔥 {task.chain} day{task.chain !== 1 ? 's' : ''}
-                  </span>
-                )}
-                {activeReminderTitles.has(task.text.toLowerCase()) && (
-                  <span className="text-[10px] bg-amber-50 dark:bg-amber-900/20 text-amber-500 px-1.5 py-0.5 rounded-full">
-                    🔔
-                  </span>
-                )}
-              </div>
-              {editingId === task.id ? (
+        {tasks.map(task => {
+          const isEditing = editDraft?.id === task.id
+          return (
+          <div key={task.id} className={`group bg-white dark:bg-slate-800 border rounded-xl transition-colors ${isEditing ? 'border-xero-green px-4 py-3' : 'border-gray-100 dark:border-slate-700 px-4 py-3 hover:border-gray-200'}`}>
+            {isEditing ? (
+              /* ── Expanded edit form ── */
+              <div className="space-y-2">
                 <input
                   autoFocus
-                  value={editText}
-                  onChange={e => setEditText(e.target.value)}
-                  onBlur={() => commitEdit(task.id)}
-                  onKeyDown={e => { if (e.key === 'Enter') commitEdit(task.id); if (e.key === 'Escape') setEditingId(null) }}
-                  className="block w-full text-sm border-0 border-b border-xero-green focus:outline-none bg-transparent text-gray-800 dark:text-slate-100 mt-0.5"
+                  value={editDraft.text}
+                  onChange={e => setEditDraft(d => d && { ...d, text: e.target.value })}
+                  onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditDraft(null) }}
+                  className="w-full text-sm border-0 border-b border-xero-green focus:outline-none bg-transparent text-gray-800 dark:text-slate-100 pb-0.5"
                 />
-              ) : (
-                <span
-                  onClick={() => startEdit(task)}
-                  className={`block text-sm mt-0.5 ${task.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-slate-100 cursor-text'}`}
-                >{task.text}</span>
-              )}
-              {task.tag === 'challenge' && task.description && (
-                <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
-              )}
-            </div>
-            <button onClick={() => deleteTask(task.id)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0 p-1">✕</button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] text-gray-400 dark:text-slate-500">Tag:</span>
+                  {(['task', 'sport', 'challenge'] as const).map(tg => (
+                    <button key={tg} type="button"
+                      onClick={() => setEditDraft(d => d && { ...d, tag: d.tag === tg ? undefined : tg })}
+                      className={`text-[10px] px-2 py-0.5 rounded-full capitalize transition-colors ${editDraft.tag === tg ? TAG_META[tg].color : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
+                      {TAG_META[tg].icon} {TAG_META[tg].label}
+                    </button>
+                  ))}
+                  <span className="text-[10px] text-gray-400 dark:text-slate-500 ml-2">Time:</span>
+                  <input
+                    type="time"
+                    value={editDraft.timeOfDay}
+                    onChange={e => setEditDraft(d => d && { ...d, timeOfDay: e.target.value })}
+                    className="text-[11px] border border-gray-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-xero-green"
+                  />
+                </div>
+                <div className="flex gap-2 pt-0.5">
+                  <button onClick={commitEdit} className="text-xs px-3 py-1.5 bg-xero-green text-white rounded-lg font-medium">Save</button>
+                  <button onClick={() => setEditDraft(null)} className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-lg">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              /* ── Normal row ── */
+              <div className="flex items-center gap-3">
+                <button onClick={() => toggleTask(task.id)} className="-m-2 p-2 flex-shrink-0 flex items-center justify-center">
+                  <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${task.done ? 'bg-xero-green border-xero-green' : 'border-gray-300 hover:border-xero-green'}`}>
+                    {task.done && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
+                  </span>
+                </button>
+                <div className="flex-1 min-w-0" onClick={() => startEdit(task)}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {task.tag && <TagBadge tag={task.tag} />}
+                    {task.timeOfDay && (
+                      <span className="text-[10px] bg-violet-50 dark:bg-violet-900/20 text-violet-500 px-1.5 py-0.5 rounded-full">
+                        🕐 {task.timeOfDay}
+                      </span>
+                    )}
+                    {task.chain != null && task.chain > 0 && (
+                      <span className="text-[10px] bg-orange-50 dark:bg-orange-900/20 text-orange-500 px-1.5 py-0.5 rounded-full font-medium">
+                        🔥 {task.chain} day{task.chain !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {activeReminderTitles.has(task.text.toLowerCase()) && (
+                      <span className="text-[10px] bg-amber-50 dark:bg-amber-900/20 text-amber-500 px-1.5 py-0.5 rounded-full">
+                        🔔
+                      </span>
+                    )}
+                  </div>
+                  <span className={`block text-sm mt-0.5 ${task.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-slate-100 cursor-text'}`}>{task.text}</span>
+                  {task.tag === 'challenge' && task.description && (
+                    <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
+                  )}
+                </div>
+                <button onClick={() => deleteTask(task.id)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0 p-1">✕</button>
+              </div>
+            )}
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {!listOnly && (
