@@ -859,7 +859,7 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
       const isHeader = /label|parent/i.test(lines[0] ?? '')
       const rows = isHeader ? lines.slice(1) : lines
       const parsed = rows.map(row => {
-        const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+        const cols = parseCSVLine(row)
         return { label: cols[0] ?? '', parentLabel: cols[1] ?? '', back: cols[2] || undefined }
       }).filter(r => r.label)
       if (!parsed.length) { setImportMmMsg('No valid rows found.'); return }
@@ -1643,7 +1643,7 @@ function VocabView() {
     const isHeader = /word|translation/i.test(lines[0] ?? '')
     const rows = isHeader ? lines.slice(1) : lines
     const items = rows.map(row => {
-      const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      const cols = parseCSVLine(row)
       return { word: cols[0] ?? '', translation: cols[1] ?? '', language: cols[2] || 'de', example: cols[3] || undefined }
     }).filter(i => i.word && i.translation)
     if (!items.length) { setImportMsg('No valid rows found.'); return }
@@ -2763,7 +2763,28 @@ function SectionShell({
   )
 }
 
-// ─── Auto-link helpers ────────────────────────────────────────────────────────
+// ─── CSV / Auto-link helpers ──────────────────────────────────────────────────
+
+function parseCSVLine(line: string): string[] {
+  const cols: string[] = []
+  let cur = '', inQ = false
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++ }
+      else inQ = !inQ
+    } else if (line[i] === ',' && !inQ) {
+      cols.push(cur.trim()); cur = ''
+    } else {
+      cur += line[i]
+    }
+  }
+  cols.push(cur.trim())
+  return cols
+}
+
+function isWordChar(ch: string | undefined): boolean {
+  return ch !== undefined && /\p{L}|\p{N}/u.test(ch)
+}
 
 function autoLink(text: string, vocab: VocabCard[], lang: string): WordLink[] {
   if (!text || !vocab.length) return []
@@ -2775,7 +2796,10 @@ function autoLink(text: string, vocab: VocabCard[], lang: string): WordLink[] {
     const w = card.word.toLowerCase()
     let idx = lower.indexOf(w)
     while (idx !== -1) {
-      links.push({ vocab_id: card.id, word: text.slice(idx, idx + card.word.length), start: idx, end: idx + card.word.length })
+      const end = idx + w.length
+      if (!isWordChar(text[idx - 1]) && !isWordChar(text[end])) {
+        links.push({ vocab_id: card.id, word: text.slice(idx, end), start: idx, end })
+      }
       idx = lower.indexOf(w, idx + 1)
     }
   }
@@ -3175,7 +3199,7 @@ function SentenceView() {
     const isHeader = /source_text|sentence/i.test(lines[0] ?? '')
     const rows = isHeader ? lines.slice(1) : lines
     const items = rows.map(row => {
-      const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      const cols = parseCSVLine(row)
       return { source_text: cols[0] ?? '', translation: cols[1] || undefined, source_lang: cols[2] || 'de', target_lang: cols[3] || 'tr' }
     }).filter(i => i.source_text)
     if (!items.length) { setSentImportMsg('No valid rows.'); return }
@@ -3526,7 +3550,7 @@ function ScenarioView() {
     const isHeader = /title|scenario/i.test(lines[0] ?? '')
     const rows = isHeader ? lines.slice(1) : lines
     const items = rows.map(row => {
-      const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      const cols = parseCSVLine(row)
       return { title: cols[0] ?? '', content: cols[1] || undefined, source_lang: cols[2] || 'de', target_lang: cols[3] || 'tr' }
     }).filter(i => i.title)
     if (!items.length) { setScenImportMsg('No valid rows.'); return }
