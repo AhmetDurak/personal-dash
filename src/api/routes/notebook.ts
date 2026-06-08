@@ -247,6 +247,23 @@ export function notebookRouter(pool: Pool): Router {
     res.json(rows)
   })
 
+  router.post('/language/sentences/bulk', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const items = (req.body as { items: { source_text: string; translation?: string; source_lang?: string; target_lang?: string }[] }).items ?? []
+    const valid = items.filter(i => i.source_text?.trim())
+    if (!valid.length) { res.json({ inserted: 0 }); return }
+    let inserted = 0
+    for (const i of valid) {
+      await pool.query(
+        `INSERT INTO language_sentences (user_id, source_text, translation, source_lang, target_lang)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [uid, i.source_text.trim(), i.translation?.trim() || null, i.source_lang ?? 'de', i.target_lang ?? 'tr']
+      )
+      inserted++
+    }
+    res.json({ inserted })
+  })
+
   router.post('/language/sentences', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { source_text = '', translation = null, source_lang = 'de', target_lang = 'tr',
@@ -304,6 +321,23 @@ export function notebookRouter(pool: Pool): Router {
       [uid]
     )
     res.json(rows)
+  })
+
+  router.post('/language/scenarios/bulk', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const items = (req.body as { items: { title: string; content?: string; source_lang?: string; target_lang?: string }[] }).items ?? []
+    const valid = items.filter(i => i.title?.trim())
+    if (!valid.length) { res.json({ inserted: 0 }); return }
+    let inserted = 0
+    for (const i of valid) {
+      await pool.query(
+        `INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [uid, i.title.trim(), i.content?.trim() || '', i.source_lang ?? 'de', i.target_lang ?? 'tr']
+      )
+      inserted++
+    }
+    res.json({ inserted })
   })
 
   router.post('/language/scenarios', async (req: Request, res: Response) => {

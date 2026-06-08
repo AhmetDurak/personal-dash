@@ -331,7 +331,18 @@ export function useLanguageSentences() {
     await mutate()
   }
 
-  return { sentences: data ?? [], isLoading, createSentence, saveSentence, reviewSentence, deleteSentence }
+  async function bulkImportSentences(items: { source_text: string; translation?: string; source_lang?: string; target_lang?: string }[]): Promise<number> {
+    const res = await fetch('/api/notebook/language/sentences/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    })
+    const { inserted } = await res.json() as { inserted: number }
+    await mutate()
+    return inserted
+  }
+
+  return { sentences: data ?? [], isLoading, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences }
 }
 
 // ─── Language Scenarios ───────────────────────────────────────────────────────
@@ -375,5 +386,16 @@ export function useLanguageScenarios() {
     await mutate()
   }
 
-  return { scenarios: data ?? [], isLoading, createScenario, saveScenario, reviewScenario, deleteScenario }
+  async function bulkImportScenarios(items: { title: string; content?: string; source_lang?: string; target_lang?: string }[]): Promise<number> {
+    const res = await fetch('/api/notebook/language/scenarios/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    })
+    const { inserted } = await res.json() as { inserted: number }
+    await mutate()
+    return inserted
+  }
+
+  return { scenarios: data ?? [], isLoading, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios }
 }

@@ -2763,6 +2763,34 @@ function SectionShell({
   )
 }
 
+// ─── Auto-link helpers ────────────────────────────────────────────────────────
+
+function autoLink(text: string, vocab: VocabCard[], lang: string): WordLink[] {
+  if (!text || !vocab.length) return []
+  const lower = text.toLowerCase()
+  const links: WordLink[] = []
+  const candidates = vocab.filter(v => v.language === lang && v.word.trim())
+  candidates.sort((a, b) => b.word.length - a.word.length) // longer matches first
+  for (const card of candidates) {
+    const w = card.word.toLowerCase()
+    let idx = lower.indexOf(w)
+    while (idx !== -1) {
+      links.push({ vocab_id: card.id, word: text.slice(idx, idx + card.word.length), start: idx, end: idx + card.word.length })
+      idx = lower.indexOf(w, idx + 1)
+    }
+  }
+  return links
+}
+
+function mergeLinks(stored: WordLink[], auto: WordLink[]): WordLink[] {
+  const result = [...stored]
+  for (const al of auto) {
+    const overlaps = result.some(l => al.start < l.end && al.end > l.start)
+    if (!overlaps) result.push(al)
+  }
+  return result
+}
+
 // ─── WordLinker ───────────────────────────────────────────────────────────────
 
 interface WordLinkerProps {
@@ -3118,7 +3146,7 @@ function ReviewSession({
 function SentenceView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { sentences, createSentence, saveSentence, reviewSentence, deleteSentence } = useLanguageSentences()
+  const { sentences, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences } = useLanguageSentences()
   const { vocab } = useVocabulary()
   const [editingId, setEditingId]   = useState<number | 'new' | null>(null)
   const [draft, setDraft]           = useState<Partial<LanguageSentence>>({})
@@ -3127,6 +3155,24 @@ function SentenceView() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [reviewMode, setReviewMode]   = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [sentImportMsg, setSentImportMsg] = useState<string | null>(null)
+  const sentCsvRef = useRef<HTMLInputElement>(null)
+
+  async function handleSentCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return
+    const lines = (await file.text()).trim().split('\n').filter(Boolean)
+    const isHeader = /source_text|sentence/i.test(lines[0] ?? '')
+    const rows = isHeader ? lines.slice(1) : lines
+    const items = rows.map(row => {
+      const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      return { source_text: cols[0] ?? '', translation: cols[1] || undefined, source_lang: cols[2] || 'de', target_lang: cols[3] || 'tr' }
+    }).filter(i => i.source_text)
+    if (!items.length) { setSentImportMsg('No valid rows.'); return }
+    const n = await bulkImportSentences(items)
+    setSentImportMsg(`Imported ${n} sentence${n !== 1 ? 's' : ''}.`)
+    setTimeout(() => setSentImportMsg(null), 4000)
+    e.target.value = ''
+  }
 
   const [langFilter, setLangFilter] = useState<string | null>(() => localStorage.getItem('sent:langFilter') ?? null)
 
@@ -3302,9 +3348,18 @@ function SentenceView() {
             🏛️ Review {dueItems.length} due
           </button>
         )}
-        <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">
-          {filtered.length}{langFilter ? `/${sentences.length}` : ''} sentences
-        </span>
+        <div className="flex items-center gap-2 ml-auto">
+          {sentImportMsg && <span className="text-xs text-xero-green font-medium">{sentImportMsg}</span>}
+          <button
+            onClick={() => sentCsvRef.current?.click()}
+            className="text-xs px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors font-medium"
+            title="source_text, translation, source_lang, target_lang"
+          >↑ CSV</button>
+          <input ref={sentCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleSentCsvImport} />
+          <span className="text-xs text-gray-400 dark:text-slate-500">
+            {filtered.length}{langFilter ? `/${sentences.length}` : ''} sentences
+          </span>
+        </div>
       </div>
 
       {langs.length > 1 && (
@@ -3351,7 +3406,7 @@ function SentenceView() {
                 <div className="text-sm mb-1 text-gray-800 dark:text-slate-100">
                   <WordLinker
                     text={s.source_text || '—'}
-                    links={s.word_links}
+                    links={mergeLinks(s.word_links ?? [], autoLink(s.source_text || '', vocab, s.source_lang))}
                     vocab={vocab}
                     sourceLang={s.source_lang}
                     onAddLink={() => {}}
@@ -3397,7 +3452,7 @@ function SentenceView() {
 function ScenarioView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { scenarios, createScenario, saveScenario, reviewScenario, deleteScenario } = useLanguageScenarios()
+  const { scenarios, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios } = useLanguageScenarios()
   const { vocab } = useVocabulary()
   const [activeId, setActiveId]         = useState<number | null>(null)
   const [draft, setDraft]               = useState<Partial<LanguageScenario>>({})
@@ -3407,6 +3462,24 @@ function ScenarioView() {
   const [reviewMode, setReviewMode]     = useState(false)
   const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [scenImportMsg, setScenImportMsg] = useState<string | null>(null)
+  const scenCsvRef = useRef<HTMLInputElement>(null)
+
+  async function handleScenCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return
+    const lines = (await file.text()).trim().split('\n').filter(Boolean)
+    const isHeader = /title|scenario/i.test(lines[0] ?? '')
+    const rows = isHeader ? lines.slice(1) : lines
+    const items = rows.map(row => {
+      const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      return { title: cols[0] ?? '', content: cols[1] || undefined, source_lang: cols[2] || 'de', target_lang: cols[3] || 'tr' }
+    }).filter(i => i.title)
+    if (!items.length) { setScenImportMsg('No valid rows.'); return }
+    const n = await bulkImportScenarios(items)
+    setScenImportMsg(`Imported ${n} scenario${n !== 1 ? 's' : ''}.`)
+    setTimeout(() => setScenImportMsg(null), 4000)
+    e.target.value = ''
+  }
 
   const [langFilter, setLangFilter] = useState<string | null>(() => localStorage.getItem('scen:langFilter') ?? null)
 
@@ -3537,7 +3610,7 @@ function ScenarioView() {
               {draft.content ? (
                 <WordLinker
                   text={draft.content}
-                  links={draft.word_links ?? []}
+                  links={mergeLinks(draft.word_links ?? [], autoLink(draft.content, vocab, draft.source_lang ?? 'de'))}
                   vocab={vocab}
                   sourceLang={draft.source_lang ?? 'de'}
                   onAddLink={handleAddLink}
@@ -3587,9 +3660,18 @@ function ScenarioView() {
             🏛️ Review {dueItems.length} due
           </button>
         )}
-        <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">
-          {filteredScenarios.length}{langFilter ? `/${scenarios.length}` : ''} scenarios
-        </span>
+        <div className="flex items-center gap-2 ml-auto">
+          {scenImportMsg && <span className="text-xs text-xero-green font-medium">{scenImportMsg}</span>}
+          <button
+            onClick={() => scenCsvRef.current?.click()}
+            className="text-xs px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors font-medium"
+            title="title, content, source_lang, target_lang"
+          >↑ CSV</button>
+          <input ref={scenCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleScenCsvImport} />
+          <span className="text-xs text-gray-400 dark:text-slate-500">
+            {filteredScenarios.length}{langFilter ? `/${scenarios.length}` : ''} scenarios
+          </span>
+        </div>
       </div>
 
       {langs.length > 1 && (
