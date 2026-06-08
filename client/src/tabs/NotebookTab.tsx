@@ -1624,6 +1624,7 @@ function VocabView() {
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [movePicking, setMovePicking] = useState(false)
+  const [vocabSearch, setVocabSearch] = useState('')
 
   useEffect(() => {
     if (!csvTooltipOpen) return
@@ -1656,7 +1657,8 @@ function VocabView() {
   const dueCards = vocab.filter(v => new Date(v.due_at) <= today)
   const folders = [...new Set(vocab.map(v => v.language))].sort()
   const base = langFilter ? vocab.filter(v => v.language === langFilter) : vocab
-  const filtered = [...base].sort((a, b) => {
+  const q = vocabSearch.trim().toLowerCase()
+  const filtered = [...base].filter(v => !q || [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))).sort((a, b) => {
     switch (sortBy) {
       case 'word-asc':  return a.word.localeCompare(b.word)
       case 'word-desc': return b.word.localeCompare(a.word)
@@ -1943,6 +1945,21 @@ function VocabView() {
               <span className="text-xs text-xero-green font-medium">{importMsg}</span>
             )}
           </div>
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <input
+            value={vocabSearch}
+            onChange={e => setVocabSearch(e.target.value)}
+            placeholder="Search word, translation, example…"
+            className="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-xero-green bg-white dark:bg-slate-800 dark:text-slate-100 placeholder-gray-400"
+          />
+          {vocabSearch && (
+            <button onClick={() => setVocabSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+              <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
+            </button>
+          )}
         </div>
 
         {/* Folder strip */}
