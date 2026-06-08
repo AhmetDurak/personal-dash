@@ -127,7 +127,12 @@ export function notebookRouter(pool: Pool): Router {
       res.status(400).json({ error: 'word and translation required' }); return
     }
     const { rows } = await pool.query(
-      'INSERT INTO vocabulary (word, translation, language, translation_language, image_url, example, user_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+      `INSERT INTO vocabulary (word, translation, language, translation_language, image_url, example, user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (LOWER(word), language, user_id) DO UPDATE
+         SET translation=EXCLUDED.translation, translation_language=EXCLUDED.translation_language,
+             image_url=EXCLUDED.image_url, example=EXCLUDED.example
+       RETURNING *`,
       [word.trim(), translation.trim(), language, translation_language, image_url ?? null, example ?? null, uid]
     )
     res.json(rows[0])
@@ -143,7 +148,9 @@ export function notebookRouter(pool: Pool): Router {
       i.word.trim(), i.translation.trim(), i.language ?? 'de', i.translation_language ?? 'tr', i.example?.trim() ?? null, String(uid),
     ])
     await pool.query(
-      `INSERT INTO vocabulary (word, translation, language, translation_language, example, user_id) VALUES ${values}`,
+      `INSERT INTO vocabulary (word, translation, language, translation_language, example, user_id) VALUES ${values}
+       ON CONFLICT (LOWER(word), language, user_id) DO UPDATE
+         SET translation=EXCLUDED.translation, example=EXCLUDED.example`,
       params
     )
     res.json({ inserted: valid.length })

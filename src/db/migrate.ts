@@ -145,6 +145,16 @@ WHERE user_id IS NULL
 CREATE UNIQUE INDEX IF NOT EXISTS foods_global_name_unique ON foods(name) WHERE user_id IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS foods_user_name_unique   ON foods(name, user_id) WHERE user_id IS NOT NULL;
 
+-- Deduplicate vocabulary: keep lowest id per (lower(word), language, user_id)
+DELETE FROM vocabulary WHERE id IN (
+  SELECT id FROM (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY LOWER(word), language, user_id ORDER BY id) AS rn
+    FROM vocabulary
+  ) t WHERE rn > 1
+);
+CREATE UNIQUE INDEX IF NOT EXISTS vocab_word_lang_user_unique
+  ON vocabulary (LOWER(word), language, user_id);
+
 CREATE TABLE IF NOT EXISTS meal_logs (
   id         SERIAL PRIMARY KEY,
   user_id    INTEGER REFERENCES users(id),
