@@ -1694,7 +1694,13 @@ function VocabView() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!newWord.word.trim() || !newWord.translation.trim()) return
-    await addWord({ ...newWord, example: newWord.example.trim() || undefined })
+    const existing = vocab.find(v => v.word.toLowerCase() === newWord.word.trim().toLowerCase() && v.language === newWord.language)
+    const payload = { ...newWord, example: newWord.example.trim() || undefined }
+    if (existing) {
+      await updateWord(existing.id, payload)
+    } else {
+      await addWord(payload)
+    }
     setNewWord({ word: '', translation: '', language: newWord.language, translation_language: newWord.translation_language, example: '' })
     setShowAdd(false)
   }
