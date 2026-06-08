@@ -230,6 +230,11 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                     🕐 {task.timeOfDay}
                   </span>
                 )}
+                {task.chain != null && task.chain > 0 && (
+                  <span className="text-[10px] bg-orange-50 dark:bg-orange-900/20 text-orange-500 px-1.5 py-0.5 rounded-full font-medium">
+                    🔥 {task.chain} day{task.chain !== 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
               {editingId === task.id ? (
                 <input
@@ -245,6 +250,9 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                   onClick={() => startEdit(task)}
                   className={`block text-sm mt-0.5 ${task.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-slate-100 cursor-text'}`}
                 >{task.text}</span>
+              )}
+              {task.tag === 'challenge' && task.description && (
+                <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
               )}
             </div>
             <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0">✕</button>

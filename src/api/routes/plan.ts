@@ -14,6 +14,8 @@ export interface PlanTask {
   durationMin?: number | null
   challengeId?: number
   timeOfDay?: string | null
+  description?: string | null
+  chain?: number
 }
 
 // 0=Mon..6=Sun from a YYYY-MM-DD string
@@ -30,7 +32,7 @@ export function planRouter(pool: Pool): Router {
     const { date } = req.params
 
     const dow = dayOfWeek(date)  // 0=Mon..6=Sun
-    const [planResult, scheduleResult, routineResult] = await Promise.all([
+    const [planResult, scheduleResult, routineResult, pastPlansResult] = await Promise.all([
       pool.query('SELECT * FROM daily_plans WHERE user_id=$1 AND date=$2', [uid, date]),
       pool.query(
         'SELECT * FROM training_schedules WHERE user_id=$1 AND day_of_week=$2 ORDER BY id',
@@ -40,9 +42,14 @@ export function planRouter(pool: Pool): Router {
       pool.query(
         `SELECT * FROM challenges
          WHERE user_id=$1 AND status='active'
-           AND repeat_cycle IN ('daily','weekly')
+           AND repeat_cycle IN ('daily','weekly','monthly')
            AND start_date <= $2
            AND (end_date IS NULL OR end_date >= $2)`,
+        [uid, date]
+      ),
+      // Past 90 days of plans for streak computation
+      pool.query(
+        `SELECT date, tasks FROM daily_plans WHERE user_id=$1 AND date < $2 ORDER BY date DESC LIMIT 90`,
         [uid, date]
       ),
     ])
@@ -68,6 +75,39 @@ export function planRouter(pool: Pool): Router {
         weightKg:           s.weight_kg != null ? Number(s.weight_kg) : null,
         durationMin:        s.duration_min ?? null,
       }))
+
+    // Build done-dates map per challengeId from past plans
+    const doneDates = new Map<number, Set<string>>()
+    for (const row of pastPlansResult.rows) {
+      const pts: PlanTask[] = row.tasks ?? []
+      for (const t of pts) {
+        if (t.tag === 'challenge' && t.challengeId != null && t.done) {
+          if (!doneDates.has(t.challengeId)) doneDates.set(t.challengeId, new Set())
+          doneDates.get(t.challengeId)!.add(row.date)
+        }
+      }
+    }
+
+    function computeChain(r: { id: number; repeat_cycle: string; repeat_days: string | null }): number {
+      const doneSet = doneDates.get(r.id) ?? new Set<string>()
+      const repeatDays: number[] = r.repeat_days ? JSON.parse(r.repeat_days) : []
+      let chain = 0
+      const cursor = new Date(date + 'T12:00:00')
+      for (let i = 0; i < 90; i++) {
+        cursor.setDate(cursor.getDate() - 1)
+        const ds = cursor.toISOString().slice(0, 10)
+        const cdow = (cursor.getDay() + 6) % 7
+        const cdom = cursor.getDate()
+        let scheduled = false
+        if (r.repeat_cycle === 'daily') scheduled = true
+        else if (r.repeat_cycle === 'weekly') scheduled = repeatDays.includes(cdow)
+        else if (r.repeat_cycle === 'monthly') scheduled = repeatDays.includes(cdom)
+        if (!scheduled) continue
+        if (doneSet.has(ds)) chain++
+        else break
+      }
+      return chain
+    }
 
     // Inject routines: daily always; weekly/monthly if repeat_days matches
     const savedChallengeIds = new Set(
@@ -95,6 +135,8 @@ export function planRouter(pool: Pool): Router {
         tag:         'challenge' as const,
         challengeId: r.id,
         timeOfDay:   r.time_of_day ?? null,
+        description: r.description ?? null,
+        chain:       computeChain(r),
       }))
 
     const merged = [...tasks, ...trainingExtra, ...routineExtra]

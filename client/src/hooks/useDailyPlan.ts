@@ -15,6 +15,8 @@ export interface PlanTask {
   durationMin?: number | null
   challengeId?: number
   timeOfDay?: string | null
+  description?: string | null
+  chain?: number
 }
 
 export interface DailyPlan {
