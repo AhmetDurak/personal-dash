@@ -3157,6 +3157,17 @@ function SentenceView() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sentImportMsg, setSentImportMsg] = useState<string | null>(null)
   const sentCsvRef = useRef<HTMLInputElement>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+
+  function toggleSelect(id: number) {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  async function deleteSelected() {
+    for (const id of selectedIds) await deleteSentence(id)
+    setSelectedIds(new Set()); setSelectMode(false)
+  }
 
   async function handleSentCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -3340,6 +3351,10 @@ function SentenceView() {
         <button onClick={openNew} className="text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 px-3 py-1.5 rounded-xl font-medium">
           + {t.addSentence}
         </button>
+        <button
+          onClick={() => { setSelectMode(m => !m); setSelectedIds(new Set()) }}
+          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${selectMode ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+        >{selectMode ? 'Done' : 'Select'}</button>
         {dueItems.length > 0 && (
           <button
             onClick={() => setReviewMode(true)}
@@ -3390,12 +3405,22 @@ function SentenceView() {
 
       {filtered.map(s => {
         const due = isDueSR(s.due_at)
+        const isSelected = selectedIds.has(s.id)
         return (
-          <div key={s.id} className={cardCls}>
-            {editingId === s.id ? (
+          <div
+            key={s.id}
+            onClick={selectMode ? () => toggleSelect(s.id) : undefined}
+            className={`${cardCls} ${selectMode ? 'cursor-pointer' : ''} ${selectMode && isSelected ? 'ring-2 ring-xero-green border-xero-green' : ''}`}
+          >
+            {editingId === s.id && !selectMode ? (
               editFormFields(true)
             ) : (
               <div>
+                {selectMode && (
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mb-2 transition-colors ${isSelected ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'}`}>
+                    {isSelected && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
+                  </div>
+                )}
                 {/* Memory palace badge */}
                 {s.memory_palace && (
                   <div className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded-full mb-2">
@@ -3425,10 +3450,12 @@ function SentenceView() {
                       {due ? '⚡ Due' : nextReviewLabel(s.due_at)}
                     </span>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => openEdit(s)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">{t.edit}</button>
-                    <button onClick={() => setConfirmDeleteId(s.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
-                  </div>
+                  {!selectMode && (
+                    <div className="flex gap-2">
+                      <button onClick={() => openEdit(s)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">{t.edit}</button>
+                      <button onClick={() => setConfirmDeleteId(s.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -3442,6 +3469,23 @@ function SentenceView() {
           onConfirm={async () => { if (confirmDeleteId !== null) { await deleteSentence(confirmDeleteId); setConfirmDeleteId(null) } }}
           onCancel={() => setConfirmDeleteId(null)}
         />
+      )}
+
+      {selectMode && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 z-40 shadow-lg">
+          <span className="text-sm text-gray-700 dark:text-slate-300 flex-shrink-0">{selectedIds.size} selected</span>
+          <button
+            onClick={() => selectedIds.size === filtered.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(filtered.map(s => s.id)))}
+            className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 transition-colors"
+          >{selectedIds.size === filtered.length ? 'Deselect All' : 'Select All'}</button>
+          <div className="flex-1" />
+          {selectedIds.size > 0 && (
+            <button onClick={deleteSelected} className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors">
+              Delete {selectedIds.size}
+            </button>
+          )}
+          <button onClick={() => { setSelectMode(false); setSelectedIds(new Set()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
+        </div>
       )}
     </div>
   )
@@ -3464,6 +3508,17 @@ function ScenarioView() {
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [scenImportMsg, setScenImportMsg] = useState<string | null>(null)
   const scenCsvRef = useRef<HTMLInputElement>(null)
+  const [scenSelectMode, setScenSelectMode] = useState(false)
+  const [scenSelectedIds, setScenSelectedIds] = useState<Set<number>>(new Set())
+
+  function toggleScenSelect(id: number) {
+    setScenSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  async function deleteScenSelected() {
+    for (const id of scenSelectedIds) await deleteScenario(id)
+    setScenSelectedIds(new Set()); setScenSelectMode(false)
+  }
 
   async function handleScenCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -3652,6 +3707,10 @@ function ScenarioView() {
 
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={handleNew} className="text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 px-3 py-1.5 rounded-xl font-medium">+ {t.addScenario}</button>
+        <button
+          onClick={() => { setScenSelectMode(m => !m); setScenSelectedIds(new Set()) }}
+          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${scenSelectMode ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+        >{scenSelectMode ? 'Done' : 'Select'}</button>
         {dueItems.length > 0 && (
           <button
             onClick={() => setReviewMode(true)}
@@ -3695,14 +3754,20 @@ function ScenarioView() {
       <div className="space-y-2">
         {filteredScenarios.map(s => {
           const due = isDueSR(s.due_at)
+          const isSel = scenSelectedIds.has(s.id)
           return (
             <button
               key={s.id}
-              onClick={() => openScenario(s)}
-              className={`w-full text-left rounded-2xl border p-4 transition-colors ${dark ? 'bg-slate-800 border-slate-700 hover:border-slate-500' : 'bg-white border-gray-100 hover:border-gray-300'}`}
+              onClick={() => scenSelectMode ? toggleScenSelect(s.id) : openScenario(s)}
+              className={`w-full text-left rounded-2xl border p-4 transition-colors ${dark ? 'bg-slate-800 border-slate-700 hover:border-slate-500' : 'bg-white border-gray-100 hover:border-gray-300'} ${scenSelectMode && isSel ? 'ring-2 ring-xero-green !border-xero-green' : ''}`}
             >
               <div className="flex items-start justify-between gap-2 mb-1">
-                <p className={`text-sm font-semibold ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{s.title || t.untitled}</p>
+                {scenSelectMode && (
+                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors mt-0.5 ${isSel ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'}`}>
+                    {isSel && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
+                  </div>
+                )}
+                <p className={`text-sm font-semibold flex-1 ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{s.title || t.untitled}</p>
                 <span className={`text-[9px] rounded-full px-1.5 py-0.5 font-semibold flex-shrink-0 ${due ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
                   {due ? '⚡ Due' : nextReviewLabel(s.due_at)}
                 </span>
@@ -3718,6 +3783,23 @@ function ScenarioView() {
           )
         })}
       </div>
+
+      {scenSelectMode && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 z-40 shadow-lg">
+          <span className="text-sm text-gray-700 dark:text-slate-300 flex-shrink-0">{scenSelectedIds.size} selected</span>
+          <button
+            onClick={() => scenSelectedIds.size === filteredScenarios.length ? setScenSelectedIds(new Set()) : setScenSelectedIds(new Set(filteredScenarios.map(s => s.id)))}
+            className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 transition-colors"
+          >{scenSelectedIds.size === filteredScenarios.length ? 'Deselect All' : 'Select All'}</button>
+          <div className="flex-1" />
+          {scenSelectedIds.size > 0 && (
+            <button onClick={deleteScenSelected} className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors">
+              Delete {scenSelectedIds.size}
+            </button>
+          )}
+          <button onClick={() => { setScenSelectMode(false); setScenSelectedIds(new Set()) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
+        </div>
+      )}
     </div>
   )
 }
