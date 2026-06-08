@@ -236,6 +236,11 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                     🔥 {task.chain} day{task.chain !== 1 ? 's' : ''}
                   </span>
                 )}
+                {activeReminderTitles.has(task.text.toLowerCase()) && (
+                  <span className="text-[10px] bg-amber-50 dark:bg-amber-900/20 text-amber-500 px-1.5 py-0.5 rounded-full">
+                    🔔
+                  </span>
+                )}
               </div>
               {editingId === task.id ? (
                 <input
@@ -256,9 +261,6 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                 <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
               )}
             </div>
-            {activeReminderTitles.has(task.text.toLowerCase()) && (
-              <span className="text-amber-400 flex-shrink-0 text-sm">🔔</span>
-            )}
             <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0">✕</button>
           </div>
         ))}
