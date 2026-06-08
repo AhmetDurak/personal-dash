@@ -211,7 +211,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2 [scroll-padding-bottom:280px]">
         {tasks.length === 0 && <p className="text-sm text-gray-400 text-center py-6">{t.noTasksYet}</p>}
         {tasks.map(task => {
           const isEditing = editDraft?.id === task.id
@@ -224,29 +224,30 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                   autoFocus
                   value={editDraft.text}
                   onChange={e => setEditDraft(d => d && { ...d, text: e.target.value })}
+                  onFocus={e => e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}
                   onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditDraft(null) }}
                   className="w-full text-sm border-0 border-b border-xero-green focus:outline-none bg-transparent text-gray-800 dark:text-slate-100 pb-0.5"
                 />
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] text-gray-400 dark:text-slate-500">Tag:</span>
+                  <span className="text-[10px] text-gray-400 dark:text-slate-400">Tag:</span>
                   {(['task', 'sport', 'challenge'] as const).map(tg => (
                     <button key={tg} type="button"
                       onClick={() => setEditDraft(d => d && { ...d, tag: d.tag === tg ? undefined : tg })}
-                      className={`text-[10px] px-2 py-0.5 rounded-full capitalize transition-colors ${editDraft.tag === tg ? TAG_META[tg].color : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
+                      className={`text-[10px] px-3 py-2 rounded-full capitalize transition-colors ${editDraft.tag === tg ? TAG_META[tg].color : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-slate-400'}`}>
                       {TAG_META[tg].icon} {TAG_META[tg].label}
                     </button>
                   ))}
-                  <span className="text-[10px] text-gray-400 dark:text-slate-500 ml-2">Time:</span>
+                  <span className="text-[10px] text-gray-400 dark:text-slate-400 ml-2">Time:</span>
                   <input
                     type="time"
                     value={editDraft.timeOfDay}
                     onChange={e => setEditDraft(d => d && { ...d, timeOfDay: e.target.value })}
-                    className="text-[11px] border border-gray-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-xero-green"
+                    className="text-[11px] border border-gray-200 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
                   />
                 </div>
                 <div className="flex gap-2 pt-0.5">
-                  <button onClick={commitEdit} className="text-xs px-3 py-1.5 bg-xero-green text-white rounded-lg font-medium">Save</button>
-                  <button onClick={() => setEditDraft(null)} className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-lg">Cancel</button>
+                  <button onClick={commitEdit} className="text-xs px-4 py-2.5 bg-xero-green text-white rounded-lg font-medium">Save</button>
+                  <button onClick={() => setEditDraft(null)} className="text-xs px-4 py-2.5 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-lg">Cancel</button>
                 </div>
               </div>
             ) : (
@@ -257,7 +258,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                     {task.done && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
                   </span>
                 </button>
-                <div className="flex-1 min-w-0" onClick={() => startEdit(task)}>
+                <button className="flex-1 min-w-0 text-left" onClick={() => startEdit(task)}>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {task.tag && <TagBadge tag={task.tag} />}
                     {task.timeOfDay && (
@@ -280,7 +281,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                   {task.tag === 'challenge' && task.description && (
                     <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
                   )}
-                </div>
+                </button>
                 <button onClick={() => deleteTask(task.id)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0 p-1">✕</button>
               </div>
             )}
