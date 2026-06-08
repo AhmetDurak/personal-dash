@@ -100,6 +100,12 @@ CREATE TABLE IF NOT EXISTS budgets (
 );
 
 ALTER TABLE reminders      ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+DELETE FROM reminders WHERE id IN (
+  SELECT id FROM (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id, title, due_at ORDER BY id) AS rn
+    FROM reminders WHERE due_at IS NOT NULL
+  ) t WHERE rn > 1
+);
 CREATE UNIQUE INDEX IF NOT EXISTS reminders_user_title_due_unique
   ON reminders(user_id, title, due_at) WHERE due_at IS NOT NULL;
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
