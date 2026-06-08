@@ -15,7 +15,7 @@ import { ETFTab } from './tabs/ETFTab'
 import { NewsTab } from './tabs/NewsTab'
 import { LearnTab } from './tabs/LearnTab'
 import { LearnSectionTab, LifeTab, RemindersView } from './tabs/NotebookTab'
-import { TodayTab } from './tabs/TodayTab'
+import { Planner } from './tabs/Planner'
 import { HomeTab } from './tabs/HomeTab'
 import { currentMonth } from './utils/format'
 import type { Span } from './components/web/BalanceChart'
@@ -101,7 +101,7 @@ export function App() {
           <Routes>
             <Route path="/login"       element={<Navigate to="/home" replace />} />
             <Route path="/home"        element={<HomeTab />} />
-            <Route path="/planner"     element={<TodayTab />} />
+            <Route path="/planner"     element={<Planner />} />
             <Route path="/today"       element={<Navigate to="/planner" replace />} />
             <Route path="/reminders"   element={<RemindersView standalone />} />
             <Route path="/life/*"      element={<LifeTab />} />

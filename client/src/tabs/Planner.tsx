@@ -674,7 +674,7 @@ type TodayMode = 'plan' | 'challenges'
 type PlanScope = 'day' | 'week' | 'month' | 'year'
 type Panel     = 'plan' | 'journal'
 
-export function TodayTab() {
+export function Planner() {
   const { t } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
   const [mobilePanel, setMobilePanel] = useState<Panel>('plan')
