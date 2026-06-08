@@ -515,32 +515,22 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
 
     function handleWheel(e: WheelEvent) {
       e.preventDefault()
-      if (e.ctrlKey || e.metaKey) {
-        // Ctrl+wheel or trackpad pinch = zoom toward cursor
-        const delta = -e.deltaY * 0.01
-        const factor = Math.exp(delta)
-        const s = scaleRef.current
-        const newScale = Math.max(0.15, Math.min(5, s * factor))
-        const rect = svgRef.current!.getBoundingClientRect()
-        const cx = e.clientX - rect.left
-        const cy = e.clientY - rect.top
-        const newPan = {
-          x: panStateRef.current.x + (cx - panStateRef.current.x) * (1 - newScale / s),
-          y: panStateRef.current.y + (cy - panStateRef.current.y) * (1 - newScale / s),
-        }
-        scaleRef.current = newScale
-        setScale(newScale)
-        panStateRef.current = newPan
-        setPan(newPan)
-      } else {
-        // Plain scroll = pan
-        const newPan = {
-          x: panStateRef.current.x - e.deltaX,
-          y: panStateRef.current.y - e.deltaY,
-        }
-        panStateRef.current = newPan
-        setPan(newPan)
+      // ctrlKey = trackpad pinch (faster); otherwise mouse wheel (slower)
+      const delta = e.ctrlKey ? -e.deltaY * 0.005 : -e.deltaY * 0.0015
+      const factor = Math.exp(delta)
+      const s = scaleRef.current
+      const newScale = Math.max(0.15, Math.min(5, s * factor))
+      const rect = svgRef.current!.getBoundingClientRect()
+      const cx = e.clientX - rect.left
+      const cy = e.clientY - rect.top
+      const newPan = {
+        x: panStateRef.current.x + (cx - panStateRef.current.x) * (1 - newScale / s),
+        y: panStateRef.current.y + (cy - panStateRef.current.y) * (1 - newScale / s),
       }
+      scaleRef.current = newScale
+      setScale(newScale)
+      panStateRef.current = newPan
+      setPan(newPan)
     }
 
     let pinchInitDist = 0
