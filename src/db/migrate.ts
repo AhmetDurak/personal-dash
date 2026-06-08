@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS budgets (
 );
 
 ALTER TABLE reminders      ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+CREATE UNIQUE INDEX IF NOT EXISTS reminders_user_title_due_unique
+  ON reminders(user_id, title, due_at) WHERE due_at IS NOT NULL;
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
 ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
 ALTER TABLE vocabulary     ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);

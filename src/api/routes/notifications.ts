@@ -50,10 +50,12 @@ export function notificationsRouter(pool: Pool): Router {
     }
     if (!title?.trim()) { res.status(400).json({ error: 'title required' }); return }
     const { rows } = await pool.query(
-      'INSERT INTO reminders (title, note, due_at, repeat, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      `INSERT INTO reminders (title, note, due_at, repeat, user_id) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id, title, due_at) WHERE due_at IS NOT NULL DO NOTHING
+       RETURNING *`,
       [title.trim(), note ?? null, due_at ?? null, repeat, uid]
     )
-    res.json(rows[0])
+    res.json(rows[0] ?? null)
   })
 
   // PATCH /api/notifications/reminders/:id/done  (toggles done)

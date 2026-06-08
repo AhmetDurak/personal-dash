@@ -482,7 +482,6 @@ export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
 
   const VIEWS: { id: View; label: string; icon: ReactNode }[] = [
     { id: 'today',    label: t.todayLabel, icon: <IconCalendarDay className="w-3.5 h-3.5" strokeWidth={2} /> },
-    { id: 'plan',     label: t.planLabel,  icon: <IconClipboard  className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'calendar', label: t.calendar,  icon: <IconCalendar   className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'history',  label: t.history,   icon: <IconHistory    className="w-3.5 h-3.5" strokeWidth={2} /> },
   ]
@@ -516,8 +515,6 @@ export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
           <EntryView date={selectedDate} onBack={() => nav({ date: null })} />
         ) : view === 'today' || (selectedDate === todayStr()) ? (
           <TodayView />
-        ) : view === 'plan' ? (
-          <PlanView />
         ) : view === 'calendar' ? (
           <CalendarView onSelectDate={d => nav({ view: 'today', date: d })} />
         ) : (
