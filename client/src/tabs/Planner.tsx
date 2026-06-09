@@ -98,6 +98,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
   const [tasks, setTasks]               = useState<PlanTask[]>([])
   const [notes, setNotes]               = useState('')
   const [input, setInput]               = useState('')
+  const [inputDesc, setInputDesc]       = useState('')
   const [saving, setSaving]             = useState(false)
   const [reminderDt, setReminderDt]     = useState('')
   const [showReminder, setShowReminder] = useState(false)
@@ -136,9 +137,9 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
   async function addTask() {
     const text = input.trim()
     if (!text) return
-    const newTask: PlanTask = { id: crypto.randomUUID(), text, done: false }
+    const newTask: PlanTask = { id: crypto.randomUUID(), text, description: inputDesc.trim() || null, done: false }
     const next: PlanTask[] = [...tasks, newTask]
-    setTasks(next); setInput('')
+    setTasks(next); setInput(''); setInputDesc('')
     scheduleSave(next, notes)
     if (reminderDt) {
       await addReminder({ title: text, due_at: reminderDt })
@@ -278,10 +279,16 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                     <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
                   )}
                 </button>
-                <button onClick={() => startEdit(task)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-300 hover:text-xero-green dark:hover:text-xero-green transition-opacity flex-shrink-0 p-1">
-                  <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />
-                </button>
-                <button onClick={() => deleteTask(task.id)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0 p-1">✕</button>
+                <div className="flex items-center gap-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                  <button
+                    onClick={() => startEdit(task)}
+                    disabled={task.done}
+                    className="text-gray-300 hover:text-xero-green transition-colors p-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />
+                  </button>
+                  <button onClick={() => deleteTask(task.id)} className="text-gray-300 hover:text-red-400 transition-colors p-2">✕</button>
+                </div>
               </div>
             )}
           </div>
@@ -309,9 +316,16 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
               {t.add}
             </button>
           </form>
+          <textarea
+            value={inputDesc}
+            onChange={e => setInputDesc(e.target.value)}
+            placeholder="Details (optional)"
+            rows={2}
+            className="w-full text-sm border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-400 resize-none"
+          />
           {showReminder && (
-            <input type="datetime-local" value={reminderDt} onChange={e => setReminderDt(e.target.value)}
-              className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 bg-amber-50/30" />
+            <input type="datetime-local" value={reminderDt} min={new Date().toISOString().slice(0, 16)} onChange={e => setReminderDt(e.target.value)}
+              className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 dark:focus:ring-amber-400 bg-amber-50/40 dark:bg-amber-900/10" />
           )}
           <textarea
             value={notes}
@@ -693,8 +707,8 @@ function PlanAddForm({ date }: { date: string }) {
         className="w-full text-sm border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-300 resize-none"
       />
       {showReminder && (
-        <input type="datetime-local" value={reminderDt} onChange={e => setReminderDt(e.target.value)}
-          className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 bg-amber-50/30" />
+        <input type="datetime-local" value={reminderDt} min={new Date().toISOString().slice(0, 16)} onChange={e => setReminderDt(e.target.value)}
+          className="w-full text-sm border border-amber-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-200 dark:focus:ring-amber-400 bg-amber-50/40 dark:bg-amber-900/10" />
       )}
     </div>
   )
