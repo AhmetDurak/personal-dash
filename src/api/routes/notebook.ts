@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { Pool } from 'pg'
+import { vault } from '../obsidian/vaultAdapter'
 
 export function notebookRouter(pool: Pool): Router {
   const router = Router()
@@ -8,6 +9,7 @@ export function notebookRouter(pool: Pool): Router {
 
   router.get('/notes', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
+    if (vault.enabled()) return res.json(vault.list(uid))
     const { rows } = await pool.query(
       'SELECT * FROM notebook_notes WHERE user_id = $1 ORDER BY updated_at DESC',
       [uid]
@@ -18,6 +20,7 @@ export function notebookRouter(pool: Pool): Router {
   router.post('/notes', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { title = 'Untitled', content = '', folder = null } = req.body as { title?: string; content?: string; folder?: string | null }
+    if (vault.enabled()) return res.json(vault.create(title, content, folder, uid))
     const { rows } = await pool.query(
       'INSERT INTO notebook_notes (title, content, folder, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
       [title, content, folder, uid]
@@ -28,6 +31,7 @@ export function notebookRouter(pool: Pool): Router {
   router.put('/notes/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { title, content } = req.body as { title: string; content: string }
+    if (vault.enabled()) return res.json(vault.update(req.params.id, title, content, uid))
     const { rows } = await pool.query(
       'UPDATE notebook_notes SET title=$1, content=$2, updated_at=now() WHERE id=$3 AND user_id=$4 RETURNING *',
       [title, content, req.params.id, uid]
@@ -38,6 +42,7 @@ export function notebookRouter(pool: Pool): Router {
   router.patch('/notes/:id/folder', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { folder } = req.body as { folder: string | null }
+    if (vault.enabled()) return res.json(vault.updateFolder(req.params.id, folder ?? null, uid))
     const { rows } = await pool.query(
       'UPDATE notebook_notes SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING *',
       [folder ?? null, req.params.id, uid]
@@ -47,6 +52,7 @@ export function notebookRouter(pool: Pool): Router {
 
   router.delete('/notes/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
+    if (vault.enabled()) { vault.delete(req.params.id, uid); return res.json({ ok: true }) }
     await pool.query('DELETE FROM notebook_notes WHERE id=$1 AND user_id=$2', [req.params.id, uid])
     res.json({ ok: true })
   })
