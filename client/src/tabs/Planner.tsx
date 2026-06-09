@@ -214,7 +214,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
 
       {total > 0 && (
         <div className="h-1 bg-gray-100 flex-shrink-0">
-          <div className="h-full bg-xero-green transition-all duration-500" style={{ width: `${(done / total) * 100}%` }} />
+          <div className="h-full bg-xero-green transition-[width] duration-500" style={{ width: `${(done / total) * 100}%` }} />
         </div>
       )}
 
@@ -255,7 +255,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                     {task.done && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
                   </span>
                 </button>
-                <button className="flex-1 min-w-0 text-left" onClick={() => toggleTask(task.id)}>
+                <button className="flex-1 min-w-0 text-left py-2" onClick={() => toggleTask(task.id)}>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {task.tag && <TagBadge tag={task.tag} />}
                     {task.timeOfDay && (
@@ -297,7 +297,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
       </div>
 
       {!listOnly && (
-        <div className="flex-shrink-0 px-6 pb-4 space-y-2">
+        <div className="flex-shrink-0 px-6 pb-4 space-y-2 overflow-y-auto max-h-[50vh]">
           <form onSubmit={e => { e.preventDefault(); addTask() }} className="flex gap-2">
             <input
               value={input}
@@ -321,7 +321,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
             onChange={e => setInputDesc(e.target.value)}
             placeholder="Details (optional)"
             rows={2}
-            className="w-full text-sm border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-400 resize-none"
+            className="w-full text-sm border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-xero-green placeholder-gray-400 resize-none"
           />
           {showReminder && (
             <input type="datetime-local" value={reminderDt} min={new Date().toISOString().slice(0, 16)} onChange={e => setReminderDt(e.target.value)}
