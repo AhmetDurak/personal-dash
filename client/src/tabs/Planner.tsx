@@ -6,7 +6,7 @@ import type { PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
 import { useAllReminders } from '../hooks/useNotebook'
 import { ChallengesView } from '../components/web/ChallengesView'
-import { IconClose, IconChevronLeft, IconChevronRight, IconBell, IconCheck } from '../lib/icons'
+import { IconClose, IconChevronLeft, IconChevronRight, IconBell, IconCheck, IconEdit } from '../lib/icons'
 import { useRoutineReminders } from '../hooks/useRoutineReminders'
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -254,7 +254,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                     {task.done && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
                   </span>
                 </button>
-                <button className="flex-1 min-w-0 text-left" onClick={() => startEdit(task)}>
+                <button className="flex-1 min-w-0 text-left" onClick={() => toggleTask(task.id)}>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {task.tag && <TagBadge tag={task.tag} />}
                     {task.timeOfDay && (
@@ -273,10 +273,13 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
                       </span>
                     )}
                   </div>
-                  <span className={`block text-sm mt-0.5 ${task.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-slate-100 cursor-text'}`}>{task.text}</span>
+                  <span className={`block text-sm mt-0.5 ${task.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-slate-100'}`}>{task.text}</span>
                   {task.description && (
                     <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-1">{task.description}</p>
                   )}
+                </button>
+                <button onClick={() => startEdit(task)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-300 hover:text-xero-green dark:hover:text-xero-green transition-opacity flex-shrink-0 p-1">
+                  <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />
                 </button>
                 <button onClick={() => deleteTask(task.id)} className="md:opacity-0 md:group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity text-xs flex-shrink-0 p-1">✕</button>
               </div>
