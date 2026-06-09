@@ -332,7 +332,7 @@ function PlanPanel({ date, listOnly = false, noHeader = false }: { date: string;
             onChange={e => { setNotes(e.target.value); scheduleSave(tasks, e.target.value) }}
             placeholder={t.motivationalNotesPlaceholder}
             rows={3}
-            className="w-full text-sm border border-amber-100 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-900/10 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none placeholder-gray-400"
+            className="w-full text-sm border border-amber-100 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-900/10 dark:text-slate-100 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-amber-200 resize-none placeholder-gray-400 dark:placeholder-slate-500"
           />
         </div>
       )}
@@ -526,7 +526,7 @@ function JournalPanel({ date, noHeader = false }: { date?: string; noHeader?: bo
           value={content}
           onChange={e => { setContent(e.target.value); scheduleSave(e.target.value, wentWell, wentBad) }}
           placeholder={t.writeAboutDay}
-          className="w-full text-sm border border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-xero-green resize-none placeholder-gray-300 h-48"
+          className="w-full text-sm border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-xero-green resize-none placeholder-gray-300 dark:placeholder-slate-500 h-48"
         />
         <div>
           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2">{t.wentWell}</p>
@@ -882,13 +882,13 @@ export function Planner() {
           <div className="flex gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
             <button
               onClick={() => up({ mode: 'plan' })}
-              className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              className={`text-xs px-2.5 py-1.5 md:py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                 mode === 'plan' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
             >{t.planLabel}</button>
             <button
               onClick={() => up({ mode: 'challenges' })}
-              className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              className={`text-xs px-2.5 py-1.5 md:py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                 mode === 'challenges' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
             >🔁 Routine</button>
@@ -897,14 +897,14 @@ export function Planner() {
           {/* Day navigator */}
           {mode === 'plan' && scope === 'day' && (
             <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
-              <button onClick={prevDay} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+              <button onClick={prevDay} className="w-10 h-10 md:w-6 md:h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
                 <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
               <button
                 onClick={() => up({ scope: 'day', date: today, selected: null })}
                 className="text-xs px-2 py-1 rounded-lg font-medium transition-colors whitespace-nowrap min-w-[72px] text-center bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm"
               >{dayLabel(dayDate, today)}</button>
-              <button onClick={nextDay} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+              <button onClick={nextDay} className="w-10 h-10 md:w-6 md:h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
                 <IconChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
             </div>
@@ -913,14 +913,14 @@ export function Planner() {
           {/* Week navigator */}
           {mode === 'plan' && scope === 'week' && (
             <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
-              <button onClick={prevWeek} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+              <button onClick={prevWeek} className="w-10 h-10 md:w-6 md:h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
                 <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
               <button
                 onClick={() => up({ weekStart: currentWeekMonday(), weekDay: null })}
                 className="text-xs px-2 py-1 rounded-lg font-medium whitespace-nowrap min-w-[80px] text-center bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm"
               >{weekLabel(weekStart)}</button>
-              <button onClick={nextWeek} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+              <button onClick={nextWeek} className="w-10 h-10 md:w-6 md:h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
                 <IconChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
             </div>
@@ -929,13 +929,13 @@ export function Planner() {
           {/* Month navigator */}
           {mode === 'plan' && scope === 'month' && (
             <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 flex-shrink-0">
-              <button onClick={prevMonth} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+              <button onClick={prevMonth} className="w-10 h-10 md:w-6 md:h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
                 <IconChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
               <span className="text-xs px-2 py-1 rounded-lg font-medium whitespace-nowrap bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm">
                 {MONTH_NAMES[viewMonthMon - 1].slice(0, 3)} {viewMonthYear}
               </span>
-              <button onClick={nextMonth} className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
+              <button onClick={nextMonth} className="w-10 h-10 md:w-6 md:h-6 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm transition-colors">
                 <IconChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
               </button>
             </div>
@@ -948,7 +948,7 @@ export function Planner() {
                 <button
                   key={s.key}
                   onClick={() => handleScopeChange(s.key)}
-                  className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                  className={`text-xs px-2.5 py-1.5 md:py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                     scope === s.key ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
                   }`}
                 >{s.label}</button>
@@ -963,7 +963,7 @@ export function Planner() {
                 <button
                   key={p}
                   onClick={() => setMobilePanel(p)}
-                  className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                  className={`text-xs px-2.5 py-1.5 md:py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
                     mobilePanel === p ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
                   }`}
                 >{p === 'plan' ? t.planLabel : t.todayLog}</button>
