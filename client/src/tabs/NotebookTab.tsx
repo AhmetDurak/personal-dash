@@ -2683,7 +2683,7 @@ function SectionShell({
   const currentLabel = views.find(v => pathname.startsWith(v.path))?.label ?? title
 
   useEffect(() => {
-    localStorage.setItem(storageKey, pathname)
+    if (storageKey) localStorage.setItem(storageKey, pathname)
   }, [pathname, storageKey])
 
   function NavItems() {
@@ -3998,7 +3998,7 @@ export function LifeTab() {
       views={VIEWS}
       trackerPaths={LIFE_TRACKER_PATHS}
       defaultRedirect="/life/log"
-      storageKey="life:lastPath"
+      storageKey=""
     >
       {(openSidebar) => (
         <>
