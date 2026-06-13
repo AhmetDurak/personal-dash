@@ -315,10 +315,11 @@ function EntryView({ date, onBack }: { date: string; onBack: () => void }) {
 export function LogTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const { t } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
-  const view = (searchParams.get('view') as View) ?? 'today'
+  const view = (searchParams.get('view') as View) ?? (localStorage.getItem('log:view') as View) ?? 'today'
   const selectedDate = searchParams.get('date')
 
   function nav(updates: { view?: View; date?: string | null }) {
+    if (updates.view !== undefined) localStorage.setItem('log:view', updates.view)
     setSearchParams(p => {
       if (updates.view !== undefined) p.set('view', updates.view)
       if (updates.date !== undefined) updates.date ? p.set('date', updates.date) : p.delete('date')

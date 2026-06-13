@@ -800,8 +800,8 @@ type View = 'today' | 'library' | 'shopping' | 'recipes'
 export function MealTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const { t } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
-  const view = (searchParams.get('view') as View) ?? 'today'
-  function setView(v: View) { setSearchParams({ view: v }) }
+  const view = (searchParams.get('view') as View) ?? (localStorage.getItem('meal:view') as View) ?? 'today'
+  function setView(v: View) { localStorage.setItem('meal:view', v); setSearchParams({ view: v }) }
   const VIEWS: { id: View; label: string; icon: ReactNode }[] = [
     { id: 'today',    label: t.today,        icon: <IconCalendarDay className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'shopping', label: t.shoppingList, icon: <IconCart        className="w-3.5 h-3.5" strokeWidth={2} /> },

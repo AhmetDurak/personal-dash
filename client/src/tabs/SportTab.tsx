@@ -837,8 +837,8 @@ type View = 'dashboard' | 'log' | 'targets' | 'challenges' | 'weight' | 'exercis
 export function SportTab({ onMenuClick }: { onMenuClick?: () => void }) {
   const { t } = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams()
-  const view = (searchParams.get('view') as View) ?? 'dashboard'
-  function setView(v: View) { setSearchParams({ view: v }) }
+  const view = (searchParams.get('view') as View) ?? (localStorage.getItem('sport:view') as View) ?? 'dashboard'
+  function setView(v: View) { localStorage.setItem('sport:view', v); setSearchParams({ view: v }) }
   const VIEWS: { id: View; label: string; icon: ReactNode }[] = [
     { id: 'dashboard',  label: t.sportDashboard, icon: <IconDashboard className="w-3.5 h-3.5" strokeWidth={2} /> },
     { id: 'plan',       label: 'Plan',           icon: <IconCalendarDay className="w-3.5 h-3.5" strokeWidth={2} /> },
