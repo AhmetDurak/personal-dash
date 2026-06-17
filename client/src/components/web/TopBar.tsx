@@ -59,10 +59,13 @@ export function TopBar() {
   const APPS = [
     { to: () => '/planner',                                                             label: t.planner,    isActive: (p: string) => p.startsWith('/planner') },
     { to: () => '/finance/overview',                                                    label: t.finance,    isActive: (p: string) => p.startsWith('/finance') },
-    { to: () => '/life/log',                                                              label: t.life,       isActive: (p: string) => p.startsWith('/life') },
+    { to: () => '/life/log',                                                            label: t.life,       isActive: (p: string) => p.startsWith('/life') },
     { to: () => localStorage.getItem('learn:lastPath') ?? '/learn/notes',              label: t.learn,      isActive: (p: string) => p.startsWith('/learn') },
     { to: () => '/reminders',                                                           label: t.reminders,  isActive: (p: string) => p.startsWith('/reminders') },
     { to: () => '/news',                                                                label: t.news,       isActive: (p: string) => p.startsWith('/news') },
+    ...(user?.email === 'durakahmet049@gmail.com'
+      ? [{ to: () => '/admin', label: 'Admin', isActive: (p: string) => p.startsWith('/admin') }]
+      : []),
   ]
 
   async function copyMobileToken() {

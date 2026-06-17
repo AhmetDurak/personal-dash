@@ -399,6 +399,20 @@ UPDATE budgets SET category = CASE category
 END
 WHERE category IN ('Income','Salary','Freelance','Investment Income','Other Income',
                    'Fixed','Market','Health','Investment','Education','Entertainment','Others');
+
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id          SERIAL PRIMARY KEY,
+  session_id  TEXT NOT NULL,
+  page        TEXT NOT NULL,
+  duration_ms INTEGER,
+  device      TEXT,
+  browser     TEXT,
+  os          TEXT,
+  timestamp   TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_analytics_timestamp ON analytics_events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_analytics_page      ON analytics_events(page);
+CREATE INDEX IF NOT EXISTS idx_analytics_session   ON analytics_events(session_id);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { useReminderNotifications } from './hooks/useReminderNotifications'
+import { useAnalytics } from './hooks/useAnalytics'
 import { LanguageContext, useLanguageState } from './hooks/useLanguage'
 import { LoginPage } from './pages/LoginPage'
 import { TopBar } from './components/web/TopBar'
@@ -17,6 +18,7 @@ import { LearnTab } from './tabs/LearnTab'
 import { LearnSectionTab, LifeTab, RemindersView } from './tabs/NotebookTab'
 import { Planner } from './tabs/Planner'
 import { HomeTab } from './tabs/HomeTab'
+import { AdminTab } from './tabs/AdminTab'
 import { currentMonth } from './utils/format'
 import type { Span } from './components/web/BalanceChart'
 
@@ -67,6 +69,8 @@ function FinanceDashboard() {
   )
 }
 
+function AnalyticsTracker() { useAnalytics(); return null }
+
 export function App() {
   const { user, isLoading } = useAuth()
   const langCtx = useLanguageState()
@@ -96,6 +100,7 @@ export function App() {
           </div>
         )}
         <TopBar />
+        <AnalyticsTracker />
         <AppTour />
         <div className="flex-1 overflow-hidden">
           <Routes>
@@ -108,6 +113,7 @@ export function App() {
             <Route path="/learn/*"     element={<LearnSectionTab />} />
             <Route path="/news"        element={<NewsPage />} />
             <Route path="/finance/*"   element={<FinanceDashboard />} />
+            <Route path="/admin"       element={<AdminTab userEmail={user.email} />} />
             {/* Legacy redirects */}
             <Route path="/workspace/log/*"     element={<Navigate to="/life/log" replace />} />
             <Route path="/workspace/meal/*"    element={<Navigate to="/life/meal" replace />} />
