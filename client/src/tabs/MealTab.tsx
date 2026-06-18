@@ -4,7 +4,7 @@ import { useFoods, useMealLogs, useShoppingList, useShoppingHistory, useReceipts
 import type { Food, MealItem, MealType, Receipt } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
-import { IconCalendarDay, IconCart, IconRecipes, IconApple, IconSunrise, IconSun, IconMoon, IconCookie, IconMenu } from '../lib/icons'
+import { IconCalendarDay, IconCart, IconRecipes, IconApple, IconSunrise, IconSun, IconMoon, IconCookie, IconMenu, IconEdit } from '../lib/icons'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -580,6 +580,8 @@ function ShoppingListView() {
   const { receipts, upload: uploadReceipt, remove: removeReceipt } = useReceipts(date)
   const [checked, setChecked]   = useState<Set<number>>(new Set())
   const [newItem, setNewItem]   = useState('')
+  const [editIdx, setEditIdx]   = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -604,6 +606,22 @@ function ShoppingListView() {
   async function removeItem(i: number) {
     await saveList(items.filter((_, idx) => idx !== i))
     setChecked(prev => { const n = new Set(prev); n.delete(i); return n })
+  }
+
+  function toggleChecked(i: number) {
+    setChecked(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })
+  }
+
+  function startEdit(i: number) { setEditIdx(i); setEditText(items[i]) }
+
+  async function commitEdit() {
+    if (editIdx === null) return
+    const v = editText.trim()
+    if (v && v !== items[editIdx]) {
+      const next = [...items]; next[editIdx] = v
+      await saveList(next)
+    }
+    setEditIdx(null)
   }
 
   function fmtDate(d: string) {
@@ -679,15 +697,41 @@ function ShoppingListView() {
         ) : (
           <div className="space-y-1.5 max-w-md">
             {items.map((item, i) => (
-              <div key={i} className="flex items-center gap-3 group bg-white rounded-xl px-4 py-3 border border-gray-100">
-                <button
-                  onClick={() => setChecked(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })}
-                  className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${checked.has(i) ? 'bg-xero-green border-xero-green' : 'border-gray-300'}`}
-                >
-                  {checked.has(i) && <span className="text-white font-bold" style={{ fontSize: 8 }}>✓</span>}
-                </button>
-                <p className={`flex-1 text-sm ${checked.has(i) ? 'line-through text-gray-300' : 'text-gray-800'}`}>{item}</p>
-                <button onClick={() => removeItem(i)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all leading-none">×</button>
+              <div key={i} className="flex items-center gap-2 group bg-white rounded-xl px-3 py-2.5 border border-gray-100">
+                {editIdx === i ? (
+                  <>
+                    <input
+                      autoFocus
+                      value={editText}
+                      onChange={e => setEditText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditIdx(null) }}
+                      className="flex-1 text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-xero-green"
+                    />
+                    <button onClick={commitEdit} className="text-xs text-xero-green font-medium px-1">Save</button>
+                    <button onClick={() => setEditIdx(null)} className="text-xs text-gray-400 px-1">Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => toggleChecked(i)}
+                      className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${checked.has(i) ? 'bg-xero-green border-xero-green' : 'border-gray-300'}`}
+                    >
+                      {checked.has(i) && <span className="text-white font-bold" style={{ fontSize: 8 }}>✓</span>}
+                    </button>
+                    <button
+                      onClick={() => toggleChecked(i)}
+                      className={`flex-1 text-left text-sm ${checked.has(i) ? 'line-through text-gray-300' : 'text-gray-800'}`}
+                    >
+                      {item}
+                    </button>
+                    <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button onClick={() => startEdit(i)} className="p-1.5 text-gray-300 hover:text-xero-green transition-colors">
+                        <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />
+                      </button>
+                      <button onClick={() => removeItem(i)} className="p-1.5 text-gray-300 hover:text-red-400 transition-colors leading-none">×</button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
