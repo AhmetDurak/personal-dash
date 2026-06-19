@@ -100,11 +100,22 @@ export function mealRouter(pool: Pool): Router {
   // GET items for a specific date
   router.get('/shopping/:date', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
+    const date = req.params.date
     const { rows } = await pool.query(
       'SELECT items FROM shopping_sessions WHERE user_id=$1 AND date=$2',
-      [uid, req.params.date]
+      [uid, date]
     )
-    res.json(rows[0]?.items ?? [])
+    // Session exists for this date — return it as-is (even if empty, user cleared it)
+    if (rows[0]) return res.json(rows[0].items ?? [])
+
+    // No session yet — carry over unchecked items from the most recent previous session
+    const { rows: prev } = await pool.query(
+      `SELECT items FROM shopping_sessions
+       WHERE user_id=$1 AND date < $2
+       ORDER BY date DESC LIMIT 1`,
+      [uid, date]
+    )
+    res.json(Array.isArray(prev[0]?.items) ? prev[0].items : [])
   })
 
   // PUT (upsert) items for a specific date
