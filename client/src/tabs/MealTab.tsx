@@ -370,7 +370,8 @@ function RecipeCard({ recipe, onUpdate, onRemove, compact = false }: {
   const [name, setName]         = useState(recipe.name)
   const [url, setUrl]           = useState(recipe.url)
   const [description, setDesc]  = useState(recipe.description)
-  const descLong = recipe.description.length > 120 || recipe.description.includes('\n')
+  const desc = recipe.description ?? ''
+  const descLong = desc.length > 120 || desc.includes('\n')
 
   function startEdit() {
     setName(recipe.name); setUrl(recipe.url); setDesc(recipe.description)
