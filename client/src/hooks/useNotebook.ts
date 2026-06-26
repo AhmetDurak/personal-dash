@@ -151,7 +151,21 @@ export function useNotes() {
     await mutate()
   }
 
-  return { notes: data ?? [], isLoading, createNote, saveNote, moveNoteToFolder, deleteNote }
+  async function renameFolder(oldPath: string, newPath: string) {
+    await fetch('/api/notebook/notes/folder-rename', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPath, newPath }),
+    })
+    await mutate()
+  }
+
+  async function deleteFolder(path: string) {
+    await fetch(`/api/notebook/notes/folder?path=${encodeURIComponent(path)}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { notes: data ?? [], isLoading, createNote, saveNote, moveNoteToFolder, deleteNote, renameFolder, deleteFolder }
 }
 
 // ─── Mindmap ──────────────────────────────────────────────────────────────────

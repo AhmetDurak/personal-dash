@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode, createContext, useContext } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage,
-  IconBook, IconMessage, IconLayers, IconMenu, IconCheck } from '../lib/icons'
+  IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
@@ -9,7 +9,7 @@ import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, u
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
-import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, WordLink } from '../hooks/useNotebook'
+import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, WordLink, Note } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -133,6 +133,143 @@ function SwipeToDelete({ onDelete, children, resetKey, contentBg = '' }: { onDel
   )
 }
 
+// ─── File tree ────────────────────────────────────────────────────────────────
+
+interface FolderNode { path: string; name: string; children: FolderNode[]; notes: Note[] }
+
+function buildTree(allNotes: Note[]): FolderNode {
+  const root: FolderNode = { path: '', name: '', children: [], notes: [] }
+  for (const note of allNotes) {
+    if (!note.folder) { root.notes.push(note); continue }
+    const parts = note.folder.split('/')
+    let cur = root, curPath = ''
+    for (const part of parts) {
+      curPath = curPath ? `${curPath}/${part}` : part
+      let child = cur.children.find(c => c.path === curPath)
+      if (!child) { child = { path: curPath, name: part, children: [], notes: [] }; cur.children.push(child) }
+      cur = child
+    }
+    cur.notes.push(note)
+  }
+  return root
+}
+
+function collectFolderPaths(node: FolderNode, result: string[] = []): string[] {
+  for (const c of node.children) { result.push(c.path); collectFolderPaths(c, result) }
+  return result
+}
+
+interface NoteTreeCtxType {
+  selectedId: number | null
+  onSelect: (id: number) => void
+  onCtx: (e: React.MouseEvent, type: 'folder'|'note', folderPath?: string, noteId?: number) => void
+  expanded: Set<string>
+  onToggle: (path: string) => void
+  renaming: { path: string; val: string } | null
+  setRenaming: (v: { path: string; val: string } | null) => void
+  addingIn: { parent: string; kind: 'note'|'folder'; val: string } | null
+  setAddingIn: (v: { parent: string; kind: 'note'|'folder'; val: string } | null) => void
+  onNewNote: (folder: string|null) => void
+  onCommitAdding: () => void
+  onCommitRename: () => void
+}
+const NoteTreeCtx = createContext<NoteTreeCtxType | null>(null)
+
+function FolderTreeRow({ node, depth }: { node: FolderNode; depth: number }) {
+  const ctx = useContext(NoteTreeCtx)!
+  const isOpen = ctx.expanded.has(node.path)
+  const isRenaming = ctx.renaming?.path === node.path
+  const cancelledRef = useRef(false)
+
+  return (
+    <>
+      <div
+        style={{ paddingLeft: depth * 14 + 4 }}
+        className="group flex items-center gap-1 py-0.5 pr-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer select-none"
+        onClick={() => ctx.onToggle(node.path)}
+        onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'folder', node.path) }}
+      >
+        <IconChevronRight className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-100 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.5} />
+        <IconFolder className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500 flex-shrink-0" strokeWidth={1.75} />
+        {isRenaming ? (
+          <input
+            autoFocus
+            value={ctx.renaming!.val}
+            onChange={e => ctx.setRenaming({ path: node.path, val: e.target.value })}
+            onKeyDown={e => {
+              e.stopPropagation()
+              if (e.key === 'Escape') { cancelledRef.current = true; ctx.setRenaming(null) }
+            }}
+            onBlur={() => { if (cancelledRef.current) { cancelledRef.current = false; return }; ctx.onCommitRename() }}
+            onClick={e => e.stopPropagation()}
+            className="flex-1 min-w-0 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
+          />
+        ) : (
+          <span className="text-xs flex-1 truncate text-gray-700 dark:text-slate-300">{node.name}</span>
+        )}
+        {!isRenaming && (
+          <div className="hidden group-hover:flex items-center gap-0.5 flex-shrink-0 ml-auto">
+            <button title="New note" onClick={e => { e.stopPropagation(); ctx.onNewNote(node.path) }}
+              className="p-0.5 rounded text-gray-400 hover:text-xero-green">
+              <IconAdd className="w-3 h-3" strokeWidth={2.5} />
+            </button>
+            <button title="More" onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'folder', node.path) }}
+              className="p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold">
+              •••
+            </button>
+          </div>
+        )}
+      </div>
+      {isOpen && (
+        <>
+          {ctx.addingIn?.parent === node.path && ctx.addingIn?.kind === 'folder' && (
+            <div style={{ paddingLeft: (depth + 1) * 14 + 4 }} className="flex items-center gap-1 py-0.5 pr-1">
+              <span className="w-3 flex-shrink-0" />
+              <IconFolder className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" strokeWidth={1.75} />
+              <input
+                autoFocus
+                value={ctx.addingIn.val}
+                onChange={e => ctx.setAddingIn({ ...ctx.addingIn!, val: e.target.value })}
+                onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') ctx.onCommitAdding(); if (e.key === 'Escape') ctx.setAddingIn(null) }}
+                onBlur={ctx.onCommitAdding}
+                placeholder="Folder name…"
+                className="flex-1 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
+              />
+            </div>
+          )}
+          {node.children.map(c => <FolderTreeRow key={c.path} node={c} depth={depth + 1} />)}
+          {node.notes.map(n => <NoteTreeRow key={n.id} note={n} depth={depth + 1} />)}
+        </>
+      )}
+    </>
+  )
+}
+
+function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
+  const ctx = useContext(NoteTreeCtx)!
+  const active = ctx.selectedId === note.id
+  return (
+    <div
+      style={{ paddingLeft: depth * 14 + 4 }}
+      className={`group flex items-center gap-1.5 py-0.5 pr-1 rounded-lg cursor-pointer ${
+        active ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'
+      }`}
+      onClick={() => ctx.onSelect(note.id)}
+      onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'note', undefined, note.id) }}
+    >
+      <span className="w-3 flex-shrink-0" />
+      <IconNote className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+      <span className={`text-xs flex-1 truncate ${active ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>
+        {note.title || 'Untitled'}
+      </span>
+      <button
+        onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'note', undefined, note.id) }}
+        className="hidden group-hover:block p-0.5 rounded text-gray-400 hover:text-gray-600 text-[10px] font-bold leading-none"
+      >•••</button>
+    </div>
+  )
+}
+
 // ─── NotesView ────────────────────────────────────────────────────────────────
 
 marked.use({ gfm: true, breaks: true })
@@ -143,7 +280,7 @@ function parseMarkdown(src: string): string {
 
 function NotesView() {
   const { t } = useLanguage()
-  const { notes, isLoading, createNote, saveNote, moveNoteToFolder, deleteNote } = useNotes()
+  const { notes, isLoading, createNote, saveNote, moveNoteToFolder, deleteNote, renameFolder, deleteFolder } = useNotes()
   const [noteParams, setNoteParams] = useSearchParams()
   const selectedId = noteParams.get('note') ? Number(noteParams.get('note')) : null
   function setSelectedId(id: number | null) {
@@ -153,17 +290,24 @@ function NotesView() {
   const [localContent, setLocalContent] = useState('')
   const [saving, setSaving] = useState(false)
   const [preview, setPreview] = useState(false)
-  const [activeFolder, setActiveFolder] = useState<string | null>(null)
-  const [newFolderInput, setNewFolderInput] = useState(false)
-  const [newFolderName, setNewFolderName] = useState('')
   const [folderPickerOpen, setFolderPickerOpen] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const previewRef  = useRef<HTMLDivElement>(null)
   const savedScroll = useRef(0)
 
-  const folders = [...new Set(notes.map(n => n.folder).filter((f): f is string => f !== null))].sort()
-  const visibleNotes = activeFolder === null ? notes : notes.filter(n => n.folder === activeFolder)
+  // Tree state
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [renaming, setRenaming] = useState<{ path: string; val: string } | null>(null)
+  const [addingIn, setAddingIn] = useState<{ parent: string; kind: 'note'|'folder'; val: string } | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; type: 'folder'|'note'; folderPath?: string; noteId?: number } | null>(null)
+  const [movingNoteId, setMovingNoteId] = useState<number | null>(null)
+  const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
+  const ctxMenuRef = useRef<HTMLDivElement>(null)
+
+  const tree = buildTree(notes)
+  const allFolderPaths = collectFolderPaths(tree)
+  const folders = allFolderPaths
   const selectedNote = notes.find(n => n.id === selectedId) ?? null
 
   useLayoutEffect(() => {
@@ -202,90 +346,99 @@ function NotesView() {
     }, 1000)
   }
 
-  async function handleNew() {
-    const note = await createNote(activeFolder)
+  async function handleNew(folder: string | null = null) {
+    const note = await createNote(folder)
     setSelectedId(note.id)
+    if (folder) {
+      const ancestors = folder.split('/').map((_, i, a) => a.slice(0, i + 1).join('/'))
+      setExpanded(s => new Set([...s, ...ancestors]))
+    }
   }
 
-  async function handleCreateFolder() {
-    const name = newFolderName.trim()
-    if (!name) { setNewFolderInput(false); return }
-    const note = await createNote(name)
-    setActiveFolder(name)
-    setSelectedId(note.id)
-    setNewFolderName('')
-    setNewFolderInput(false)
+  async function commitAdding() {
+    if (!addingIn || !addingIn.val.trim()) { setAddingIn(null); return }
+    const name = addingIn.val.trim()
+    const newPath = addingIn.parent ? `${addingIn.parent}/${name}` : name
+    setAddingIn(null)
+    await handleNew(newPath)
   }
+
+  async function commitRename() {
+    const r = renaming
+    setRenaming(null)
+    if (!r) return
+    const newName = r.val.trim()
+    if (!newName || newName === r.path.split('/').pop()) return
+    const parts = r.path.split('/')
+    parts[parts.length - 1] = newName
+    const newPath = parts.join('/')
+    await renameFolder(r.path, newPath)
+    setExpanded(s => { const n = new Set(s); n.delete(r.path); n.add(newPath); return n })
+  }
+
+  function openCtx(e: React.MouseEvent, type: 'folder'|'note', folderPath?: string, noteId?: number) {
+    const x = Math.min(e.clientX, window.innerWidth - 175)
+    const y = Math.min(e.clientY, window.innerHeight - 210)
+    setCtxMenu({ x, y, type, folderPath, noteId })
+  }
+
+  useEffect(() => {
+    if (!ctxMenu) return
+    function dismiss(ev: MouseEvent) {
+      if (!ctxMenuRef.current?.contains(ev.target as Node)) setCtxMenu(null)
+    }
+    document.addEventListener('mousedown', dismiss)
+    return () => document.removeEventListener('mousedown', dismiss)
+  }, [ctxMenu])
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
-  const [swipeResetKey, setSwipeResetKey] = useState(0)
 
   async function handleDelete(id: number) {
     await deleteNote(id)
-    setSwipeResetKey(k => k + 1)
     if (selectedId === id) setSelectedId(null)
   }
 
   return (
     <div className="flex h-full">
-      {/* Sidebar list — hidden on mobile when a note is open */}
-      <div className={`${selectedId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-60 border-r border-gray-100 flex-col bg-gray-50 flex-shrink-0`}>
-        {/* Folder strip */}
-        <div className="px-3 pt-3 pb-2 border-b border-gray-100 space-y-2">
-          <div className="flex overflow-x-auto gap-1" style={{ scrollbarWidth: 'none' }}>
-            <button
-              onClick={() => setActiveFolder(null)}
-              className={`text-xs px-2.5 py-2 rounded-full font-medium whitespace-nowrap flex-shrink-0 transition-colors ${activeFolder === null ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-            >All</button>
-            {folders.map(f => (
-              <button
-                key={f}
-                onClick={() => setActiveFolder(f)}
-                className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap flex-shrink-0 transition-colors ${activeFolder === f ? 'bg-xero-green text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-              >{f}</button>
-            ))}
-          </div>
-          {newFolderInput ? (
-            <div className="flex gap-1">
-              <input
-                autoFocus
-                value={newFolderName}
-                onChange={e => setNewFolderName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setNewFolderInput(false); setNewFolderName('') } }}
-                placeholder="Folder name…"
-                className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-xero-green bg-white"
-              />
-              <button onClick={handleCreateFolder} className="text-xs bg-xero-green text-white px-2 rounded-lg font-medium">✓</button>
-              <button onClick={() => { setNewFolderInput(false); setNewFolderName('') }} className="text-xs text-gray-400 hover:text-gray-600 px-1">✕</button>
-            </div>
-          ) : (
-            <div className="flex gap-1">
-              <button onClick={handleNew} className="flex-1 text-xs bg-xero-green text-white rounded-lg py-1.5 font-medium hover:bg-xero-green-dark transition-colors">
-                + {t.newNote}
-              </button>
-              <button onClick={() => setNewFolderInput(true)} className="text-xs bg-gray-200 text-gray-600 hover:bg-gray-300 rounded-lg px-2.5 py-1.5 font-medium transition-colors" title="New folder">
-                <IconFolder className="w-3.5 h-3.5" strokeWidth={2} />
-              </button>
-            </div>
-          )}
+      {/* File tree sidebar */}
+      <div className={`${selectedId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-gray-100 dark:border-slate-700 flex-col bg-gray-50 dark:bg-slate-900 flex-shrink-0`}>
+        <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          <button onClick={() => handleNew(null)}
+            className="flex-1 text-xs bg-xero-green text-white rounded-lg py-1.5 font-medium hover:bg-xero-green-dark transition-colors">
+            + {t.newNote}
+          </button>
+          <button onClick={() => setAddingIn({ parent: '', kind: 'folder', val: '' })}
+            className="text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-300 dark:hover:bg-slate-600 rounded-lg px-2.5 py-1.5 transition-colors"
+            title="New folder">
+            <IconFolder className="w-3.5 h-3.5" strokeWidth={2} />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto py-1 px-1">
           {isLoading && <p className="text-xs text-gray-400 p-4">Loading…</p>}
-          {visibleNotes.map(n => (
-            <SwipeToDelete key={n.id} onDelete={() => handleDelete(n.id)} contentBg="bg-gray-50" resetKey={swipeResetKey}>
-              <button
-                onClick={() => setSelectedId(n.id)}
-                className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-100 transition-colors ${
-                  selectedId === n.id ? 'bg-gray-100 border-l-2 border-l-xero-green' : ''
-                }`}
-              >
-                <p className="text-sm font-medium text-gray-800 truncate">{n.title || t.untitled}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {new Date(n.updated_at).toLocaleDateString('de-DE')}
-                </p>
-              </button>
-            </SwipeToDelete>
-          ))}
+          <NoteTreeCtx.Provider value={{
+            selectedId, onSelect: setSelectedId, onCtx: openCtx,
+            expanded, onToggle: p => setExpanded(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n }),
+            renaming, setRenaming, addingIn, setAddingIn,
+            onNewNote: handleNew, onCommitAdding: commitAdding, onCommitRename: commitRename,
+          }}>
+            {addingIn?.parent === '' && addingIn?.kind === 'folder' && (
+              <div className="flex items-center gap-1 py-0.5 px-1">
+                <span className="w-3 flex-shrink-0" />
+                <IconFolder className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" strokeWidth={1.75} />
+                <input
+                  autoFocus
+                  value={addingIn.val}
+                  onChange={e => setAddingIn(a => a && { ...a, val: e.target.value })}
+                  onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commitAdding(); if (e.key === 'Escape') setAddingIn(null) }}
+                  onBlur={commitAdding}
+                  placeholder="Folder name…"
+                  className="flex-1 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
+                />
+              </div>
+            )}
+            {tree.children.map(n => <FolderTreeRow key={n.path} node={n} depth={0} />)}
+            {tree.notes.map(n => <NoteTreeRow key={n.id} note={n} depth={0} />)}
+          </NoteTreeCtx.Provider>
         </div>
       </div>
 
@@ -395,6 +548,85 @@ function NotesView() {
           </>
         )}
       </div>
+
+      {/* Context menu */}
+      {ctxMenu && (
+        <div
+          ref={ctxMenuRef}
+          className="fixed z-50 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-xl py-1 min-w-[160px] text-xs"
+          style={{ top: ctxMenu.y, left: ctxMenu.x }}
+        >
+          {ctxMenu.type === 'folder' ? (
+            <>
+              <button onClick={() => { handleNew(ctxMenu.folderPath ?? null); setCtxMenu(null) }}
+                className="w-full text-left px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2 text-gray-700 dark:text-slate-300">
+                <IconAdd className="w-3.5 h-3.5" strokeWidth={2} /> New note
+              </button>
+              <button onClick={() => { if (ctxMenu.folderPath) setExpanded(s => new Set([...s, ctxMenu.folderPath!])); setAddingIn({ parent: ctxMenu.folderPath ?? '', kind: 'folder', val: '' }); setCtxMenu(null) }}
+                className="w-full text-left px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2 text-gray-700 dark:text-slate-300">
+                <IconFolder className="w-3.5 h-3.5" strokeWidth={2} /> New subfolder
+              </button>
+              <div className="border-t border-gray-100 dark:border-slate-700 my-1" />
+              <button onClick={() => { const fp = ctxMenu.folderPath!; setExpanded(s => new Set([...s, fp])); setRenaming({ path: fp, val: fp.split('/').pop()! }); setCtxMenu(null) }}
+                className="w-full text-left px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2 text-gray-700 dark:text-slate-300">
+                <IconEdit className="w-3.5 h-3.5" strokeWidth={2} /> Rename
+              </button>
+              <button onClick={() => { setDeletingFolderPath(ctxMenu.folderPath!); setCtxMenu(null) }}
+                className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 text-red-500">
+                <IconDelete className="w-3.5 h-3.5" strokeWidth={2} /> Delete folder
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { setMovingNoteId(ctxMenu.noteId!); setCtxMenu(null) }}
+                className="w-full text-left px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2 text-gray-700 dark:text-slate-300">
+                <IconCut className="w-3.5 h-3.5" strokeWidth={2} /> Move to…
+              </button>
+              <div className="border-t border-gray-100 dark:border-slate-700 my-1" />
+              <button onClick={() => { handleDelete(ctxMenu.noteId!); setCtxMenu(null) }}
+                className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 text-red-500">
+                <IconDelete className="w-3.5 h-3.5" strokeWidth={2} /> Delete
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Move note modal */}
+      {movingNoteId !== null && (
+        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center" onClick={() => setMovingNoteId(null)}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 w-64 shadow-xl" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 mb-3">Move to…</p>
+            <div className="max-h-52 overflow-y-auto space-y-0.5">
+              <button
+                onClick={() => { moveNoteToFolder(movingNoteId, null); setMovingNoteId(null) }}
+                className="w-full text-left text-xs px-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 flex items-center gap-1.5"
+              ><IconFolder className="w-3.5 h-3.5 text-gray-400" strokeWidth={1.75} /> Root (no folder)</button>
+              {allFolderPaths.map(fp => (
+                <button key={fp}
+                  onClick={() => { moveNoteToFolder(movingNoteId, fp); setMovingNoteId(null) }}
+                  className="w-full text-left text-xs py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 flex items-center gap-1.5"
+                  style={{ paddingLeft: (fp.split('/').length - 1) * 12 + 12 }}
+                >
+                  <IconFolder className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" strokeWidth={1.75} />
+                  {fp.split('/').pop()}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setMovingNoteId(null)} className="mt-3 w-full text-xs text-gray-400 hover:text-gray-600 py-1">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete folder confirm */}
+      {deletingFolderPath !== null && (
+        <ConfirmDialog
+          message={`Delete "${deletingFolderPath.split('/').pop()}" and all notes inside?`}
+          confirmLabel="Delete"
+          onConfirm={async () => { await deleteFolder(deletingFolderPath); setDeletingFolderPath(null); if (selectedId !== null && notes.find(n => n.id === selectedId)?.folder?.startsWith(deletingFolderPath)) setSelectedId(null) }}
+          onCancel={() => setDeletingFolderPath(null)}
+        />
+      )}
     </div>
   )
 }

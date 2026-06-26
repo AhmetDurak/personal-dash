@@ -39,6 +39,22 @@ export function notebookRouter(pool: Pool): Router {
     res.json(rows[0] ?? null)
   })
 
+  router.patch('/notes/folder-rename', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { oldPath, newPath } = req.body as { oldPath: string; newPath: string }
+    if (!oldPath?.trim() || !newPath?.trim()) { res.status(400).json({ error: 'oldPath and newPath required' }); return }
+    await pool.query(
+      `UPDATE notebook_notes
+       SET folder = CASE
+         WHEN folder = $1 THEN $2
+         ELSE $2 || SUBSTRING(folder FROM LENGTH($1) + 1)
+       END, updated_at = now()
+       WHERE user_id = $3 AND (folder = $1 OR folder LIKE $4)`,
+      [oldPath, newPath, uid, oldPath + '/%']
+    )
+    res.json({ ok: true })
+  })
+
   router.patch('/notes/:id/folder', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { folder } = req.body as { folder: string | null }
@@ -48,6 +64,17 @@ export function notebookRouter(pool: Pool): Router {
       [folder ?? null, req.params.id, uid]
     )
     res.json(rows[0] ?? null)
+  })
+
+  router.delete('/notes/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { path } = req.query as { path: string }
+    if (!path?.trim()) { res.status(400).json({ error: 'path required' }); return }
+    await pool.query(
+      `DELETE FROM notebook_notes WHERE user_id = $1 AND (folder = $2 OR folder LIKE $3)`,
+      [uid, path, path + '/%']
+    )
+    res.json({ ok: true })
   })
 
   router.delete('/notes/:id', async (req: Request, res: Response) => {
