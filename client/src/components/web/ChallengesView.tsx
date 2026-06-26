@@ -3,6 +3,7 @@ import { useChallenges } from '../../hooks/useChallenges'
 import type { Challenge, Checkpoint, ChallengeScope, RepeatCycle } from '../../hooks/useChallenges'
 import { ConfirmDialog } from './ConfirmDialog'
 import { IconTrophy as Trophy, IconFlag as Flag, IconAdd as Plus, IconChevronDown as ChevronDown, IconChevronUp as ChevronUp, IconCheck as Check, IconDelete as Trash2, IconEdit as Pencil, IconClose as X } from '../../lib/icons'
+import { Linkified } from '../../lib/linkify'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ function CheckpointItem({
       </button>
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-medium ${cp.completed ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-800 dark:text-slate-100'}`}>
-          {cp.label}
+          <Linkified text={cp.label} />
         </p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className={`text-[11px] ${overdue && !cp.completed ? 'text-red-500 font-semibold' : 'text-gray-400 dark:text-slate-500'}`}>
@@ -213,9 +214,9 @@ function ChallengeCard({
               </div>
             ) : (
               <>
-                <p className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">{challenge.title}</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate"><Linkified text={challenge.title} /></p>
                 {challenge.description && (
-                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-2">{challenge.description}</p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 line-clamp-2"><Linkified text={challenge.description} /></p>
                 )}
               </>
             )}
