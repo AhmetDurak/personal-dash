@@ -4,7 +4,7 @@ import { useFoods, useMealLogs, useShoppingList, useShoppingHistory, useReceipts
 import type { Food, MealItem, MealType, Receipt } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
-import { IconCalendarDay, IconCart, IconRecipes, IconApple, IconSunrise, IconSun, IconMoon, IconCookie, IconMenu, IconEdit } from '../lib/icons'
+import { IconCalendarDay, IconCart, IconRecipes, IconApple, IconSunrise, IconSun, IconMoon, IconCookie, IconMenu, IconEdit, IconList, IconGrid } from '../lib/icons'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -359,15 +359,18 @@ function normalizeUrl(u: string) {
   return u.startsWith('http://') || u.startsWith('https://') ? u : `https://${u}`
 }
 
-function RecipeCard({ recipe, onUpdate, onRemove }: {
+function RecipeCard({ recipe, onUpdate, onRemove, compact = false }: {
   recipe: Recipe
   onUpdate: (fields: Partial<Omit<Recipe, 'id'>>) => void
   onRemove: () => void
+  compact?: boolean
 }) {
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditing]   = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [name, setName]         = useState(recipe.name)
   const [url, setUrl]           = useState(recipe.url)
   const [description, setDesc]  = useState(recipe.description)
+  const descLong = recipe.description.length > 120 || recipe.description.includes('\n')
 
   function startEdit() {
     setName(recipe.name); setUrl(recipe.url); setDesc(recipe.description)
@@ -428,33 +431,47 @@ function RecipeCard({ recipe, onUpdate, onRemove }: {
   }
 
   return (
-    <div className="group bg-white rounded-xl px-4 py-3 border border-gray-100 hover:border-gray-200 transition-colors">
-      <div className="flex items-start gap-2">
+    <div className="group bg-white rounded-xl px-4 py-3 border border-gray-100 hover:border-gray-200 transition-colors h-full flex flex-col">
+      <div className="flex items-start gap-2 flex-1 min-w-0">
         <div className="flex-1 min-w-0">
           {recipe.url ? (
             <a
               href={normalizeUrl(recipe.url)}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm font-semibold text-xero-green hover:underline break-all"
+              className="text-sm font-semibold text-xero-green hover:underline break-words leading-snug"
             >
               {recipe.name}
             </a>
           ) : (
-            <p className="text-sm font-semibold text-gray-800">{recipe.name}</p>
+            <p className="text-sm font-semibold text-gray-800 leading-snug">{recipe.name}</p>
           )}
-          {recipe.url && (
+          {!compact && recipe.url && (
             <p className="text-[11px] text-gray-400 truncate mt-0.5">{recipe.url}</p>
           )}
           {recipe.description && (
-            <p className="text-sm text-gray-600 mt-1.5 whitespace-pre-wrap">{recipe.description}</p>
+            <div className="mt-1.5">
+              <p className={`text-sm text-gray-600 whitespace-pre-wrap ${!expanded ? (compact ? 'line-clamp-2' : 'line-clamp-3') : ''}`}>
+                {recipe.description}
+              </p>
+              {descLong && (
+                <button
+                  onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
+                  className="text-xs text-gray-400 hover:text-gray-600 mt-0.5 transition-colors"
+                >
+                  {expanded ? 'Show less' : 'Show more'}
+                </button>
+              )}
+            </div>
           )}
         </div>
         <button
           onClick={startEdit}
-          className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 transition-all text-xs px-1.5 py-1"
+          className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 transition-all p-1"
           title="Edit"
-        >✏️</button>
+        >
+          <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />
+        </button>
       </div>
     </div>
   )
@@ -466,6 +483,11 @@ function RecipesView() {
   const [url, setUrl]           = useState('')
   const [description, setDesc]  = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() =>
+    (localStorage.getItem('meal:recipesView') as 'list' | 'grid') ?? 'list'
+  )
+
+  function setView(v: 'list' | 'grid') { setViewMode(v); localStorage.setItem('meal:recipesView', v) }
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -475,15 +497,36 @@ function RecipesView() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-xl mx-auto space-y-3">
-      {!showForm ? (
-        <button
-          onClick={() => setShowForm(true)}
-          className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
-        >
-          + Add Recipe
-        </button>
-      ) : (
+    <div className="p-4 md:p-6 space-y-3 max-w-4xl mx-auto">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2">
+        {!showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+          >
+            + Add Recipe
+          </button>
+        )}
+        <div className="ml-auto flex rounded-lg overflow-hidden border border-gray-200">
+          <button
+            onClick={() => setView('list')}
+            className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600'}`}
+            title="List view"
+          >
+            <IconList className="w-3.5 h-3.5" strokeWidth={2} />
+          </button>
+          <button
+            onClick={() => setView('grid')}
+            className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600'}`}
+            title="Grid view"
+          >
+            <IconGrid className="w-3.5 h-3.5" strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+
+      {showForm && (
         <form onSubmit={handleAdd} className="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-2.5 shadow-sm">
           <input
             autoFocus
@@ -524,11 +567,12 @@ function RecipesView() {
         <p className="text-sm text-gray-400 text-center py-12">No recipes yet. Add your first one!</p>
       )}
 
-      <div className="space-y-2">
+      <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 gap-3' : 'space-y-2'}>
         {recipes.map(r => (
           <RecipeCard
             key={r.id}
             recipe={r}
+            compact={viewMode === 'grid'}
             onUpdate={fields => update(r.id, fields)}
             onRemove={() => remove(r.id)}
           />

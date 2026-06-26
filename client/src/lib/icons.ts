@@ -63,6 +63,7 @@ export { DollarSign    as IconMoney        } from 'lucide-react'
 // ── UI / Layout ───────────────────────────────────────────────────────────────
 export { LayoutDashboard as IconDashboard   } from 'lucide-react'
 export { AlignJustify    as IconList        } from 'lucide-react'
+export { LayoutGrid      as IconGrid        } from 'lucide-react'
 export { Menu            as IconMenu        } from 'lucide-react'
 export { MoreHorizontal  as IconMore        } from 'lucide-react'
 export { MoreVertical    as IconMoreV       } from 'lucide-react'
