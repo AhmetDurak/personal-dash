@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom'
+
 interface Props {
   message: string
   confirmLabel?: string
@@ -6,8 +8,8 @@ interface Props {
 }
 
 export function ConfirmDialog({ message, confirmLabel = 'Yes, proceed', onConfirm, onCancel }: Props) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
       <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-6 w-80 max-w-[calc(100vw-2rem)] flex flex-col gap-5">
         <div className="flex flex-col gap-1.5">
@@ -29,6 +31,7 @@ export function ConfirmDialog({ message, confirmLabel = 'Yes, proceed', onConfir
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
