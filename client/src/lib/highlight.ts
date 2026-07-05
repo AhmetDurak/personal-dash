@@ -36,23 +36,6 @@ hljs.registerLanguage('rust', rust)
 hljs.registerLanguage('rs', rust)
 hljs.registerLanguage('java', java)
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
+hljs.configure({ ignoreUnescapedHTML: true })
 
-export function highlightCode(text: string, lang?: string): string {
-  if (lang && hljs.getLanguage(lang)) {
-    return hljs.highlight(text, { language: lang }).value
-  }
-  return escapeHtml(text)
-}
-
-export function codeBlockHtml(text: string, lang?: string): string {
-  const highlighted = highlightCode(text, lang)
-  const displayLang = lang || 'plaintext'
-  return `<div class="hljs-wrapper"><span class="hljs-lang-badge">${displayLang}</span><pre><code class="hljs">${highlighted}</code></pre></div>\n`
-}
+export { hljs }

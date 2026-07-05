@@ -4,7 +4,7 @@ import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete
   IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconUpload } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import { codeBlockHtml } from '../lib/highlight'
+import { hljs } from '../lib/highlight'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
@@ -273,13 +273,7 @@ function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
 
 // ─── NotesView ────────────────────────────────────────────────────────────────
 
-marked.use({
-  gfm: true,
-  breaks: true,
-  renderer: {
-    code({ text, lang }) { return codeBlockHtml(text, lang) },
-  },
-})
+marked.use({ gfm: true, breaks: true })
 
 function parseMarkdown(src: string): string {
   return DOMPurify.sanitize(marked.parse(src) as string, { ADD_ATTR: ['target'] })
@@ -354,6 +348,27 @@ function NotesView() {
     const el = preview ? previewRef.current : textareaRef.current
     if (el) el.scrollTop = savedScroll.current
   }, [preview])
+
+  useEffect(() => {
+    if (!preview || !previewRef.current) return
+    previewRef.current.querySelectorAll<HTMLElement>('pre code').forEach(el => {
+      const lang = Array.from(el.classList)
+        .find(c => c.startsWith('language-'))
+        ?.slice(9)
+      if (lang && hljs.getLanguage(lang)) {
+        hljs.highlightElement(el)
+      } else {
+        el.classList.add('hljs')
+      }
+      const pre = el.parentElement
+      if (pre && pre.tagName === 'PRE' && !pre.querySelector('.hljs-lang-badge')) {
+        const badge = document.createElement('span')
+        badge.className = 'hljs-lang-badge'
+        badge.textContent = lang ?? 'plaintext'
+        pre.prepend(badge)
+      }
+    })
+  }, [preview, localContent])
 
   function togglePreview() {
     const el = preview ? previewRef.current : textareaRef.current

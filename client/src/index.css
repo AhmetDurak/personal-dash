@@ -176,23 +176,11 @@ html, body {
 .dark .note-prose th, .dark .note-prose td { border-color: #334155; }
 
 /* ── Syntax-highlighted code blocks ─────────────────────────────────────────── */
-.hljs-wrapper {
-  position: relative;
-  margin: 0.75rem 0;
-}
-.note-prose .hljs-wrapper pre {
-  background: none;
-  padding: 0;
-  margin: 0;
-  border-radius: 8px;
-  overflow: hidden;
-}
-.hljs-wrapper pre code.hljs {
-  display: block;
+.note-prose pre { position: relative; }
+.note-prose pre code.hljs {
   border-radius: 8px;
   font-size: 0.875em;
   font-family: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
-  overflow-x: auto;
 }
 .hljs-lang-badge {
   position: absolute;
