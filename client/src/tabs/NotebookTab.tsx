@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode, createContext, useContext } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage,
-  IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight } from '../lib/icons'
+  IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconUpload } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
@@ -295,6 +295,33 @@ function NotesView() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const previewRef  = useRef<HTMLDivElement>(null)
   const savedScroll = useRef(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
+  async function uploadAndInsert(files: FileList | null) {
+    if (!files?.length || selectedId === null) return
+    setUploading(true)
+    for (const file of Array.from(files)) {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/notebook/attachments', { method: 'POST', body: form })
+      if (!res.ok) continue
+      const { url, name, mime } = await res.json() as { url: string; name: string; mime: string }
+      const snippet = mime.startsWith('image/') ? `![${name}](${url})` : `[${name}](${url})`
+      const ta = textareaRef.current
+      if (ta) {
+        const start = ta.selectionStart ?? localContent.length
+        const next = localContent.slice(0, start) + snippet + '\n' + localContent.slice(start)
+        setLocalContent(next)
+        scheduleSave(localTitle, next)
+      } else {
+        const next = localContent + '\n' + snippet + '\n'
+        setLocalContent(next)
+        scheduleSave(localTitle, next)
+      }
+    }
+    setUploading(false)
+  }
 
   // Tree state
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -467,8 +494,16 @@ function NotesView() {
                 placeholder="Note title…"
                 className="text-lg font-semibold text-gray-900 bg-transparent flex-1 outline-none placeholder-gray-300 min-w-0"
               />
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,application/pdf,.doc,.docx,.txt,.csv,.xls,.xlsx,.ppt,.pptx"
+                className="hidden"
+                onChange={e => uploadAndInsert(e.target.files)}
+              />
               <div className="flex items-center gap-2 flex-shrink-0">
-                {saving && <span className="text-xs text-gray-400">{t.saving}</span>}
+                {(saving || uploading) && <span className="text-xs text-gray-400">{uploading ? 'Uploading…' : t.saving}</span>}
                 {/* Folder badge */}
                 <div className="relative">
                   <button
@@ -506,6 +541,14 @@ function NotesView() {
                   )}
                 </div>
                 <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  title="Attach file"
+                  className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors p-1.5 rounded-lg disabled:opacity-40"
+                >
+                  <IconUpload className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+                <button
                   onClick={togglePreview}
                   className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${preview ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
                 >
@@ -541,7 +584,9 @@ function NotesView() {
                 ref={textareaRef}
                 value={localContent}
                 onChange={e => { setLocalContent(e.target.value); scheduleSave(localTitle, e.target.value) }}
-                placeholder="Write your note here…"
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); uploadAndInsert(e.dataTransfer.files) }}
+                placeholder="Write your note here… (drag & drop images or files)"
                 className="flex-1 p-6 text-sm text-gray-700 bg-white resize-none outline-none placeholder-gray-300 overflow-y-auto"
               />
             )}

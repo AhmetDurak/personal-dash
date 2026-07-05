@@ -1,9 +1,42 @@
 import { Router, Request, Response } from 'express'
 import { Pool } from 'pg'
 import { vault } from '../obsidian/vaultAdapter'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs'
+
+const ATTACHMENT_DIR = path.join(process.cwd(), 'uploads', 'notebook')
+fs.mkdirSync(ATTACHMENT_DIR, { recursive: true })
+
+const attachmentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, ATTACHMENT_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname)
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`)
+  },
+})
+const attachmentUpload = multer({ storage: attachmentStorage, limits: { fileSize: 20 * 1024 * 1024 } })
 
 export function notebookRouter(pool: Pool): Router {
   const router = Router()
+
+  // ─── Attachments ────────────────────────────────────────────────────────────
+
+  router.post('/attachments', attachmentUpload.single('file'), (req: Request, res: Response) => {
+    const file = req.file
+    if (!file) { res.status(400).json({ error: 'No file uploaded' }); return }
+    res.json({
+      url: `/api/notebook/attachments/${file.filename}`,
+      name: file.originalname,
+      mime: file.mimetype,
+    })
+  })
+
+  router.get('/attachments/:filename', (req: Request, res: Response) => {
+    const { filename } = req.params
+    if (filename.includes('/') || filename.includes('..')) { res.status(400).end(); return }
+    res.sendFile(path.join(ATTACHMENT_DIR, filename))
+  })
 
   // ─── Notes ──────────────────────────────────────────────────────────────────
 
