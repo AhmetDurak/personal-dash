@@ -297,15 +297,19 @@ function NotesView() {
   const savedScroll = useRef(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const isTouch = typeof window !== 'undefined' && 'ontouchstart' in window
 
   async function uploadAndInsert(files: FileList | null) {
     if (!files?.length || selectedId === null) return
     setUploading(true)
+    setUploadError(null)
+    const failed: string[] = []
     for (const file of Array.from(files)) {
       const form = new FormData()
       form.append('file', file)
       const res = await fetch('/api/notebook/attachments', { method: 'POST', body: form })
-      if (!res.ok) continue
+      if (!res.ok) { failed.push(file.name); continue }
       const { url, name, mime } = await res.json() as { url: string; name: string; mime: string }
       const snippet = mime.startsWith('image/') ? `![${name}](${url})` : `[${name}](${url})`
       const ta = textareaRef.current
@@ -320,7 +324,9 @@ function NotesView() {
         scheduleSave(localTitle, next)
       }
     }
+    if (fileInputRef.current) fileInputRef.current.value = ''
     setUploading(false)
+    if (failed.length) setUploadError(`Failed: ${failed.join(', ')}`)
   }
 
   // Tree state
@@ -503,7 +509,8 @@ function NotesView() {
                 onChange={e => uploadAndInsert(e.target.files)}
               />
               <div className="flex items-center gap-2 flex-shrink-0">
-                {(saving || uploading) && <span className="text-xs text-gray-400">{uploading ? 'Uploading…' : t.saving}</span>}
+                {uploadError && <span className="text-xs text-red-400 truncate max-w-[120px]">{uploadError}</span>}
+                {(saving || uploading) && !uploadError && <span className="text-xs text-gray-400">{uploading ? 'Uploading…' : t.saving}</span>}
                 {/* Folder badge */}
                 <div className="relative">
                   <button
@@ -544,7 +551,7 @@ function NotesView() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                   title="Attach file"
-                  className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors p-1.5 rounded-lg disabled:opacity-40"
+                  className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors p-2.5 rounded-lg disabled:opacity-40 min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <IconUpload className="w-3.5 h-3.5" strokeWidth={2} />
                 </button>
@@ -586,7 +593,7 @@ function NotesView() {
                 onChange={e => { setLocalContent(e.target.value); scheduleSave(localTitle, e.target.value) }}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); uploadAndInsert(e.dataTransfer.files) }}
-                placeholder="Write your note here… (drag & drop images or files)"
+                placeholder={isTouch ? 'Write your note here…' : 'Write your note here… (drag & drop files)'}
                 className="flex-1 p-6 text-sm text-gray-700 bg-white resize-none outline-none placeholder-gray-300 overflow-y-auto"
               />
             )}
