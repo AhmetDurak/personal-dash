@@ -4,6 +4,7 @@ import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete
   IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconUpload } from '../lib/icons'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { codeBlockHtml } from '../lib/highlight'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
@@ -272,7 +273,13 @@ function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
 
 // ─── NotesView ────────────────────────────────────────────────────────────────
 
-marked.use({ gfm: true, breaks: true })
+marked.use({
+  gfm: true,
+  breaks: true,
+  renderer: {
+    code({ text, lang }) { return codeBlockHtml(text, lang) },
+  },
+})
 
 function parseMarkdown(src: string): string {
   return DOMPurify.sanitize(marked.parse(src) as string, { ADD_ATTR: ['target'] })
