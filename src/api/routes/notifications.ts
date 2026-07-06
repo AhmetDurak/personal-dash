@@ -7,7 +7,14 @@ export function notificationsRouter(pool: Pool): Router {
   // GET /api/notifications
   router.get('/', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const month = new Date().toISOString().slice(0, 7)
+    const currentMonth = new Date().toISOString().slice(0, 7)
+
+    // Use the most recent month that has transactions; fall back to current month
+    const { rows: latestRows } = await pool.query(
+      'SELECT month FROM transactions WHERE user_id = $1 ORDER BY month DESC LIMIT 1',
+      [uid]
+    )
+    const month = latestRows[0]?.month ?? currentMonth
 
     const [summary, watchlist, remindersResult] = await Promise.all([
       req.ledger.getSummary(month).catch(() => null),
