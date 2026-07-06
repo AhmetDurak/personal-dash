@@ -22,12 +22,12 @@ export function SortFilterBar({
           value={query}
           onChange={e => onQuery(e.target.value)}
           placeholder={placeholder}
-          className="w-full text-xs pl-6 pr-5 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg outline-none focus:ring-1 focus:ring-xero-green placeholder-gray-300 dark:placeholder-slate-600"
+          className="w-full text-xs pl-6 pr-8 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg outline-none focus:ring-1 focus:ring-xero-green placeholder-gray-300 dark:placeholder-slate-600"
         />
         {query && (
           <button
             onClick={() => onQuery('')}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+            className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
           >
             <IconClose className="w-3 h-3" strokeWidth={2.5} />
           </button>
@@ -38,7 +38,7 @@ export function SortFilterBar({
         <select
           value={sortKey}
           onChange={e => onSort(e.target.value)}
-          className="text-[11px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg pl-5 pr-1.5 py-1 outline-none focus:ring-1 focus:ring-xero-green text-gray-600 dark:text-slate-400 cursor-pointer appearance-none"
+          className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg pl-5 pr-1.5 py-2.5 min-h-[44px] outline-none focus:ring-1 focus:ring-xero-green text-gray-600 dark:text-slate-400 cursor-pointer appearance-none"
         >
           {sorts.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>

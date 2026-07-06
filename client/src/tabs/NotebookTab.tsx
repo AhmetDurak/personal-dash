@@ -138,6 +138,8 @@ function SwipeToDelete({ onDelete, children, resetKey, contentBg = '' }: { onDel
 
 // ─── File tree ────────────────────────────────────────────────────────────────
 
+const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+
 interface FolderNode { path: string; name: string; children: FolderNode[]; notes: Note[] }
 
 function buildTree(allNotes: Note[]): FolderNode {
@@ -191,7 +193,7 @@ function FolderTreeRow({ node, depth }: { node: FolderNode; depth: number }) {
     <>
       <div
         style={{ paddingLeft: depth * 14 + 4 }}
-        className={`group flex items-center gap-1 py-0.5 pr-1 rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 ring-1 ring-xero-green/30' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+        className={`group flex items-center gap-1 py-2 pr-1 rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
         onClick={() => ctx.onToggle(node.path)}
         onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'folder', node.path) }}
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
@@ -217,7 +219,7 @@ function FolderTreeRow({ node, depth }: { node: FolderNode; depth: number }) {
           <span className="text-xs flex-1 truncate text-gray-700 dark:text-slate-300">{node.name}</span>
         )}
         {!isRenaming && (
-          <div className="hidden group-hover:flex items-center gap-0.5 flex-shrink-0 ml-auto">
+          <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto opacity-30 group-hover:opacity-100">
             <button title="New note" onClick={e => { e.stopPropagation(); ctx.onNewNote(node.path) }}
               className="p-0.5 rounded text-gray-400 hover:text-xero-green">
               <IconAdd className="w-3 h-3" strokeWidth={2.5} />
@@ -261,22 +263,24 @@ function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
 
   return (
     <div
-      draggable
-      onDragStart={e => { e.dataTransfer.setData('noteId', String(note.id)); e.dataTransfer.effectAllowed = 'move' }}
-      onDragOver={e => {
-        e.preventDefault(); e.stopPropagation()
-        const rect = e.currentTarget.getBoundingClientRect()
-        setDropPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
-      }}
-      onDragLeave={() => setDropPos(null)}
-      onDrop={e => {
-        e.preventDefault(); e.stopPropagation()
-        const id = e.dataTransfer.getData('noteId')
-        if (id && dropPos && Number(id) !== note.id) ctx.onReorderNote(Number(id), note.id, dropPos)
-        setDropPos(null)
-      }}
+      {...(!isTouch && {
+        draggable: true,
+        onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('noteId', String(note.id)); e.dataTransfer.effectAllowed = 'move' },
+        onDragOver: (e: React.DragEvent) => {
+          e.preventDefault(); e.stopPropagation()
+          const rect = e.currentTarget.getBoundingClientRect()
+          setDropPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+        },
+        onDragLeave: () => setDropPos(null),
+        onDrop: (e: React.DragEvent) => {
+          e.preventDefault(); e.stopPropagation()
+          const id = e.dataTransfer.getData('noteId')
+          if (id && dropPos && Number(id) !== note.id) ctx.onReorderNote(Number(id), note.id, dropPos)
+          setDropPos(null)
+        },
+      })}
       style={{ paddingLeft: depth * 14 + 4 }}
-      className={`group flex items-center gap-1.5 py-0.5 pr-1 rounded-lg cursor-pointer relative ${
+      className={`group flex items-center gap-1.5 py-2 pr-1 rounded-lg cursor-pointer relative ${
         active ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'
       }${dropPos === 'before' ? ' border-t-2 border-xero-green' : dropPos === 'after' ? ' border-b-2 border-xero-green' : ''}`}
       onClick={() => ctx.onSelect(note.id)}
@@ -289,7 +293,7 @@ function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
       </span>
       <button
         onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'note', undefined, note.id) }}
-        className="hidden group-hover:block p-0.5 rounded text-gray-400 hover:text-gray-600 text-[10px] font-bold leading-none"
+        className="p-2 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] font-bold leading-none opacity-30 group-hover:opacity-100"
       >•••</button>
     </div>
   )
@@ -500,11 +504,15 @@ function NotesView() {
 
   useEffect(() => {
     if (!ctxMenu) return
-    function dismiss(ev: MouseEvent) {
+    function dismiss(ev: MouseEvent | TouchEvent) {
       if (!ctxMenuRef.current?.contains(ev.target as Node)) setCtxMenu(null)
     }
     document.addEventListener('mousedown', dismiss)
-    return () => document.removeEventListener('mousedown', dismiss)
+    document.addEventListener('touchstart', dismiss as EventListener, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', dismiss)
+      document.removeEventListener('touchstart', dismiss as EventListener)
+    }
   }, [ctxMenu])
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
@@ -520,11 +528,11 @@ function NotesView() {
       <div className={`${selectedId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-gray-100 dark:border-slate-700 flex-col bg-gray-50 dark:bg-slate-900 flex-shrink-0`}>
         <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <button onClick={() => handleNew(null)}
-            className="flex-1 text-xs bg-xero-green text-white rounded-lg py-1.5 font-medium hover:bg-xero-green-dark transition-colors">
+            className="flex-1 text-xs bg-xero-green text-white rounded-lg py-2.5 font-medium hover:bg-xero-green-dark transition-colors min-h-[44px]">
             + {t.newNote}
           </button>
           <button onClick={() => setAddingIn({ parent: '', kind: 'folder', val: '' })}
-            className="text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-300 dark:hover:bg-slate-600 rounded-lg px-2.5 py-1.5 transition-colors"
+            className="text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-300 dark:hover:bg-slate-600 rounded-lg px-2.5 py-2.5 min-h-[44px] transition-colors"
             title="New folder">
             <IconFolder className="w-3.5 h-3.5" strokeWidth={2} />
           </button>
@@ -593,7 +601,7 @@ function NotesView() {
             <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-gray-100 flex-shrink-0 bg-white gap-2">
               <button
                 onClick={() => setSelectedId(null)}
-                className="md:hidden flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-1 -ml-1"
+                className="md:hidden flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-3 -ml-3 min-w-[44px] min-h-[44px] flex items-center justify-center"
                 aria-label="Back to notes"
               >
                 ←
@@ -624,7 +632,7 @@ function NotesView() {
                     <IconFolder className="w-3 h-3" strokeWidth={2} /> {selectedNote?.folder ?? 'No folder'}
                   </button>
                   {folderPickerOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[140px]">
+                    <div className="absolute right-0 top-full mt-1 z-40 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[140px]">
                       <button
                         onClick={() => { if (selectedId) moveNoteToFolder(selectedId, null); setFolderPickerOpen(false) }}
                         className="w-full text-left text-xs px-3 py-1.5 hover:bg-gray-50 text-gray-500"
@@ -661,13 +669,13 @@ function NotesView() {
                 </button>
                 <button
                   onClick={togglePreview}
-                  className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${preview ? 'bg-gray-900 text-white' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
+                  className={`text-xs px-2.5 py-2 min-h-[44px] rounded-lg font-medium transition-colors ${preview ? 'bg-gray-900 text-white dark:bg-slate-200 dark:text-slate-900' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                 >
                   {preview ? t.editMode : t.preview}
                 </button>
                 <button
                   onClick={() => setConfirmDeleteId(selectedId)}
-                  className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                  className="text-xs text-red-400 hover:text-red-600 transition-colors px-2 py-2 min-h-[44px] flex items-center"
                 >
                   {t.delete}
                 </button>
