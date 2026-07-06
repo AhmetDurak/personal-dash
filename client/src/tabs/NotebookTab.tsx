@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, type ReactNode, createContext, useContext } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode, createContext, useContext } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage,
   IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconUpload } from '../lib/icons'
@@ -176,6 +176,7 @@ interface NoteTreeCtxType {
   onCommitAdding: () => void
   onCommitRename: () => void
   onDropNote: (noteId: number, folder: string | null) => void
+  onReorderNote: (dragId: number, targetId: number, pos: 'before' | 'after') => void
 }
 const NoteTreeCtx = createContext<NoteTreeCtxType | null>(null)
 
@@ -256,14 +257,28 @@ function FolderTreeRow({ node, depth }: { node: FolderNode; depth: number }) {
 function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
   const ctx = useContext(NoteTreeCtx)!
   const active = ctx.selectedId === note.id
+  const [dropPos, setDropPos] = useState<'before' | 'after' | null>(null)
+
   return (
     <div
       draggable
       onDragStart={e => { e.dataTransfer.setData('noteId', String(note.id)); e.dataTransfer.effectAllowed = 'move' }}
+      onDragOver={e => {
+        e.preventDefault(); e.stopPropagation()
+        const rect = e.currentTarget.getBoundingClientRect()
+        setDropPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+      }}
+      onDragLeave={() => setDropPos(null)}
+      onDrop={e => {
+        e.preventDefault(); e.stopPropagation()
+        const id = e.dataTransfer.getData('noteId')
+        if (id && dropPos && Number(id) !== note.id) ctx.onReorderNote(Number(id), note.id, dropPos)
+        setDropPos(null)
+      }}
       style={{ paddingLeft: depth * 14 + 4 }}
-      className={`group flex items-center gap-1.5 py-0.5 pr-1 rounded-lg cursor-pointer ${
+      className={`group flex items-center gap-1.5 py-0.5 pr-1 rounded-lg cursor-pointer relative ${
         active ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'
-      }`}
+      }${dropPos === 'before' ? ' border-t-2 border-xero-green' : dropPos === 'after' ? ' border-b-2 border-xero-green' : ''}`}
       onClick={() => ctx.onSelect(note.id)}
       onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'note', undefined, note.id) }}
     >
@@ -348,20 +363,47 @@ function NotesView() {
   const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
   const ctxMenuRef = useRef<HTMLDivElement>(null)
 
-  const tree = buildTree(notes)
-  const allFolderPaths = collectFolderPaths(tree)
+  const allFolderPaths = collectFolderPaths(buildTree(notes))
   const folders = allFolderPaths
   const selectedNote = notes.find(n => n.id === selectedId) ?? null
 
-  const { query, setQuery, sortKey, setSortKey, result: filteredNotes, sortOptions } = useSortFilter(notes, {
+  // Manual order persisted in localStorage
+  const [manualOrder, setManualOrder] = useState<number[]>(() => {
+    try { return JSON.parse(localStorage.getItem('notes:order') ?? '[]') as number[] } catch { return [] }
+  })
+
+  function reorderNote(dragId: number, targetId: number, pos: 'before' | 'after') {
+    const allIds = notes.map(n => n.id)
+    const base = [...manualOrder.filter(id => allIds.includes(id)), ...allIds.filter(id => !manualOrder.includes(id))]
+    const next = base.filter(id => id !== dragId)
+    const idx = next.indexOf(targetId)
+    next.splice(pos === 'before' ? idx : idx + 1, 0, dragId)
+    localStorage.setItem('notes:order', JSON.stringify(next))
+    setManualOrder(next)
+    setSortKey('manual')
+  }
+
+  const { query, setQuery, sortKey, setSortKey, result: hookSorted, sortOptions } = useSortFilter(notes, {
     search: (n: Note) => n.title || 'Untitled',
     defaultSort: 'updated',
     sorts: [
-      { value: 'updated', label: 'Last edited', compare: (a: Note, b: Note) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() },
-      { value: 'created', label: 'Date created', compare: (a: Note, b: Note) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime() },
-      { value: 'az', label: 'A → Z', compare: (a: Note, b: Note) => (a.title || '').localeCompare(b.title || '') },
+      { value: 'updated',  label: 'Last edited',   compare: (a: Note, b: Note) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() },
+      { value: 'created',  label: 'Date created',   compare: (a: Note, b: Note) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime() },
+      { value: 'az',       label: 'A → Z',          compare: (a: Note, b: Note) => (a.title || '').localeCompare(b.title || '') },
+      { value: 'manual',   label: 'Manual order',   compare: () => 0 },
     ],
   })
+
+  // Apply manual sort outside the hook so it reacts to manualOrder state changes
+  const filteredNotes = useMemo(() => {
+    if (sortKey !== 'manual') return hookSorted
+    const allIds = notes.map(n => n.id)
+    const base = [...manualOrder.filter(id => allIds.includes(id)), ...allIds.filter(id => !manualOrder.includes(id))]
+    return [...hookSorted].sort((a, b) => base.indexOf(a.id) - base.indexOf(b.id))
+  }, [hookSorted, sortKey, manualOrder, notes])
+
+  // Build tree from sorted notes so sort order takes effect in the sidebar
+  const tree = buildTree(query ? notes : filteredNotes)
 
   useLayoutEffect(() => {
     const el = preview ? previewRef.current : textareaRef.current
@@ -506,6 +548,7 @@ function NotesView() {
             renaming, setRenaming, addingIn, setAddingIn,
             onNewNote: handleNew, onCommitAdding: commitAdding, onCommitRename: commitRename,
             onDropNote: (noteId, folder) => moveNoteToFolder(noteId, folder),
+            onReorderNote: reorderNote,
           }}>
             {query ? (
               filteredNotes.length === 0
