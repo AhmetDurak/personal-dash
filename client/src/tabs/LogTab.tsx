@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useJournalEntry, useRecentJournal } from '../hooks/useJournal'
 import { useLanguage } from '../hooks/useLanguage'
-import { IconClose, IconChevronLeft, IconChevronRight, IconCalendarDay, IconCalendar, IconHistory, IconMenu, IconCheck } from '../lib/icons'
+import { IconClose, IconChevronLeft, IconChevronRight, IconCalendarDay, IconCalendar, IconHistory, IconMenu } from '../lib/icons'
 import type { ReactNode } from 'react'
 
 type View = 'today' | 'calendar' | 'history'

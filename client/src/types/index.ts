@@ -123,3 +123,133 @@ export interface MonthSummary {
   investmentsYTD: number
   savingsRate: number
 }
+
+// ─── Chart types ───────────────────────────────────────────────────────────────
+
+export interface BalanceSeries {
+  labels: string[]
+  balance: number[]
+  investmentsYTD: number[]
+}
+
+export interface DonutDataset {
+  labels: Category[]
+  values: number[]
+  colors: string[]
+}
+
+export interface BarDataset {
+  labels: string[]
+  income: number[]
+  expenses: number[]
+}
+
+export interface StackedDataset {
+  labels: string[]
+  categories: string[]
+  series: Record<string, number[]>
+}
+
+export interface TopPayee {
+  name: string
+  total: number
+}
+
+// ─── ETF types ─────────────────────────────────────────────────────────────────
+
+export interface ETFSnapshot {
+  ticker: string
+  name: string
+  currency: string
+  price: number
+  previousClose: number
+  change: number
+  changePct: number
+  high52w: number
+  low52w: number
+  nav: number | null
+  totalAssets: number | null
+  ter: number | null
+  yield: number | null
+  ytdReturn: number | null
+  beta: number | null
+  category: string | null
+  fundFamily: string | null
+  isin: string | null
+  inception: string | null
+  replicationMethod: string | null
+  distribution: string | null
+}
+
+export interface ETFCandle { date: string; close: number }
+
+export interface ETFHolding { name: string; weight: number }
+
+export interface ETFComposition {
+  topHoldings: ETFHolding[]
+  sectors: { name: string; weight: number }[]
+  countries: { name: string; weight: number }[]
+  bondRating: { name: string; weight: number }[]
+  equityStyle: string | null
+}
+
+export interface ETFRisk {
+  beta: number | null
+  alpha: number | null
+  stdDev: number | null
+  sharpe: number | null
+  treynor: number | null
+  r2: number | null
+  meanReturn: number | null
+}
+
+export interface ETFSearchResult {
+  ticker: string
+  name: string
+  exchange: string
+}
+
+export interface NewsItem {
+  id: string
+  title: string
+  publisher: string
+  link: string
+  publishedAt: string
+  thumbnail: string | null
+}
+
+export interface CategorizedNewsItem extends NewsItem {
+  category: 'etf' | 'metals' | 'ai' | 'politics'
+  relatedTicker?: string
+}
+
+export interface MetalPrice {
+  symbol: string
+  name: string
+  price: number
+  change: number
+  changePct: number
+  currency: string
+}
+
+export interface NewsFeed {
+  news: CategorizedNewsItem[]
+  metals: MetalPrice[]
+}
+
+// ─── PDF import types ──────────────────────────────────────────────────────────
+
+export interface ParsedTx {
+  date: string
+  name: string
+  amount: number
+  type: 'income' | 'expense'
+  category: string
+  subcategory?: string
+  dbCategory: string
+}
+
+export interface PdfPreview {
+  ready: ParsedTx[]
+  conflicts: { existing: Transaction; incoming: ParsedTx }[]
+}

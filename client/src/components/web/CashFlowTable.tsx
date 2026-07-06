@@ -21,7 +21,7 @@ export function CashFlowTable({ summary }: Props) {
         <tbody className="divide-y divide-xero-border">
           <tr className="hover:bg-gray-50 transition-colors">
             <td className="px-6 py-3 flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS.Income }} />
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS['Einkommen'] }} />
               <span className="font-medium text-gray-800">Income</span>
             </td>
             <td className="px-6 py-3 text-right font-semibold text-xero-green">{formatEur(summary.income)}</td>

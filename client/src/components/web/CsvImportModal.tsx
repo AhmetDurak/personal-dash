@@ -30,7 +30,7 @@ interface Props {
   onClose:    () => void
 }
 
-const FIELD_LABELS: { key: keyof Omit<ColumnMapping, 'separator' | 'hasHeader'>; label: string; required: boolean }[] = [
+const FIELD_LABELS: { key: keyof Omit<ColumnMapping, 'separator' | 'hasHeader' | 'dataStart'>; label: string; required: boolean }[] = [
   { key: 'dateCol',   label: 'Date',     required: true  },
   { key: 'nameCol',   label: 'Name / Payee', required: true  },
   { key: 'amountCol', label: 'Amount',   required: true  },

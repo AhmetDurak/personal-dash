@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNewsFeed } from '../hooks/useETF'
-import type { NewsItem, MetalPrice } from '../types'
+import type { CategorizedNewsItem, MetalPrice } from '../types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -68,7 +68,7 @@ function MetalStrip({ metals }: { metals: MetalPrice[] }) {
 
 // ── News card ─────────────────────────────────────────────────────────────────
 
-function NewsCard({ item }: { item: NewsItem }) {
+function NewsCard({ item }: { item: CategorizedNewsItem }) {
   const badge = CAT_BADGE[item.category]
   return (
     <a

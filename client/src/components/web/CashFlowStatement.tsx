@@ -70,7 +70,7 @@ export function CashFlowStatement({ summary, prevEndBalance = 0 }: Props) {
             </tr>
             <tr className="hover:bg-gray-50 transition-colors">
               <td className="px-4 md:px-6 py-3 flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS.Income }} />
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CAT_COLORS['Einkommen'] }} />
                 <span className="font-medium text-gray-800">Total Income</span>
               </td>
               <td className="px-3 md:px-4 py-3 text-right text-xero-green font-semibold">{formatEur(summary.income)}</td>

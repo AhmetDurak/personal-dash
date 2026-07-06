@@ -2731,6 +2731,14 @@ function VocabView() {
           </form>
         </div>
       )}
+      {confirmDeleteVocabId !== null && (
+        <ConfirmDialog
+          message={`"${vocab.find((c: VocabCard) => c.id === confirmDeleteVocabId)?.word ?? ''}" will be permanently deleted.`}
+          confirmLabel="Delete"
+          onConfirm={() => { deleteWord(confirmDeleteVocabId); setConfirmDeleteVocabId(null) }}
+          onCancel={() => setConfirmDeleteVocabId(null)}
+        />
+      )}
     </div>
   )
 }
@@ -3498,14 +3506,6 @@ function ReviewSession({
         )}
       </div>
 
-      {confirmDeleteVocabId !== null && (
-        <ConfirmDialog
-          message={`"${vocab.find(c => c.id === confirmDeleteVocabId)?.word ?? ''}" will be permanently deleted.`}
-          confirmLabel="Delete"
-          onConfirm={() => { deleteWord(confirmDeleteVocabId); setConfirmDeleteVocabId(null) }}
-          onCancel={() => setConfirmDeleteVocabId(null)}
-        />
-      )}
     </div>
   )
 }
