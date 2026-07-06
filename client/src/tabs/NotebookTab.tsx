@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode, createContext, useContext } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage,
-  IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconUpload } from '../lib/icons'
+  IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconChevronLeft, IconUpload } from '../lib/icons'
 import { useSortFilter } from '../hooks/useSortFilter'
 import { SortFilterBar } from '../components/web/SortFilterBar'
 import { marked } from 'marked'
@@ -3082,6 +3082,8 @@ function SectionShell({
 }) {
   const { pathname } = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const collapseKey = `sidebar:collapsed:${defaultRedirect}`
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(collapseKey) === '1')
 
   const isTracker  = trackerPaths.some(p => pathname.startsWith(p))
   const currentLabel = views.find(v => pathname.startsWith(v.path))?.label ?? title
@@ -3090,16 +3092,25 @@ function SectionShell({
     if (storageKey) localStorage.setItem(storageKey, pathname)
   }, [pathname, storageKey])
 
-  function NavItems() {
+  function toggleCollapsed() {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem(collapseKey, next ? '1' : '0')
+  }
+
+  function NavItems({ onNav }: { onNav?: () => void }) {
     return (
       <nav className="flex-1 py-4 overflow-y-auto">
         {views.map(v => (
           <NavLink
             key={v.path}
             to={v.path}
-            onClick={() => setSidebarOpen(false)}
+            onClick={onNav}
+            title={collapsed ? v.label : undefined}
             className={({ isActive }) =>
-              `w-full flex items-center gap-3 px-6 py-3 text-sm transition-colors text-left border-l-[3px] ${
+              `w-full flex items-center gap-3 text-sm transition-colors text-left border-l-[3px] ${
+                collapsed ? 'justify-center px-0 py-3.5' : 'px-6 py-3'
+              } ${
                 isActive
                   ? 'border-xero-green text-xero-green bg-xero-navy-light'
                   : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'
@@ -3107,7 +3118,7 @@ function SectionShell({
             }
           >
             <span className="flex-shrink-0 w-4 h-4">{v.icon}</span>
-            <span className="font-medium">{v.label}</span>
+            {!collapsed && <span className="font-medium">{v.label}</span>}
           </NavLink>
         ))}
       </nav>
@@ -3116,11 +3127,28 @@ function SectionShell({
 
   return (
     <div className="flex h-full overflow-hidden">
-      <aside className="hidden md:flex w-[220px] h-full bg-xero-navy flex-col flex-shrink-0">
-        <div className="px-6 py-5 border-b border-xero-navy-light">
-          <p className="text-white font-bold text-lg tracking-tight">{title}</p>
+      <aside
+        className={`hidden md:flex h-full bg-xero-navy flex-col flex-shrink-0 transition-[width] duration-200 ${
+          collapsed ? 'w-14' : 'w-[220px]'
+        }`}
+      >
+        <div className={`border-b border-xero-navy-light flex-shrink-0 ${collapsed ? 'py-5 flex justify-center' : 'px-6 py-5'}`}>
+          {collapsed
+            ? <span className="text-xero-green font-bold text-sm">•••</span>
+            : <p className="text-white font-bold text-lg tracking-tight">{title}</p>
+          }
         </div>
         <NavItems />
+        <button
+          onClick={toggleCollapsed}
+          className="flex items-center justify-center py-3 border-t border-xero-navy-light text-gray-500 hover:text-gray-200 transition-colors flex-shrink-0"
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed
+            ? <IconChevronRight className="w-4 h-4" strokeWidth={2} />
+            : <IconChevronLeft  className="w-4 h-4" strokeWidth={2} />
+          }
+        </button>
       </aside>
 
       {sidebarOpen && (
@@ -3130,7 +3158,7 @@ function SectionShell({
             <div className="px-6 py-5 border-b border-xero-navy-light">
               <p className="text-white font-bold text-lg tracking-tight">{title}</p>
             </div>
-            <NavItems />
+            <NavItems onNav={() => setSidebarOpen(false)} />
           </aside>
         </div>
       )}
