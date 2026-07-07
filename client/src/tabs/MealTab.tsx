@@ -1,10 +1,10 @@
-import { useState, useRef, type ReactNode } from 'react'
+import { useState, useRef, useMemo, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useFoods, useMealLogs, useShoppingList, useShoppingHistory, useReceipts, localFoodName } from '../hooks/useMeal'
 import type { Food, MealItem, MealType, Receipt } from '../hooks/useMeal'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { useLanguage } from '../hooks/useLanguage'
-import { IconCalendarDay, IconCart, IconRecipes, IconApple, IconSunrise, IconSun, IconMoon, IconCookie, IconMenu, IconEdit, IconList, IconGrid } from '../lib/icons'
+import { IconCalendarDay, IconCart, IconRecipes, IconApple, IconSunrise, IconSun, IconMoon, IconCookie, IconMenu, IconEdit, IconList, IconGrid, IconSearch, IconClose, IconTag } from '../lib/icons'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -334,18 +334,32 @@ function FoodLibrary() {
 
 // ─── Recipes ──────────────────────────────────────────────────────────────────
 
-interface Recipe { id: string; name: string; url: string; description: string }
+interface Recipe {
+  id: string
+  name: string
+  url: string
+  description: string
+  tags: string[]
+  mealType: string       // 'breakfast' | 'lunch' | 'dinner' | 'snack' | ''
+  calories: number | null
+}
+
+const MEAL_TYPE_OPTS = ['breakfast', 'lunch', 'dinner', 'snack']
+
+function normalize(r: Partial<Recipe> & { id: string }): Recipe {
+  return { tags: [], mealType: '', calories: null, url: '', description: '', ...r } as Recipe
+}
 
 function useRecipes() {
   const [recipes, setRecipes] = useState<Recipe[]>(() => {
-    try { return JSON.parse(localStorage.getItem('meal:recipes') ?? '[]') } catch { return [] }
+    try { return (JSON.parse(localStorage.getItem('meal:recipes') ?? '[]') as Recipe[]).map(normalize) } catch { return [] }
   })
   function save(next: Recipe[]) {
     setRecipes(next)
     localStorage.setItem('meal:recipes', JSON.stringify(next))
   }
-  function add(name: string, url: string, description: string) {
-    save([...recipes, { id: crypto.randomUUID(), name: name.trim(), url: url.trim(), description: description.trim() }])
+  function add(data: Omit<Recipe, 'id'>) {
+    save([...recipes, { id: crypto.randomUUID(), ...data }])
   }
   function update(id: string, fields: Partial<Omit<Recipe, 'id'>>) {
     save(recipes.map(r => r.id === id ? { ...r, ...fields } : r))
@@ -359,33 +373,85 @@ function normalizeUrl(u: string) {
   return u.startsWith('http://') || u.startsWith('https://') ? u : `https://${u}`
 }
 
+// ─── TagInput ─────────────────────────────────────────────────────────────────
+
+function TagInput({ tags, onChange, placeholder = 'Add tags… (Enter or ,)' }: {
+  tags: string[]
+  onChange: (t: string[]) => void
+  placeholder?: string
+}) {
+  const [input, setInput] = useState('')
+
+  function commit() {
+    const t = input.trim().replace(/,$/, '').toLowerCase()
+    if (t && !tags.includes(t)) onChange([...tags, t])
+    setInput('')
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center border border-gray-200 rounded-lg px-2 py-1.5 focus-within:ring-1 focus-within:ring-xero-green min-h-[38px]">
+      {tags.map(t => (
+        <span key={t} className="flex items-center gap-1 text-[11px] bg-xero-green/10 text-xero-green px-2 py-0.5 rounded-full font-medium">
+          {t}
+          <button type="button" onClick={() => onChange(tags.filter(x => x !== t))} className="text-xero-green/60 hover:text-xero-green leading-none">×</button>
+        </span>
+      ))}
+      <input
+        type="text"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); commit() }
+          if (e.key === 'Backspace' && !input && tags.length) onChange(tags.slice(0, -1))
+        }}
+        onBlur={commit}
+        placeholder={tags.length ? '' : placeholder}
+        className="flex-1 min-w-[120px] text-xs outline-none bg-transparent placeholder-gray-300"
+      />
+    </div>
+  )
+}
+
+// ─── RecipeCard ───────────────────────────────────────────────────────────────
+
 function RecipeCard({ recipe, onUpdate, onRemove, compact = false }: {
   recipe: Recipe
   onUpdate: (fields: Partial<Omit<Recipe, 'id'>>) => void
   onRemove: () => void
   compact?: boolean
 }) {
-  const [editing, setEditing]   = useState(false)
-  const [expanded, setExpanded] = useState(false)
-  const [name, setName]         = useState(recipe.name)
-  const [url, setUrl]           = useState(recipe.url)
-  const [description, setDesc]  = useState(recipe.description)
+  const [editing, setEditing]     = useState(false)
+  const [expanded, setExpanded]   = useState(false)
+  const [name, setName]           = useState(recipe.name)
+  const [url, setUrl]             = useState(recipe.url)
+  const [description, setDesc]    = useState(recipe.description)
+  const [tags, setTags]           = useState<string[]>(recipe.tags ?? [])
+  const [mealType, setMealType]   = useState(recipe.mealType ?? '')
+  const [calories, setCalories]   = useState(recipe.calories != null ? String(recipe.calories) : '')
+
   const desc = recipe.description ?? ''
   const descLong = desc.length > 120 || desc.includes('\n')
 
   function startEdit() {
     setName(recipe.name); setUrl(recipe.url); setDesc(recipe.description)
+    setTags(recipe.tags ?? []); setMealType(recipe.mealType ?? '')
+    setCalories(recipe.calories != null ? String(recipe.calories) : '')
     setEditing(true)
   }
 
   function save() {
     if (!name.trim()) return
-    onUpdate({ name: name.trim(), url: url.trim(), description: description.trim() })
+    onUpdate({
+      name: name.trim(), url: url.trim(), description: description.trim(),
+      tags, mealType, calories: calories ? Number(calories) : null,
+    })
     setEditing(false)
   }
 
   function cancel() {
     setName(recipe.name); setUrl(recipe.url); setDesc(recipe.description)
+    setTags(recipe.tags ?? []); setMealType(recipe.mealType ?? '')
+    setCalories(recipe.calories != null ? String(recipe.calories) : '')
     setEditing(false)
   }
 
@@ -409,21 +475,45 @@ function RecipeCard({ recipe, onUpdate, onRemove, compact = false }: {
           value={description}
           onChange={e => setDesc(e.target.value)}
           placeholder="Description, ingredients, steps… (optional)"
-          rows={5}
+          rows={4}
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green resize-y"
         />
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Tags</p>
+            <TagInput tags={tags} onChange={setTags} />
+          </div>
+          <div className="w-32">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Meal type</p>
+            <select
+              value={mealType}
+              onChange={e => setMealType(e.target.value)}
+              className="w-full text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green capitalize"
+            >
+              <option value="">—</option>
+              {MEAL_TYPE_OPTS.map(m => <option key={m} value={m} className="capitalize">{m}</option>)}
+            </select>
+          </div>
+          <div className="w-24">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">kcal</p>
+            <input
+              type="number"
+              min={0}
+              value={calories}
+              onChange={e => setCalories(e.target.value)}
+              placeholder="—"
+              className="w-full text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+            />
+          </div>
+        </div>
         <div className="flex gap-2 pt-1">
-          <button
-            onClick={save}
-            disabled={!name.trim()}
+          <button onClick={save} disabled={!name.trim()}
             className="text-sm bg-xero-green text-white px-4 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors disabled:opacity-40"
           >Save</button>
-          <button
-            onClick={cancel}
+          <button onClick={cancel}
             className="text-sm text-gray-400 hover:text-gray-600 px-3 py-1.5 transition-colors"
           >Cancel</button>
-          <button
-            onClick={onRemove}
+          <button onClick={onRemove}
             className="ml-auto text-sm text-red-400 hover:text-red-500 px-3 py-1.5 transition-colors"
           >Delete</button>
         </div>
@@ -436,16 +526,25 @@ function RecipeCard({ recipe, onUpdate, onRemove, compact = false }: {
       <div className="flex items-start gap-2 flex-1 min-w-0">
         <div className="flex-1 min-w-0">
           {recipe.url ? (
-            <a
-              href={normalizeUrl(recipe.url)}
-              target="_blank"
-              rel="noopener noreferrer"
+            <a href={normalizeUrl(recipe.url)} target="_blank" rel="noopener noreferrer"
               className="text-sm font-semibold text-xero-green hover:underline break-words leading-snug"
-            >
-              {recipe.name}
-            </a>
+            >{recipe.name}</a>
           ) : (
             <p className="text-sm font-semibold text-gray-800 leading-snug">{recipe.name}</p>
+          )}
+          {/* Badges row */}
+          {(recipe.mealType || recipe.calories != null || (recipe.tags?.length ?? 0) > 0) && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {recipe.mealType && (
+                <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full capitalize">{recipe.mealType}</span>
+              )}
+              {recipe.calories != null && (
+                <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded-full">{recipe.calories} kcal</span>
+              )}
+              {recipe.tags?.map(t => (
+                <span key={t} className="text-[10px] px-1.5 py-0.5 bg-xero-green/10 text-xero-green rounded-full">{t}</span>
+              ))}
+            </div>
           )}
           {!compact && recipe.url && (
             <p className="text-[11px] text-gray-400 truncate mt-0.5">{recipe.url}</p>
@@ -456,18 +555,14 @@ function RecipeCard({ recipe, onUpdate, onRemove, compact = false }: {
                 {recipe.description}
               </p>
               {descLong && (
-                <button
-                  onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
+                <button onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
                   className="text-xs text-gray-400 hover:text-gray-600 mt-0.5 transition-colors"
-                >
-                  {expanded ? 'Show less' : 'Show more'}
-                </button>
+                >{expanded ? 'Show less' : 'Show more'}</button>
               )}
             </div>
           )}
         </div>
-        <button
-          onClick={startEdit}
+        <button onClick={startEdit}
           className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 transition-all p-1"
           title="Edit"
         >
@@ -478,86 +573,200 @@ function RecipeCard({ recipe, onUpdate, onRemove, compact = false }: {
   )
 }
 
+// ─── RecipesView ──────────────────────────────────────────────────────────────
+
 function RecipesView() {
   const { recipes, add, update, remove } = useRecipes()
-  const [name, setName]         = useState('')
-  const [url, setUrl]           = useState('')
-  const [description, setDesc]  = useState('')
-  const [showForm, setShowForm] = useState(false)
+
+  // Add form state
+  const [showForm, setShowForm]   = useState(false)
+  const [fName, setFName]         = useState('')
+  const [fUrl, setFUrl]           = useState('')
+  const [fDesc, setFDesc]         = useState('')
+  const [fTags, setFTags]         = useState<string[]>([])
+  const [fMealType, setFMealType] = useState('')
+  const [fCalories, setFCalories] = useState('')
+
+  // View mode
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(() =>
     (localStorage.getItem('meal:recipesView') as 'list' | 'grid') ?? 'list'
   )
-
   function setView(v: 'list' | 'grid') { setViewMode(v); localStorage.setItem('meal:recipesView', v) }
+
+  // Search & filter state
+  const [search, setSearch]           = useState('')
+  const [activeTags, setActiveTags]   = useState<string[]>([])
+  const [mealTypeFilter, setMTFilter] = useState('')
+  const [calMin, setCalMin]           = useState('')
+  const [calMax, setCalMax]           = useState('')
+
+  // Derived: all tags across recipes
+  const allTags = useMemo(() => {
+    const s = new Set<string>()
+    recipes.forEach(r => (r.tags ?? []).forEach(t => s.add(t)))
+    return [...s].sort()
+  }, [recipes])
+
+  // Filtered recipes
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const min = calMin ? Number(calMin) : null
+    const max = calMax ? Number(calMax) : null
+    return recipes.filter(r => {
+      if (q && !r.name.toLowerCase().includes(q) && !(r.description ?? '').toLowerCase().includes(q)) return false
+      if (activeTags.length && !activeTags.every(t => (r.tags ?? []).includes(t))) return false
+      if (mealTypeFilter && r.mealType !== mealTypeFilter) return false
+      if (min !== null && r.calories != null && r.calories < min) return false
+      if (max !== null && r.calories != null && r.calories > max) return false
+      return true
+    })
+  }, [recipes, search, activeTags, mealTypeFilter, calMin, calMax])
+
+  function toggleTag(t: string) {
+    setActiveTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  }
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim()) return
-    add(name, url, description)
-    setName(''); setUrl(''); setDesc(''); setShowForm(false)
+    if (!fName.trim()) return
+    add({ name: fName.trim(), url: fUrl.trim(), description: fDesc.trim(), tags: fTags, mealType: fMealType, calories: fCalories ? Number(fCalories) : null })
+    setFName(''); setFUrl(''); setFDesc(''); setFTags([]); setFMealType(''); setFCalories('')
+    setShowForm(false)
   }
+
+  const hasFilters = search || activeTags.length || mealTypeFilter || calMin || calMax
 
   return (
     <div className="p-4 md:p-6 space-y-3 max-w-4xl mx-auto">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2">
+
+      {/* Row 1: Add + Search + View toggle */}
+      <div className="flex items-center gap-2 flex-wrap">
         {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
-          >
-            + Add Recipe
-          </button>
+          <button onClick={() => setShowForm(true)}
+            className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors flex-shrink-0"
+          >+ Add Recipe</button>
         )}
-        <div className="ml-auto flex rounded-lg overflow-hidden border border-gray-200">
-          <button
-            onClick={() => setView('list')}
+        <div className="relative flex-1 min-w-[160px]">
+          <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" strokeWidth={2} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or ingredient…"
+            className="w-full text-sm border border-gray-200 rounded-lg pl-8 pr-7 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
+            </button>
+          )}
+        </div>
+        <div className="flex rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
+          <button onClick={() => setView('list')} title="List view"
             className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600'}`}
-            title="List view"
-          >
-            <IconList className="w-3.5 h-3.5" strokeWidth={2} />
-          </button>
-          <button
-            onClick={() => setView('grid')}
+          ><IconList className="w-3.5 h-3.5" strokeWidth={2} /></button>
+          <button onClick={() => setView('grid')} title="Grid view"
             className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600'}`}
-            title="Grid view"
-          >
-            <IconGrid className="w-3.5 h-3.5" strokeWidth={2} />
-          </button>
+          ><IconGrid className="w-3.5 h-3.5" strokeWidth={2} /></button>
         </div>
       </div>
 
+      {/* Row 2: Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Meal type */}
+        <select
+          value={mealTypeFilter}
+          onChange={e => setMTFilter(e.target.value)}
+          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-xero-green text-gray-600 capitalize"
+        >
+          <option value="">All meal types</option>
+          {MEAL_TYPE_OPTS.map(m => <option key={m} value={m} className="capitalize">{m}</option>)}
+        </select>
+
+        {/* Calorie range */}
+        <div className="flex items-center gap-1">
+          <input
+            type="number" min={0} value={calMin} onChange={e => setCalMin(e.target.value)}
+            placeholder="Min kcal"
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 w-20 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          <span className="text-gray-300 text-xs">—</span>
+          <input
+            type="number" min={0} value={calMax} onChange={e => setCalMax(e.target.value)}
+            placeholder="Max kcal"
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 w-20 focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+        </div>
+
+        {/* Tag pills */}
+        {allTags.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <IconTag className="w-3 h-3 text-gray-300 flex-shrink-0" strokeWidth={2} />
+            {allTags.map(t => (
+              <button
+                key={t}
+                onClick={() => toggleTag(t)}
+                className={`text-[11px] px-2 py-0.5 rounded-full font-medium transition-colors ${
+                  activeTags.includes(t)
+                    ? 'bg-xero-green text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >{t}</button>
+            ))}
+          </div>
+        )}
+
+        {/* Clear filters */}
+        {hasFilters && (
+          <button
+            onClick={() => { setSearch(''); setActiveTags([]); setMTFilter(''); setCalMin(''); setCalMax('') }}
+            className="text-xs text-gray-400 hover:text-red-400 transition-colors ml-auto"
+          >Clear filters</button>
+        )}
+      </div>
+
+      {/* Add form */}
       {showForm && (
         <form onSubmit={handleAdd} className="bg-white rounded-xl border border-gray-200 px-4 py-4 space-y-2.5 shadow-sm">
-          <input
-            autoFocus
-            value={name}
-            onChange={e => setName(e.target.value)}
+          <input autoFocus value={fName} onChange={e => setFName(e.target.value)}
             placeholder="Recipe name…"
             className="w-full text-sm font-semibold border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
           />
-          <input
-            value={url}
-            onChange={e => setUrl(e.target.value)}
+          <input value={fUrl} onChange={e => setFUrl(e.target.value)}
             placeholder="Link (optional)…"
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
           />
-          <textarea
-            value={description}
-            onChange={e => setDesc(e.target.value)}
+          <textarea value={fDesc} onChange={e => setFDesc(e.target.value)}
             placeholder="Description, ingredients, steps… (optional)"
-            rows={5}
+            rows={4}
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green resize-y"
           />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Tags</p>
+              <TagInput tags={fTags} onChange={setFTags} />
+            </div>
+            <div className="w-32">
+              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Meal type</p>
+              <select value={fMealType} onChange={e => setFMealType(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green capitalize"
+              >
+                <option value="">—</option>
+                {MEAL_TYPE_OPTS.map(m => <option key={m} value={m} className="capitalize">{m}</option>)}
+              </select>
+            </div>
+            <div className="w-24">
+              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">kcal</p>
+              <input type="number" min={0} value={fCalories} onChange={e => setFCalories(e.target.value)}
+                placeholder="—"
+                className="w-full text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
+              />
+            </div>
+          </div>
           <div className="flex gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={!name.trim()}
+            <button type="submit" disabled={!fName.trim()}
               className="text-sm bg-xero-green text-white px-4 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors disabled:opacity-40"
             >Add</button>
-            <button
-              type="button"
-              onClick={() => { setShowForm(false); setName(''); setUrl(''); setDesc('') }}
+            <button type="button" onClick={() => { setShowForm(false); setFName(''); setFUrl(''); setFDesc(''); setFTags([]); setFMealType(''); setFCalories('') }}
               className="text-sm text-gray-400 hover:text-gray-600 px-3 py-1.5 transition-colors"
             >Cancel</button>
           </div>
@@ -568,8 +777,12 @@ function RecipesView() {
         <p className="text-sm text-gray-400 text-center py-12">No recipes yet. Add your first one!</p>
       )}
 
+      {recipes.length > 0 && filtered.length === 0 && (
+        <p className="text-sm text-gray-400 text-center py-12">No recipes match your filters.</p>
+      )}
+
       <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 gap-3' : 'space-y-2'}>
-        {recipes.map(r => (
+        {filtered.map(r => (
           <RecipeCard
             key={r.id}
             recipe={r}
