@@ -55,6 +55,7 @@ export interface VocabCard {
   ease_factor: string
   due_at: string
   created_at: string
+  folder: string | null
 }
 
 export interface Reminder {
@@ -91,6 +92,7 @@ export interface LanguageSentence {
   due_at:        string   // ISO date YYYY-MM-DD
   memory_palace: string | null
   image_url:     string | null
+  folder:        string | null
   created_at:    string
   updated_at:    string
 }
@@ -108,6 +110,7 @@ export interface LanguageScenario {
   ease_factor:   number
   due_at:        string
   memory_palace: string | null
+  folder:        string | null
   created_at:    string
   updated_at:    string
 }
@@ -274,7 +277,30 @@ export function useVocabulary() {
     await mutate()
   }
 
-  return { vocab: data ?? [], isLoading, addWord, deleteWord, review, bulkImport, updateWord, bulkMove }
+  async function moveVocabToFolder(id: number, folder: string | null) {
+    await fetch(`/api/notebook/vocabulary/${id}/folder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    })
+    await mutate()
+  }
+
+  async function renameVocabFolder(oldPath: string, newPath: string) {
+    await fetch('/api/notebook/vocabulary/folder-rename', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPath, newPath }),
+    })
+    await mutate()
+  }
+
+  async function deleteVocabFolder(path: string) {
+    await fetch(`/api/notebook/vocabulary/folder?path=${encodeURIComponent(path)}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { vocab: data ?? [], isLoading, addWord, deleteWord, review, bulkImport, updateWord, bulkMove, moveVocabToFolder, renameVocabFolder, deleteVocabFolder }
 }
 
 // ─── All Reminders (notebook view — includes done) ────────────────────────────
@@ -356,7 +382,30 @@ export function useLanguageSentences() {
     return inserted
   }
 
-  return { sentences: data ?? [], isLoading, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences }
+  async function moveSentenceToFolder(id: number, folder: string | null) {
+    await fetch(`/api/notebook/language/sentences/${id}/folder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    })
+    await mutate()
+  }
+
+  async function renameSentenceFolder(oldPath: string, newPath: string) {
+    await fetch('/api/notebook/language/sentences/folder-rename', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPath, newPath }),
+    })
+    await mutate()
+  }
+
+  async function deleteSentenceFolder(path: string) {
+    await fetch(`/api/notebook/language/sentences/folder?path=${encodeURIComponent(path)}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { sentences: data ?? [], isLoading, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences, moveSentenceToFolder, renameSentenceFolder, deleteSentenceFolder }
 }
 
 // ─── Language Scenarios ───────────────────────────────────────────────────────
@@ -411,5 +460,28 @@ export function useLanguageScenarios() {
     return inserted
   }
 
-  return { scenarios: data ?? [], isLoading, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios }
+  async function moveScenarioToFolder(id: number, folder: string | null) {
+    await fetch(`/api/notebook/language/scenarios/${id}/folder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    })
+    await mutate()
+  }
+
+  async function renameScenarioFolder(oldPath: string, newPath: string) {
+    await fetch('/api/notebook/language/scenarios/folder-rename', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPath, newPath }),
+    })
+    await mutate()
+  }
+
+  async function deleteScenarioFolder(path: string) {
+    await fetch(`/api/notebook/language/scenarios/folder?path=${encodeURIComponent(path)}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { scenarios: data ?? [], isLoading, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios, moveScenarioToFolder, renameScenarioFolder, deleteScenarioFolder }
 }

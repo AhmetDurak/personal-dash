@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode, 
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage,
   IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconChevronLeft, IconUpload } from '../lib/icons'
+import { buildFolderTree, collectFolderPaths, getItemsInFolder, type FolderNode } from '../lib/folderTree'
+import { FolderSidebar, NewFolderRow } from '../components/web/FolderSidebar'
 import { useSortFilter } from '../hooks/useSortFilter'
 import { SortFilterBar } from '../components/web/SortFilterBar'
 import { marked } from 'marked'
@@ -140,30 +142,6 @@ function SwipeToDelete({ onDelete, children, resetKey, contentBg = '' }: { onDel
 
 const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
-interface FolderNode { path: string; name: string; children: FolderNode[]; notes: Note[] }
-
-function buildTree(allNotes: Note[]): FolderNode {
-  const root: FolderNode = { path: '', name: '', children: [], notes: [] }
-  for (const note of allNotes) {
-    if (!note.folder) { root.notes.push(note); continue }
-    const parts = note.folder.split('/')
-    let cur = root, curPath = ''
-    for (const part of parts) {
-      curPath = curPath ? `${curPath}/${part}` : part
-      let child = cur.children.find(c => c.path === curPath)
-      if (!child) { child = { path: curPath, name: part, children: [], notes: [] }; cur.children.push(child) }
-      cur = child
-    }
-    cur.notes.push(note)
-  }
-  return root
-}
-
-function collectFolderPaths(node: FolderNode, result: string[] = []): string[] {
-  for (const c of node.children) { result.push(c.path); collectFolderPaths(c, result) }
-  return result
-}
-
 interface NoteTreeCtxType {
   selectedId: number | null
   onSelect: (id: number) => void
@@ -182,7 +160,7 @@ interface NoteTreeCtxType {
 }
 const NoteTreeCtx = createContext<NoteTreeCtxType | null>(null)
 
-function FolderTreeRow({ node, depth }: { node: FolderNode; depth: number }) {
+function FolderTreeRow({ node, depth }: { node: FolderNode<Note>; depth: number }) {
   const ctx = useContext(NoteTreeCtx)!
   const isOpen = ctx.expanded.has(node.path)
   const isRenaming = ctx.renaming?.path === node.path
@@ -249,7 +227,7 @@ function FolderTreeRow({ node, depth }: { node: FolderNode; depth: number }) {
             </div>
           )}
           {node.children.map(c => <FolderTreeRow key={c.path} node={c} depth={depth + 1} />)}
-          {node.notes.map(n => <NoteTreeRow key={n.id} note={n} depth={depth + 1} />)}
+          {node.items.map(n => <NoteTreeRow key={n.id} note={n} depth={depth + 1} />)}
         </>
       )}
     </>
@@ -367,7 +345,7 @@ function NotesView() {
   const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
   const ctxMenuRef = useRef<HTMLDivElement>(null)
 
-  const allFolderPaths = collectFolderPaths(buildTree(notes))
+  const allFolderPaths = collectFolderPaths(buildFolderTree(notes))
   const folders = allFolderPaths
   const selectedNote = notes.find(n => n.id === selectedId) ?? null
 
@@ -407,7 +385,7 @@ function NotesView() {
   }, [hookSorted, sortKey, manualOrder, notes])
 
   // Build tree from sorted notes so sort order takes effect in the sidebar
-  const tree = buildTree(query ? notes : filteredNotes)
+  const tree = buildFolderTree(query ? notes : filteredNotes)
 
   useLayoutEffect(() => {
     const el = preview ? previewRef.current : textareaRef.current
@@ -580,7 +558,7 @@ function NotesView() {
                   </div>
                 )}
                 {tree.children.map(n => <FolderTreeRow key={n.path} node={n} depth={0} />)}
-                {tree.notes.map(n => <NoteTreeRow key={n.id} note={n} depth={0} />)}
+                {tree.items.map(n => <NoteTreeRow key={n.id} note={n} depth={0} />)}
               </>
             )}
           </NoteTreeCtx.Provider>
@@ -1980,9 +1958,13 @@ async function fetchDeConj(word: string): Promise<DeConjugation | null> {
 
 function VocabView() {
   const { t } = useLanguage()
-  const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord, bulkMove } = useVocabulary()
+  const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord, moveVocabToFolder, renameVocabFolder, deleteVocabFolder } = useVocabulary()
   const [confirmDeleteVocabId, setConfirmDeleteVocabId] = useState<number | null>(null)
-  const [langFilter, setLangFilter] = useState<string | null>(() => localStorage.getItem('vocab:langFilter') ?? null)
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [extraFolders, setExtraFolders] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('vocab:extraFolders') ?? '[]') as string[] } catch { return [] }
+  })
+  const [newFolderParent, setNewFolderParent] = useState<string | null>(null)
   const [reviewMode, setReviewMode] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [reviewIdx, setReviewIdx] = useState(0)
@@ -2021,6 +2003,7 @@ function VocabView() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [movePicking, setMovePicking] = useState(false)
   const [vocabSearch, setVocabSearch] = useState('')
+  const vocabTree = useMemo(() => buildFolderTree(vocab, extraFolders), [vocab, extraFolders])
 
   useEffect(() => {
     if (!csvTooltipOpen) return
@@ -2051,8 +2034,7 @@ function VocabView() {
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const dueCards = vocab.filter(v => new Date(v.due_at) <= today)
-  const folders = [...new Set(vocab.map(v => v.language))].sort()
-  const base = langFilter ? vocab.filter(v => v.language === langFilter) : vocab
+  const base = getItemsInFolder(vocabTree, selectedFolder)
   const q = vocabSearch.trim().toLowerCase()
   const filtered = [...base].filter(v => !q || [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))).sort((a, b) => {
     switch (sortBy) {
@@ -2147,13 +2129,7 @@ function VocabView() {
     })
   }
 
-  async function handleBulkMove(lang: string) {
-    if (!selectedIds.size) return
-    await bulkMove([...selectedIds], lang)
-    setSelectedIds(new Set())
-    setMovePicking(false)
-    setSelectMode(false)
-  }
+
 
   if (reviewMode) {
     return (
@@ -2256,8 +2232,71 @@ function VocabView() {
     )
   }
 
+  function handleNewFolder(parentPath: string) {
+    setNewFolderParent(parentPath)
+  }
+
+  function commitNewFolder(name: string, parentPath: string) {
+    const path = parentPath ? `${parentPath}/${name}` : name
+    const next = [...extraFolders, path]
+    setExtraFolders(next)
+    localStorage.setItem('vocab:extraFolders', JSON.stringify(next))
+    setNewFolderParent(null)
+    setSelectedFolder(path)
+  }
+
+  async function handleMoveToFolder(folderPath: string | null) {
+    for (const id of selectedIds) {
+      await moveVocabToFolder(id, folderPath)
+    }
+    setMovePicking(false)
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  async function handleRenameVocabFolder(oldPath: string, newPath: string) {
+    const updated = extraFolders.map(p => p === oldPath ? newPath : p.startsWith(oldPath + '/') ? newPath + p.slice(oldPath.length) : p)
+    setExtraFolders(updated)
+    localStorage.setItem('vocab:extraFolders', JSON.stringify(updated))
+    if (selectedFolder === oldPath || selectedFolder?.startsWith(oldPath + '/')) setSelectedFolder(null)
+    await renameVocabFolder(oldPath, newPath)
+  }
+
+  async function handleDeleteVocabFolder(path: string) {
+    const updated = extraFolders.filter(p => p !== path && !p.startsWith(path + '/'))
+    setExtraFolders(updated)
+    localStorage.setItem('vocab:extraFolders', JSON.stringify(updated))
+    if (selectedFolder === path || selectedFolder?.startsWith(path + '/')) setSelectedFolder(null)
+    await deleteVocabFolder(path)
+  }
+
+  const folderPaths = collectFolderPaths(vocabTree)
+
   return (
-    <div className={`p-6 overflow-y-auto h-full ${selectMode ? 'pb-24' : ''}`}>
+    <div className="flex h-full overflow-hidden">
+      {/* Folder sidebar */}
+      <div className="flex flex-col">
+        <FolderSidebar
+          tree={vocabTree}
+          selectedFolder={selectedFolder}
+          onSelect={setSelectedFolder}
+          onNewFolder={handleNewFolder}
+          onRenameFolder={handleRenameVocabFolder}
+          onDeleteFolder={handleDeleteVocabFolder}
+          totalCount={vocab.length}
+          allLabel="All Words"
+        />
+        {newFolderParent !== null && (
+          <NewFolderRow
+            parentPath={newFolderParent}
+            onCommit={commitNewFolder}
+            onCancel={() => setNewFolderParent(null)}
+          />
+        )}
+      </div>
+
+      {/* Main content */}
+      <div className={`flex-1 overflow-y-auto p-6 ${selectMode ? 'pb-24' : ''}`}>
       {/* Header: row 1 — stats + actions */}
       <div className="mb-5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2357,24 +2396,6 @@ function VocabView() {
           </div>
         </div>
 
-        {/* Folder strip */}
-        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-          <button
-            onClick={() => { setLangFilter(null); localStorage.removeItem('vocab:langFilter') }}
-            className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${!langFilter ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-          >
-            🌐 All <span className="opacity-60">({vocab.length})</span>
-          </button>
-          {folders.map(lang => (
-            <button
-              key={lang}
-              onClick={() => { const next = langFilter === lang ? null : lang; setLangFilter(next); next ? localStorage.setItem('vocab:langFilter', next) : localStorage.removeItem('vocab:langFilter') }}
-              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${langFilter === lang ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-            >
-              {LANG_LABELS[lang] ?? lang} <span className="opacity-60">({vocab.filter(v => v.language === lang).length})</span>
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Add form */}
@@ -2581,14 +2602,20 @@ function VocabView() {
             onClick={e => e.stopPropagation()}
           >
             <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">Move to folder</p>
-            <div className="grid grid-cols-2 gap-2">
-              {LANGS.map(lang => (
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              <button
+                onClick={() => handleMoveToFolder(null)}
+                className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-slate-300 w-full"
+              >
+                No folder (unsorted)
+              </button>
+              {folderPaths.map(fp => (
                 <button
-                  key={lang}
-                  onClick={() => handleBulkMove(lang)}
-                  className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-slate-300"
+                  key={fp}
+                  onClick={() => handleMoveToFolder(fp)}
+                  className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-slate-300 w-full"
                 >
-                  {LANG_LABELS[lang]}
+                  {fp}
                 </button>
               ))}
             </div>
@@ -2790,6 +2817,7 @@ function VocabView() {
           onCancel={() => setConfirmDeleteVocabId(null)}
         />
       )}
+      </div>
     </div>
   )
 }
@@ -3594,7 +3622,7 @@ function ReviewSession({
 function SentenceView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { sentences, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences } = useLanguageSentences()
+  const { sentences, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences, renameSentenceFolder, deleteSentenceFolder } = useLanguageSentences()
   const { vocab } = useVocabulary()
   const [editingId, setEditingId]   = useState<number | 'new' | null>(null)
   const [draft, setDraft]           = useState<Partial<LanguageSentence>>({})
@@ -3641,11 +3669,37 @@ function SentenceView() {
     e.target.value = ''
   }
 
-  const [langFilter, setLangFilter] = useState<string | null>(() => localStorage.getItem('sent:langFilter') ?? null)
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [extraFolders, setExtraFolders] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('sent:extraFolders') ?? '[]') as string[] } catch { return [] }
+  })
+  const [newFolderParent, setNewFolderParent] = useState<string | null>(null)
+  const [singleReviewItem, setSingleReviewItem] = useState<LanguageSentence | null>(null)
 
-  const langs = [...new Set(sentences.map(s => s.source_lang))].sort()
-  const filtered = langFilter ? sentences.filter(s => s.source_lang === langFilter) : sentences
+  const sentTree = useMemo(() => buildFolderTree(sentences, extraFolders), [sentences, extraFolders])
+  const filtered = getItemsInFolder(sentTree, selectedFolder)
   const dueItems = filtered.filter(s => isDueSR(s.due_at))
+
+  function commitSentFolder(name: string, parentPath: string) {
+    const path = parentPath ? `${parentPath}/${name}` : name
+    const next = [...extraFolders, path]
+    setExtraFolders(next); localStorage.setItem('sent:extraFolders', JSON.stringify(next))
+    setNewFolderParent(null); setSelectedFolder(path)
+  }
+
+  async function handleRenameSentFolder(oldPath: string, newPath: string) {
+    const updated = extraFolders.map(p => p === oldPath ? newPath : p.startsWith(oldPath + '/') ? newPath + p.slice(oldPath.length) : p)
+    setExtraFolders(updated); localStorage.setItem('sent:extraFolders', JSON.stringify(updated))
+    if (selectedFolder === oldPath || selectedFolder?.startsWith(oldPath + '/')) setSelectedFolder(null)
+    await renameSentenceFolder(oldPath, newPath)
+  }
+
+  async function handleDeleteSentFolder(path: string) {
+    const updated = extraFolders.filter(p => p !== path && !p.startsWith(path + '/'))
+    setExtraFolders(updated); localStorage.setItem('sent:extraFolders', JSON.stringify(updated))
+    if (selectedFolder === path || selectedFolder?.startsWith(path + '/')) setSelectedFolder(null)
+    await deleteSentenceFolder(path)
+  }
 
   function openNew() {
     setDraft({ source_text: '', translation: null, source_lang: 'de', target_lang: 'tr', word_links: [], memory_palace: null })
@@ -3784,6 +3838,17 @@ function SentenceView() {
     )
   }
 
+  if (singleReviewItem) {
+    return (
+      <ReviewSession
+        items={[{ id: singleReviewItem.id, front: singleReviewItem.source_text, back: singleReviewItem.translation, palace: singleReviewItem.memory_palace }]}
+        onRate={async (id, q) => { await reviewSentence(id, q) }}
+        onDone={() => setSingleReviewItem(null)}
+        allowTyping
+      />
+    )
+  }
+
   if (reviewMode) {
     return (
       <ReviewSession
@@ -3796,7 +3861,29 @@ function SentenceView() {
   }
 
   return (
-    <div className="p-4 space-y-3 max-w-2xl mx-auto">
+    <div className="flex h-full overflow-hidden">
+      {/* Folder sidebar */}
+      <div className="flex flex-col">
+        <FolderSidebar
+          tree={sentTree}
+          selectedFolder={selectedFolder}
+          onSelect={setSelectedFolder}
+          onNewFolder={p => setNewFolderParent(p)}
+          onRenameFolder={handleRenameSentFolder}
+          onDeleteFolder={handleDeleteSentFolder}
+          totalCount={sentences.length}
+          allLabel="All Sentences"
+        />
+        {newFolderParent !== null && (
+          <NewFolderRow
+            parentPath={newFolderParent}
+            onCommit={commitSentFolder}
+            onCancel={() => setNewFolderParent(null)}
+          />
+        )}
+      </div>
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
       {/* Autocomplete list for memory palace suggestions */}
       <datalist id="palace-suggestions">
         {PALACE_SUGGESTIONS.map(p => <option key={p} value={p} />)}
@@ -3850,25 +3937,10 @@ function SentenceView() {
           </div>
           <input ref={sentCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleSentCsvImport} />
           <span className="text-xs text-gray-400 dark:text-slate-500">
-            {filtered.length}{langFilter ? `/${sentences.length}` : ''} sentences
+            {filtered.length} sentences
           </span>
         </div>
       </div>
-
-      {langs.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-          <button
-            onClick={() => { setLangFilter(null); localStorage.removeItem('sent:langFilter') }}
-            className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${!langFilter ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-          >🌐 All <span className="opacity-60">({sentences.length})</span></button>
-          {langs.map(lang => (
-            <button key={lang}
-              onClick={() => { const next = langFilter === lang ? null : lang; setLangFilter(next); next ? localStorage.setItem('sent:langFilter', next) : localStorage.removeItem('sent:langFilter') }}
-              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${langFilter === lang ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-            >{LANG_LABELS[lang] ?? lang} <span className="opacity-60">({sentences.filter(s => s.source_lang === lang).length})</span></button>
-          ))}
-        </div>
-      )}
 
       {editingId === 'new' && (
         <div className={cardCls}>
@@ -3930,6 +4002,7 @@ function SentenceView() {
                   </div>
                   {!selectMode && (
                     <div className="flex gap-2">
+                      <button onClick={() => setSingleReviewItem(s)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
                       <button onClick={() => openEdit(s)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">{t.edit}</button>
                       <button onClick={() => setConfirmDeleteId(s.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
                     </div>
@@ -3973,6 +4046,7 @@ function SentenceView() {
           onCancel={() => setConfirmBulkDelete(false)}
         />
       )}
+      </div>
     </div>
   )
 }
@@ -3982,7 +4056,7 @@ function SentenceView() {
 function ScenarioView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { scenarios, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios } = useLanguageScenarios()
+  const { scenarios, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios, renameScenarioFolder, deleteScenarioFolder } = useLanguageScenarios()
   const { vocab } = useVocabulary()
   const [activeId, setActiveId]         = useState<number | null>(null)
   const [draft, setDraft]               = useState<Partial<LanguageScenario>>({})
@@ -4030,12 +4104,38 @@ function ScenarioView() {
     e.target.value = ''
   }
 
-  const [langFilter, setLangFilter] = useState<string | null>(() => localStorage.getItem('scen:langFilter') ?? null)
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [extraFolders, setExtraFolders] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('scen:extraFolders') ?? '[]') as string[] } catch { return [] }
+  })
+  const [newFolderParent, setNewFolderParent] = useState<string | null>(null)
+  const [singleReviewItem, setSingleReviewItem] = useState<LanguageScenario | null>(null)
 
-  const langs = [...new Set(scenarios.map(s => s.source_lang))].sort()
-  const filteredScenarios = langFilter ? scenarios.filter(s => s.source_lang === langFilter) : scenarios
+  const scenTree = useMemo(() => buildFolderTree(scenarios, extraFolders), [scenarios, extraFolders])
+  const filteredScenarios = getItemsInFolder(scenTree, selectedFolder)
   const active   = scenarios.find(s => s.id === activeId) ?? null
   const dueItems = filteredScenarios.filter(s => isDueSR(s.due_at))
+
+  function commitScenFolder(name: string, parentPath: string) {
+    const path = parentPath ? `${parentPath}/${name}` : name
+    const next = [...extraFolders, path]
+    setExtraFolders(next); localStorage.setItem('scen:extraFolders', JSON.stringify(next))
+    setNewFolderParent(null); setSelectedFolder(path)
+  }
+
+  async function handleRenameScenFolder(oldPath: string, newPath: string) {
+    const updated = extraFolders.map(p => p === oldPath ? newPath : p.startsWith(oldPath + '/') ? newPath + p.slice(oldPath.length) : p)
+    setExtraFolders(updated); localStorage.setItem('scen:extraFolders', JSON.stringify(updated))
+    if (selectedFolder === oldPath || selectedFolder?.startsWith(oldPath + '/')) setSelectedFolder(null)
+    await renameScenarioFolder(oldPath, newPath)
+  }
+
+  async function handleDeleteScenFolder(path: string) {
+    const updated = extraFolders.filter(p => p !== path && !p.startsWith(path + '/'))
+    setExtraFolders(updated); localStorage.setItem('scen:extraFolders', JSON.stringify(updated))
+    if (selectedFolder === path || selectedFolder?.startsWith(path + '/')) setSelectedFolder(null)
+    await deleteScenarioFolder(path)
+  }
 
   async function handleNew() {
     const s = await createScenario()
@@ -4090,6 +4190,16 @@ function ScenarioView() {
   }
 
   // ── Review mode ──────────────────────────────────────────────────────────────
+  if (singleReviewItem) {
+    return (
+      <ReviewSession
+        items={[{ id: singleReviewItem.id, front: singleReviewItem.title, back: singleReviewItem.content || null, palace: singleReviewItem.memory_palace }]}
+        onRate={async (id, q) => { await reviewScenario(id, q) }}
+        onDone={() => setSingleReviewItem(null)}
+      />
+    )
+  }
+
   if (reviewMode) {
     return (
       <ReviewSession
@@ -4193,7 +4303,29 @@ function ScenarioView() {
 
   // ── List view ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-4 space-y-3 max-w-2xl mx-auto">
+    <div className="flex h-full overflow-hidden">
+      {/* Folder sidebar */}
+      <div className="flex flex-col">
+        <FolderSidebar
+          tree={scenTree}
+          selectedFolder={selectedFolder}
+          onSelect={setSelectedFolder}
+          onNewFolder={p => setNewFolderParent(p)}
+          onRenameFolder={handleRenameScenFolder}
+          onDeleteFolder={handleDeleteScenFolder}
+          totalCount={scenarios.length}
+          allLabel="All Scenarios"
+        />
+        {newFolderParent !== null && (
+          <NewFolderRow
+            parentPath={newFolderParent}
+            onCommit={commitScenFolder}
+            onCancel={() => setNewFolderParent(null)}
+          />
+        )}
+      </div>
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
       {/* Autocomplete shared with SentenceView */}
       <datalist id="palace-suggestions">
         {PALACE_SUGGESTIONS.map(p => <option key={p} value={p} />)}
@@ -4244,25 +4376,10 @@ function ScenarioView() {
           </div>
           <input ref={scenCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleScenCsvImport} />
           <span className="text-xs text-gray-400 dark:text-slate-500">
-            {filteredScenarios.length}{langFilter ? `/${scenarios.length}` : ''} scenarios
+            {filteredScenarios.length} scenarios
           </span>
         </div>
       </div>
-
-      {langs.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-          <button
-            onClick={() => { setLangFilter(null); localStorage.removeItem('scen:langFilter') }}
-            className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${!langFilter ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-          >🌐 All <span className="opacity-60">({scenarios.length})</span></button>
-          {langs.map(lang => (
-            <button key={lang}
-              onClick={() => { const next = langFilter === lang ? null : lang; setLangFilter(next); next ? localStorage.setItem('scen:langFilter', next) : localStorage.removeItem('scen:langFilter') }}
-              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${langFilter === lang ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-            >{LANG_LABELS[lang] ?? lang} <span className="opacity-60">({scenarios.filter(s => s.source_lang === lang).length})</span></button>
-          ))}
-        </div>
-      )}
 
       {filteredScenarios.length === 0 && (
         <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">{t.noScenariosYet}</p>
@@ -4272,30 +4389,39 @@ function ScenarioView() {
           const due = isDueSR(s.due_at)
           const isSel = scenSelectedIds.has(s.id)
           return (
-            <button
+            <div
               key={s.id}
-              onClick={() => scenSelectMode ? toggleScenSelect(s.id) : openScenario(s)}
-              className={`w-full text-left rounded-2xl border p-4 transition-colors ${dark ? 'bg-slate-800 border-slate-700 hover:border-slate-500' : 'bg-white border-gray-100 hover:border-gray-300'} ${scenSelectMode && isSel ? 'ring-2 ring-xero-green !border-xero-green' : ''}`}
+              className={`rounded-2xl border p-4 transition-colors ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'} ${scenSelectMode && isSel ? 'ring-2 ring-xero-green !border-xero-green' : ''}`}
             >
-              <div className="flex items-start justify-between gap-2 mb-1">
-                {scenSelectMode && (
-                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors mt-0.5 ${isSel ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'}`}>
-                    {isSel && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
-                  </div>
+              <button
+                className="w-full text-left"
+                onClick={() => scenSelectMode ? toggleScenSelect(s.id) : openScenario(s)}
+              >
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  {scenSelectMode && (
+                    <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors mt-0.5 ${isSel ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'}`}>
+                      {isSel && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
+                    </div>
+                  )}
+                  <p className={`text-sm font-semibold flex-1 ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{s.title || t.untitled}</p>
+                  <span className={`text-[9px] rounded-full px-1.5 py-0.5 font-semibold flex-shrink-0 ${due ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
+                    {due ? '⚡ Due' : nextReviewLabel(s.due_at)}
+                  </span>
+                </div>
+                {s.memory_palace && (
+                  <p className="text-[10px] text-violet-500 dark:text-violet-400 mb-1">🏛️ {s.memory_palace}</p>
                 )}
-                <p className={`text-sm font-semibold flex-1 ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{s.title || t.untitled}</p>
-                <span className={`text-[9px] rounded-full px-1.5 py-0.5 font-semibold flex-shrink-0 ${due ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
-                  {due ? '⚡ Due' : nextReviewLabel(s.due_at)}
+                <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-2">{s.content || '—'}</p>
+                <span className="mt-2 inline-block text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
+                  {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
                 </span>
-              </div>
-              {s.memory_palace && (
-                <p className="text-[10px] text-violet-500 dark:text-violet-400 mb-1">🏛️ {s.memory_palace}</p>
+              </button>
+              {!scenSelectMode && (
+                <div className="flex gap-2 mt-2 pt-2 border-t border-gray-50 dark:border-slate-700">
+                  <button onClick={() => setSingleReviewItem(s)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
+                </div>
               )}
-              <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-2">{s.content || '—'}</p>
-              <span className="mt-2 inline-block text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
-                {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
-              </span>
-            </button>
+            </div>
           )
         })}
       </div>
@@ -4324,6 +4450,7 @@ function ScenarioView() {
           onCancel={() => setConfirmScenBulkDelete(false)}
         />
       )}
+      </div>
     </div>
   )
 }
@@ -4361,7 +4488,7 @@ function LanguageTab() {
           ))}
         </div>
       </header>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-hidden">
         <Routes>
           <Route path="vocab"    element={<VocabView />} />
           <Route path="sentence" element={<SentenceView />} />

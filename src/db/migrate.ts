@@ -324,6 +324,11 @@ ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS memory_palace TEXT;
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
 ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
 
+-- Folders for language learning items
+ALTER TABLE vocabulary          ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
+ALTER TABLE language_sentences  ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
+ALTER TABLE language_scenarios  ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
+
 -- Extended category/subcategory system
 ALTER TABLE transactions        ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT NULL;
 ALTER TABLE recurring_templates ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT NULL;

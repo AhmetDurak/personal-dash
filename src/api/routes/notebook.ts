@@ -288,6 +288,39 @@ export function notebookRouter(pool: Pool): Router {
     res.json(updated[0])
   })
 
+  router.patch('/vocabulary/folder-rename', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { oldPath, newPath } = req.body as { oldPath: string; newPath: string }
+    if (!oldPath?.trim() || !newPath?.trim()) { res.status(400).json({ error: 'oldPath and newPath required' }); return }
+    await pool.query(
+      `UPDATE vocabulary SET folder = CASE WHEN folder = $1 THEN $2 ELSE $2 || SUBSTRING(folder FROM LENGTH($1) + 1) END
+       WHERE user_id = $3 AND (folder = $1 OR folder LIKE $4)`,
+      [oldPath, newPath, uid, oldPath + '/%']
+    )
+    res.json({ ok: true })
+  })
+
+  router.patch('/vocabulary/:id/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { folder } = req.body as { folder: string | null }
+    const { rows } = await pool.query(
+      'UPDATE vocabulary SET folder=$1 WHERE id=$2 AND user_id=$3 RETURNING *',
+      [folder ?? null, req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
+  })
+
+  router.delete('/vocabulary/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { path } = req.query as { path: string }
+    if (!path?.trim()) { res.status(400).json({ error: 'path required' }); return }
+    await pool.query(
+      `DELETE FROM vocabulary WHERE user_id = $1 AND (folder = $2 OR folder LIKE $3)`,
+      [uid, path, path + '/%']
+    )
+    res.json({ ok: true })
+  })
+
   // ─── SM-2 helper (shared by sentences and scenarios) ─────────────────────────
 
   function sm2(interval: number, repetitions: number, easeFactor: number, quality: number) {
@@ -378,6 +411,39 @@ export function notebookRouter(pool: Pool): Router {
     res.json({ ok: true })
   })
 
+  router.patch('/language/sentences/folder-rename', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { oldPath, newPath } = req.body as { oldPath: string; newPath: string }
+    if (!oldPath?.trim() || !newPath?.trim()) { res.status(400).json({ error: 'oldPath and newPath required' }); return }
+    await pool.query(
+      `UPDATE language_sentences SET folder = CASE WHEN folder = $1 THEN $2 ELSE $2 || SUBSTRING(folder FROM LENGTH($1) + 1) END
+       WHERE user_id = $3 AND (folder = $1 OR folder LIKE $4)`,
+      [oldPath, newPath, uid, oldPath + '/%']
+    )
+    res.json({ ok: true })
+  })
+
+  router.patch('/language/sentences/:id/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { folder } = req.body as { folder: string | null }
+    const { rows } = await pool.query(
+      'UPDATE language_sentences SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING *',
+      [folder ?? null, req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
+  })
+
+  router.delete('/language/sentences/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { path } = req.query as { path: string }
+    if (!path?.trim()) { res.status(400).json({ error: 'path required' }); return }
+    await pool.query(
+      `DELETE FROM language_sentences WHERE user_id = $1 AND (folder = $2 OR folder LIKE $3)`,
+      [uid, path, path + '/%']
+    )
+    res.json({ ok: true })
+  })
+
   // ─── Language Scenarios ───────────────────────────────────────────────────────
 
   router.get('/language/scenarios', async (req: Request, res: Response) => {
@@ -451,6 +517,39 @@ export function notebookRouter(pool: Pool): Router {
   router.delete('/language/scenarios/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     await pool.query('DELETE FROM language_scenarios WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
+  })
+
+  router.patch('/language/scenarios/folder-rename', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { oldPath, newPath } = req.body as { oldPath: string; newPath: string }
+    if (!oldPath?.trim() || !newPath?.trim()) { res.status(400).json({ error: 'oldPath and newPath required' }); return }
+    await pool.query(
+      `UPDATE language_scenarios SET folder = CASE WHEN folder = $1 THEN $2 ELSE $2 || SUBSTRING(folder FROM LENGTH($1) + 1) END
+       WHERE user_id = $3 AND (folder = $1 OR folder LIKE $4)`,
+      [oldPath, newPath, uid, oldPath + '/%']
+    )
+    res.json({ ok: true })
+  })
+
+  router.patch('/language/scenarios/:id/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { folder } = req.body as { folder: string | null }
+    const { rows } = await pool.query(
+      'UPDATE language_scenarios SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING *',
+      [folder ?? null, req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
+  })
+
+  router.delete('/language/scenarios/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { path } = req.query as { path: string }
+    if (!path?.trim()) { res.status(400).json({ error: 'path required' }); return }
+    await pool.query(
+      `DELETE FROM language_scenarios WHERE user_id = $1 AND (folder = $2 OR folder LIKE $3)`,
+      [uid, path, path + '/%']
+    )
     res.json({ ok: true })
   })
 
