@@ -60,14 +60,16 @@ function ChainLink({ mark, index, onToggle, size = 'md' }: {
   onToggle?: () => void
   size?: 'md' | 'sm'
 }) {
-  const rotated = index % 2 === 1
-  const dims = size === 'sm' ? 'w-6 h-9' : 'w-9 h-14'
+  // Box is a touch narrower than the ring itself so neighbouring links
+  // overlap slightly and read as one interlocked chain, all facing the same way.
+  const box = size === 'sm' ? 'w-5 h-9' : 'w-8 h-14'
+  const svg = size === 'sm' ? 'w-6 h-9' : 'w-9 h-14'
   const glyphSize = size === 'sm' ? 'text-xs' : 'text-base'
 
   const content = (
     <>
-      <svg viewBox="0 0 34 54" className={`${dims} drop-shadow-sm transition-transform ${rotated ? 'rotate-90' : ''}`}>
-        <ellipse cx="17" cy="27" rx="10" ry="22" fill="none" stroke={`url(#${gradientId(mark)})`} strokeWidth="8" />
+      <svg viewBox="0 0 34 54" className={`${svg} drop-shadow-sm`}>
+        <ellipse cx="17" cy="27" rx="11" ry="23" fill="none" stroke={`url(#${gradientId(mark)})`} strokeWidth="7" />
       </svg>
       <span className={`absolute inset-0 flex items-center justify-center ${glyphSize} font-bold pointer-events-none drop-shadow-sm ${
         mark === 'check' ? 'text-emerald-700 dark:text-emerald-800' : mark === 'cross' ? 'text-red-700 dark:text-red-800' : ''
@@ -78,14 +80,14 @@ function ChainLink({ mark, index, onToggle, size = 'md' }: {
   )
 
   if (!onToggle) {
-    return <div className={`relative flex-shrink-0 ${dims} flex items-center justify-center`}>{content}</div>
+    return <div className={`relative flex-shrink-0 ${box} flex items-center justify-center`}>{content}</div>
   }
 
   return (
     <button
       onClick={onToggle}
       title={`Day ${index + 1}`}
-      className={`relative flex-shrink-0 ${dims} flex items-center justify-center transition-transform hover:scale-105 active:scale-95`}
+      className={`relative flex-shrink-0 ${box} flex items-center justify-center transition-transform hover:scale-105 active:scale-95`}
     >
       {content}
     </button>
