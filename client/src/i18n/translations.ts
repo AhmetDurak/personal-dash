@@ -14,6 +14,7 @@ export const TRANSLATIONS = {
     // notebook sections
     notes: 'Notes',
     mindmap: 'Mindmap',
+    chains: 'Chains',
     vocab: 'Vocabulary',
     reminders: 'Reminders',
     // actions
@@ -205,6 +206,7 @@ export const TRANSLATIONS = {
     news: 'News',
     notes: 'Notizen',
     mindmap: 'Mindmap',
+    chains: 'Ketten',
     vocab: 'Wortschatz',
     reminders: 'Erinnerungen',
     save: 'Speichern',
@@ -385,6 +387,7 @@ export const TRANSLATIONS = {
     news: 'Haberler',
     notes: 'Notlar',
     mindmap: 'Zihin Haritası',
+    chains: 'Zincirler',
     vocab: 'Kelimeler',
     reminders: 'Hatırlatıcılar',
     save: 'Kaydet',

@@ -16,6 +16,7 @@ import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
 import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, WordLink, Note } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
+import { ChainsView } from '../components/web/ChainsView'
 import { useLanguage } from '../hooks/useLanguage'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { AreaChart, Area, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContainer } from 'recharts'
@@ -4509,6 +4510,7 @@ export function LearnSectionTab() {
     { path: '/learn/notes',    label: t.notes,           icon: <IconNote     className="w-4 h-4" strokeWidth={1.75} /> },
     { path: '/learn/mindmap',  label: t.mindmap,         icon: <IconMindmap  className="w-4 h-4" strokeWidth={1.75} /> },
     { path: '/learn/language', label: t.languageSection, icon: <IconLanguage className="w-4 h-4" strokeWidth={1.75} /> },
+    { path: '/learn/chains',   label: t.chains,          icon: <IconLink     className="w-4 h-4" strokeWidth={1.75} /> },
   ]
 
   return (
@@ -4524,6 +4526,7 @@ export function LearnSectionTab() {
           <Route path="notes"   element={<NotesView />} />
           <Route path="mindmap" element={<MindmapView />} />
           <Route path="language/*" element={<LanguageTab />} />
+          <Route path="chains"  element={<ChainsView />} />
         </>
       )}
     </SectionShell>

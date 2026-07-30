@@ -436,4 +436,12 @@ html, body {
   background-color: #313244; color: #CDD6F4; border-color: #45475A;
 }
 [data-theme="catppuccin"] ::-webkit-scrollbar-track { background: #1E1E2E; }
+
+/* ── Chains (Learn) ──────────────────────────────────────────────────────── */
+@keyframes chain-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.chain-emoji-pop { animation: chain-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
 [data-theme="catppuccin"] ::-webkit-scrollbar-thumb { background: #45475A; }
