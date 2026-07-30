@@ -4526,7 +4526,7 @@ export function LearnSectionTab() {
           <Route path="notes"   element={<NotesView />} />
           <Route path="mindmap" element={<MindmapView />} />
           <Route path="language/*" element={<LanguageTab />} />
-          <Route path="chains"  element={<ChainsView />} />
+          <Route path="chains/*" element={<ChainsView />} />
         </>
       )}
     </SectionShell>
