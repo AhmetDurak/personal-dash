@@ -10,7 +10,7 @@ export function mcpRouter(pool: Pool): Router {
   const router = Router()
 
   router.all('/mcp', requireMcpAuth(pool), attachMcpAgents(pool), async (req: Request, res: Response) => {
-    const server = createMcpServer(req)
+    const server = createMcpServer(req, pool)
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
 
     res.on('close', () => {

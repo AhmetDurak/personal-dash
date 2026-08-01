@@ -3,6 +3,10 @@ export const SCOPE_GROUPS = {
     label: 'Finance & Investments',
     description: 'Read-only: month summaries, transactions, charts, watchlist prices. No changes can be made to your ledger.',
   },
+  'notes:readwrite': {
+    label: 'Notes',
+    description: 'Read, create, edit, and delete your notes.',
+  },
 } as const
 
 export type ScopeKey = keyof typeof SCOPE_GROUPS
