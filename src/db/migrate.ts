@@ -418,6 +418,65 @@ CREATE TABLE IF NOT EXISTS analytics_events (
 CREATE INDEX IF NOT EXISTS idx_analytics_timestamp ON analytics_events(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_analytics_page      ON analytics_events(page);
 CREATE INDEX IF NOT EXISTS idx_analytics_session   ON analytics_events(session_id);
+
+-- MCP (Model Context Protocol) remote connector: OAuth 2.1 authorization server tables.
+CREATE TABLE IF NOT EXISTS mcp_oauth_clients (
+  client_id                  TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  client_secret_hash         TEXT,
+  client_name                TEXT,
+  redirect_uris              TEXT[] NOT NULL,
+  grant_types                TEXT[] NOT NULL DEFAULT ARRAY['authorization_code','refresh_token'],
+  response_types             TEXT[] NOT NULL DEFAULT ARRAY['code'],
+  token_endpoint_auth_method TEXT NOT NULL DEFAULT 'none',
+  created_at                 TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS mcp_authorization_codes (
+  code                  TEXT PRIMARY KEY,
+  client_id             TEXT NOT NULL REFERENCES mcp_oauth_clients(client_id) ON DELETE CASCADE,
+  user_id               INTEGER NOT NULL REFERENCES users(id),
+  redirect_uri          TEXT NOT NULL,
+  scope                 TEXT NOT NULL,
+  code_challenge        TEXT NOT NULL,
+  code_challenge_method TEXT NOT NULL DEFAULT 'S256',
+  resource              TEXT,
+  expires_at            TIMESTAMPTZ NOT NULL,
+  used                  BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at            TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_auth_codes_expires ON mcp_authorization_codes(expires_at);
+
+CREATE TABLE IF NOT EXISTS mcp_access_tokens (
+  token_hash TEXT PRIMARY KEY,
+  client_id  TEXT NOT NULL REFERENCES mcp_oauth_clients(client_id) ON DELETE CASCADE,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  scope      TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_access_tokens_user ON mcp_access_tokens(user_id);
+
+CREATE TABLE IF NOT EXISTS mcp_refresh_tokens (
+  token_hash TEXT PRIMARY KEY,
+  client_id  TEXT NOT NULL REFERENCES mcp_oauth_clients(client_id) ON DELETE CASCADE,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  scope      TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_refresh_tokens_user ON mcp_refresh_tokens(user_id);
+
+CREATE TABLE IF NOT EXISTS mcp_consents (
+  user_id       INTEGER NOT NULL REFERENCES users(id),
+  client_id     TEXT NOT NULL REFERENCES mcp_oauth_clients(client_id) ON DELETE CASCADE,
+  granted_scope TEXT NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now(),
+  revoked_at    TIMESTAMPTZ,
+  PRIMARY KEY (user_id, client_id)
+);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]

@@ -5,6 +5,7 @@ import { useReminderNotifications } from './hooks/useReminderNotifications'
 import { useAnalytics } from './hooks/useAnalytics'
 import { LanguageContext, useLanguageState } from './hooks/useLanguage'
 import { LoginPage } from './pages/LoginPage'
+import { McpConsentPage } from './pages/McpConsentPage'
 import { TopBar } from './components/web/TopBar'
 import { Sidebar } from './components/web/Sidebar'
 import { AppTour } from './components/web/AppTour'
@@ -105,6 +106,7 @@ export function App() {
         <div className="flex-1 overflow-hidden">
           <Routes>
             <Route path="/login"       element={<Navigate to="/home" replace />} />
+            <Route path="/mcp-consent" element={<McpConsentPage />} />
             <Route path="/home"        element={<HomeTab />} />
             <Route path="/planner"     element={<Planner />} />
             <Route path="/today"       element={<Navigate to="/planner" replace />} />

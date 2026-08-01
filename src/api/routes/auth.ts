@@ -12,8 +12,8 @@ export function authRouter(pool?: Pool) {
 
   router.get('/google/callback',
     passport.authenticate('google', { failureRedirect: '/login' }),
-    (_req, res) => {
-      res.redirect(process.env.FRONTEND_URL ?? '/')
+    (req, res) => {
+      res.redirect(req.session.mcpAuthRequest ? '/mcp-consent' : (process.env.FRONTEND_URL ?? '/'))
     }
   )
 

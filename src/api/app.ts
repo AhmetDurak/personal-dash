@@ -29,10 +29,15 @@ import { sportRouter } from './routes/sport'
 import { planRouter } from './routes/plan'
 import { translateRouter } from './routes/translate'
 import { analyticsRouter } from './routes/analytics'
+import { mcpWellKnownRouter } from './routes/mcpWellKnown'
+import { mcpOAuthRouter } from './routes/mcpOAuth'
+import { mcpConsentApiRouter } from './routes/mcpConsentApi'
+import { mcpRouter } from './routes/mcp'
 
 const PgSession = connectPgSimple(session)
 
 const app = express()
+app.set('trust proxy', 1) // Render terminates TLS at the edge — needed for secure cookies below
 app.use(express.json())
 
 app.use(session({
@@ -40,7 +45,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET ?? 'dev-secret-change-in-prod',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
+  cookie: {
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  },
 }))
 
 configurePassport(pool)
@@ -49,6 +58,12 @@ app.use(passport.session())
 
 // Auth routes (public)
 app.use('/auth', authRouter(pool))
+
+// MCP remote connector: OAuth discovery/registration/authorize/token (public — own auth scheme)
+// and the protocol endpoint itself (guarded internally by requireMcpAuth, not the session/bearer scheme below).
+app.use(mcpWellKnownRouter())
+app.use(mcpOAuthRouter(pool))
+app.use(mcpRouter(pool))
 
 // Require login for all API routes (session cookie OR Bearer token)
 async function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -97,6 +112,7 @@ app.use('/api/sport',         sportRouter(pool))
 app.use('/api/plan',          planRouter(pool))
 app.use('/api/translate',     translateRouter())
 app.use('/api/analytics',    analyticsRouter(pool))
+app.use('/api/mcp',          mcpConsentApiRouter(pool))
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
 
