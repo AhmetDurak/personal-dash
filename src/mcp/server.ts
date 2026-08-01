@@ -4,6 +4,9 @@ import type { Pool } from 'pg'
 import { registerFinanceTools } from './tools/finance'
 import { registerInvestmentTools } from './tools/investments'
 import { registerNotesTools } from './tools/notes'
+import { registerMindmapTools } from './tools/mindmap'
+import { registerLanguageTools } from './tools/language'
+import { registerChainsTools } from './tools/chains'
 import type { ScopeKey } from './scopes'
 
 // Builds a fresh, request-scoped McpServer registering only the tools whose
@@ -11,7 +14,7 @@ import type { ScopeKey } from './scopes'
 export function createMcpServer(req: Request, pool: Pool): McpServer {
   const server = new McpServer(
     { name: 'financedash', version: '1.0.0' },
-    { instructions: 'Personal finance dashboard. Finance and investment tools are strictly read-only — there is no way to create, edit, or delete ledger data through this connector. Other tool groups (e.g. Notes) may support full read/write, scoped to what the user granted at connection time.' }
+    { instructions: 'Personal finance dashboard. Finance and investment tools are strictly read-only — there is no way to create, edit, or delete ledger data through this connector. Other tool groups (Notes, Mindmap, Language, Chains) support full read/write, scoped to what the user granted at connection time.' }
   )
 
   const scopes = new Set<ScopeKey>(req.mcpScope ?? [])
@@ -23,6 +26,18 @@ export function createMcpServer(req: Request, pool: Pool): McpServer {
 
   if (scopes.has('notes:readwrite')) {
     registerNotesTools(server, req, pool)
+  }
+
+  if (scopes.has('mindmap:readwrite')) {
+    registerMindmapTools(server, req, pool)
+  }
+
+  if (scopes.has('language:readwrite')) {
+    registerLanguageTools(server, req, pool)
+  }
+
+  if (scopes.has('chains:readwrite')) {
+    registerChainsTools(server, req, pool)
   }
 
   return server

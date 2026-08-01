@@ -71,11 +71,14 @@ export function mcpOAuthRouter(pool: Pool): Router {
       resource,
     }
 
-    if (!req.isAuthenticated()) {
-      res.redirect('/auth/google')
-      return
-    }
-    res.redirect('/mcp-consent')
+    // Explicitly wait for the session to persist before redirecting — express-session's
+    // save-on-res.end hook races with connect-pg-simple's write in practice, and the
+    // browser's next request (to /auth/google or /mcp-consent) can arrive before the
+    // mcpAuthRequest write actually lands, making it look "missing" moments later.
+    req.session.save(err => {
+      if (err) { res.status(500).send('Failed to persist authorization request'); return }
+      res.redirect(req.isAuthenticated() ? '/mcp-consent' : '/auth/google')
+    })
   })
 
   // ── Token endpoint — server-to-server, no CORS needed ────────────────────────

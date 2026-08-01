@@ -477,6 +477,18 @@ CREATE TABLE IF NOT EXISTS mcp_consents (
   revoked_at    TIMESTAMPTZ,
   PRIMARY KEY (user_id, client_id)
 );
+
+-- Chains habit tracker (Learn section) — was localStorage-only, moved server-side
+-- so it can sync across devices and be reachable via the MCP connector.
+CREATE TABLE IF NOT EXISTS chains (
+  id         TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  name       TEXT NOT NULL,
+  length     INTEGER NOT NULL,
+  marks      JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_chains_user ON chains(user_id);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]

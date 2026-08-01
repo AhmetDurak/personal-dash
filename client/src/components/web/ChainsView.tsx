@@ -214,7 +214,7 @@ function NewChainForm({ onCreate, onCancel }: {
 // ─── List view (/learn/chains) ──────────────────────────────────────────────
 
 function ChainsListView() {
-  const { chains, addChain, removeChain } = useChains()
+  const { chains, isLoading, addChain, removeChain } = useChains()
   const [showAdd, setShowAdd] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const deletingChain = chains.find(c => c.id === confirmDeleteId) ?? null
@@ -239,6 +239,8 @@ function ChainsListView() {
         />
       )}
 
+      {isLoading && <p className="text-sm text-gray-400 dark:text-slate-500">Loading…</p>}
+
       <div className="space-y-3">
         {chains.map(chain => (
           <ChainSummaryCard
@@ -249,7 +251,7 @@ function ChainsListView() {
         ))}
       </div>
 
-      {chains.length === 0 && !showAdd && (
+      {!isLoading && chains.length === 0 && !showAdd && (
         <div className="text-center py-14">
           <p className="text-3xl mb-3">🔗</p>
           <p className="text-sm font-medium text-gray-600 dark:text-slate-400 mb-1">No chains yet</p>
@@ -274,61 +276,77 @@ function ChainsListView() {
 function ChainDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { chains, toggleMark, removeChain } = useChains()
+  const { chains, isLoading, toggleMark, removeChain } = useChains()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const chain = chains.find(c => c.id === id)
 
-  if (!chain) {
+  const backButton = (
+    <Link
+      to=".."
+      className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-3 -ml-3 min-w-[44px] min-h-[44px] flex items-center justify-center"
+      aria-label="Back to chains"
+    >
+      ←
+    </Link>
+  )
+
+  if (!isLoading && !chain) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-sm text-gray-400 dark:text-slate-500 mb-3">Chain not found.</p>
-        <Link to=".." className="text-sm text-xero-green hover:underline">← Back to chains</Link>
+      <div className="h-full overflow-y-auto">
+        <div className="flex items-center gap-2 px-4 md:px-6 py-3 border-b border-gray-100 dark:border-slate-700">
+          {backButton}
+        </div>
+        <div className="p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-slate-500">Chain not found.</p>
+        </div>
       </div>
     )
   }
 
-  const status = getStatus(chain)
-  const checkedCount = chain.marks.filter(m => m === 'check').length
-  const brokenCount = chain.marks.filter(m => m === 'cross').length
+  const status = chain ? getStatus(chain) : 'progress'
+  const checkedCount = chain?.marks.filter(m => m === 'check').length ?? 0
+  const brokenCount = chain?.marks.filter(m => m === 'cross').length ?? 0
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="flex items-center gap-2 px-4 md:px-6 py-3 border-b border-gray-100 dark:border-slate-700">
-        <Link
-          to=".."
-          className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors p-3 -ml-3 min-w-[44px] min-h-[44px] flex items-center justify-center"
-          aria-label="Back to chains"
-        >
-          ←
-        </Link>
+        {backButton}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">{chain.name}</p>
-          <p className="text-[11px] text-gray-400 dark:text-slate-500">
-            {checkedCount}/{chain.length} checked{brokenCount > 0 ? ` · ${brokenCount} broken` : ''}
-          </p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">{chain?.name ?? 'Loading…'}</p>
+          {chain && (
+            <p className="text-[11px] text-gray-400 dark:text-slate-500">
+              {checkedCount}/{chain.length} checked{brokenCount > 0 ? ` · ${brokenCount} broken` : ''}
+            </p>
+          )}
         </div>
-        <span key={status} className="text-2xl chain-emoji-pop flex-shrink-0">{STATUS_EMOJI[status]}</span>
-        <button
-          onClick={() => setConfirmDelete(true)}
-          className="p-2 text-gray-300 dark:text-slate-600 hover:text-red-400 transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
-          title="Delete chain"
-        >
-          <IconDelete className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
-        <ChainStrip chain={chain} onToggle={i => toggleMark(chain.id, i)} />
-
-        {status === 'complete' && (
-          <div key="trophy" className="chain-emoji-pop flex flex-col items-center gap-1 py-4">
-            <IconTrophy className="w-9 h-9 text-amber-400" />
-            <p className="text-sm font-semibold text-amber-500">Chain complete!</p>
-          </div>
+        {chain && (
+          <>
+            <span key={status} className="text-2xl chain-emoji-pop flex-shrink-0">{STATUS_EMOJI[status]}</span>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="p-2 text-gray-300 dark:text-slate-600 hover:text-red-400 transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              title="Delete chain"
+            >
+              <IconDelete className="w-4 h-4" />
+            </button>
+          </>
         )}
       </div>
 
-      {confirmDelete && (
+      {chain && (
+        <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
+          <ChainStrip chain={chain} onToggle={i => toggleMark(chain.id, i)} />
+
+          {status === 'complete' && (
+            <div key="trophy" className="chain-emoji-pop flex flex-col items-center gap-1 py-4">
+              <IconTrophy className="w-9 h-9 text-amber-400" />
+              <p className="text-sm font-semibold text-amber-500">Chain complete!</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {confirmDelete && chain && (
         <ConfirmDialog
           message={`"${chain.name}" will be deleted.`}
           confirmLabel="Delete"

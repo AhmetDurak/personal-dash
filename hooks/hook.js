@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'fs'
+import { readFileSync, statSync, appendFileSync } from 'fs'
 import { logToolUsage } from './telemetry.js'
 import { updateLearning } from './learning.js'
 import { compressResponse } from './compression.js'
@@ -6,6 +6,7 @@ import { compressResponse } from './compression.js'
 const LARGE_FILE_BYTES = 50_000
 const LARGE_OUTPUT_BYTES = 20_000
 const DEFAULT_LIMIT = 200
+const SESSION_EDITED_TSX_LOG = '/tmp/fd_session_edited_tsx'
 
 function readStdin() {
   try { return JSON.parse(readFileSync(0, 'utf-8')) } catch { process.exit(0) }
@@ -37,6 +38,9 @@ if (hook_event_name === 'PostToolUse') {
     logToolUsage({ tool: tool_name, query: JSON.stringify(tool_input ?? '').slice(0, 120), duration: 0, size, status: 'completed' })
     updateLearning({ tool: tool_name, success: true })
   } catch {}
+  if (['Edit', 'Write', 'NotebookEdit'].includes(tool_name) && tool_input?.file_path?.endsWith('.tsx')) {
+    try { appendFileSync(SESSION_EDITED_TSX_LOG, tool_input.file_path + '\n') } catch {}
+  }
   if (size > LARGE_OUTPUT_BYTES) {
     const compressed = compressResponse(tool_response, tool_name)
     const preview = (typeof compressed === 'string' ? compressed : JSON.stringify(compressed, null, 2)).slice(0, 2000)

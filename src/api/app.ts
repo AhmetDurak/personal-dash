@@ -29,6 +29,7 @@ import { sportRouter } from './routes/sport'
 import { planRouter } from './routes/plan'
 import { translateRouter } from './routes/translate'
 import { analyticsRouter } from './routes/analytics'
+import { chainsRouter } from './routes/chains'
 import { mcpWellKnownRouter } from './routes/mcpWellKnown'
 import { mcpOAuthRouter } from './routes/mcpOAuth'
 import { mcpConsentApiRouter } from './routes/mcpConsentApi'
@@ -112,6 +113,7 @@ app.use('/api/sport',         sportRouter(pool))
 app.use('/api/plan',          planRouter(pool))
 app.use('/api/translate',     translateRouter())
 app.use('/api/analytics',    analyticsRouter(pool))
+app.use('/api/chains',       chainsRouter(pool))
 app.use('/api/mcp',          mcpConsentApiRouter(pool))
 
 app.get('/health', (_req, res) => res.json({ ok: true }))

@@ -267,6 +267,8 @@ Google login plus an explicit consent screen that lists what's being shared.
 5. You're redirected back to Claude, and the connector shows as connected. Try asking:
    > "What's my spending summary for this month?"
    > "What does my ETF watchlist look like right now?"
+   > "Add a note with today's meeting takeaways."
+   > "Mark today as done on my 'Meditate daily' chain."
 
 ### Try it with ChatGPT
 
@@ -277,17 +279,22 @@ Google login plus an explicit consent screen that lists what's being shared.
 
 ### What's exposed right now
 
-Only the `finance:read` scope exists today — **read-only**, and deliberately narrow:
+Five scopes exist today, each granted independently at connect time:
 
-- Month summaries, transaction lists, top payees, category breakdown, balance trend,
-  income vs. expense (all from the existing `LedgerAgent`/`ChartAgent`).
-- ETF watchlist prices/performance and YTD investment contributions — amounts only,
-  no merchant names, no per-holding composition, no bank-connection status (see the
-  roadmap below for why).
+- **`finance:read`** — read-only, deliberately narrow: month summaries, transaction lists,
+  top payees, category breakdown, balance trend, income vs. expense (from `LedgerAgent`/
+  `ChartAgent`), plus ETF watchlist prices/performance and YTD investment contributions —
+  amounts only, no merchant names, no per-holding composition, no bank-connection status
+  (see the roadmap above for why). No way to create, edit, or delete ledger data.
+- **`notes:readwrite`** — full CRUD on Notes, including the Obsidian-vault backend.
+- **`mindmap:readwrite`** — full CRUD on Mindmaps.
+- **`language:readwrite`** — full CRUD + spaced-repetition review on Vocabulary,
+  Sentences, and Scenarios.
+- **`chains:readwrite`** — full CRUD on habit Chains.
 
-There is no way to create, edit, or delete anything through the connector yet, and
-your journal is never exposed. You can review/revoke what's connected from the
-`mcp_consents`/`mcp_access_tokens` tables today; a UI for this is on the roadmap.
+Your journal is never exposed — there is no `journal:*` scope at all. You can review/revoke
+what's connected from the `mcp_consents`/`mcp_access_tokens` tables today; a UI for this is
+on the roadmap.
 
 ## Developing with Claude Code
 
@@ -326,12 +333,18 @@ development for full detail):
 - [x] Phase 1 — OAuth 2.1 authorization server (dynamic client registration, PKCE,
       RFC 8414/9728 discovery), reusing the existing Google login
 - [x] Phase 2 — `/mcp` Streamable HTTP endpoint + read-only Finance/Investments tools
-- [ ] Phase 3 — Notes tools (read + write)
-- [ ] Phase 4 — Reminders tools (read + write)
-- [ ] Phase 5 — Meal tools (Foods/Logs/Shopping; recipes need a server-side home first —
+- [x] Phase 3 — Notes tools (read + write), including the Obsidian-vault backend
+- [x] Phase 4 — Mindmap tools (read + write)
+- [x] Phase 5 — Language tools (read + write): vocabulary, sentences, scenarios, with
+      spaced-repetition review
+- [x] Phase 6 — Chains tools (read + write) — required first migrating the "Don't break
+      the Chain" habit tracker from browser `localStorage` to a real `chains` table
+      (existing local chains auto-migrate to the server on next page load)
+- [ ] Reminders tools (read + write)
+- [ ] Meal tools (Foods/Logs/Shopping; recipes need a server-side home first —
       they're currently browser-`localStorage`-only)
-- [ ] Phase 6 — Sport tools (exercises, templates, logs, targets, challenges, weight, schedule)
-- [ ] Phase 7 — Production deploy + register the connector in Claude.ai and ChatGPT,
+- [ ] Sport tools (exercises, templates, logs, targets, challenges, weight, schedule)
+- [ ] Production deploy + register the connector in Claude.ai and ChatGPT,
       end-to-end verification; stretch: a "Connected Apps" panel to view/revoke access
 
 **Product backlog** (see `.claude/tasks/backlog.md` for the live, up-to-date list):

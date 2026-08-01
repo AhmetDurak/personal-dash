@@ -7,6 +7,18 @@ export const SCOPE_GROUPS = {
     label: 'Notes',
     description: 'Read, create, edit, and delete your notes.',
   },
+  'mindmap:readwrite': {
+    label: 'Mindmap',
+    description: 'Read, create, edit, and delete your mindmaps.',
+  },
+  'language:readwrite': {
+    label: 'Language',
+    description: 'Read, create, edit, delete, and review your vocabulary, sentences, and scenarios.',
+  },
+  'chains:readwrite': {
+    label: 'Chains',
+    description: 'Read, create, check off, and delete your habit chains.',
+  },
 } as const
 
 export type ScopeKey = keyof typeof SCOPE_GROUPS
