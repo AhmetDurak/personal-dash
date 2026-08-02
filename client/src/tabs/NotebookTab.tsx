@@ -149,9 +149,9 @@ function SwipeToDelete({ onDelete, children, resetKey, contentBg = '' }: { onDel
 const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
 interface NoteTreeCtxType {
-  selectedId: number | null
-  onSelect: (id: number) => void
-  onCtx: (e: React.MouseEvent, type: 'folder'|'note', folderPath?: string, noteId?: number) => void
+  selectedId: string | null
+  onSelect: (id: string) => void
+  onCtx: (e: React.MouseEvent, type: 'folder'|'note', folderPath?: string, noteId?: string) => void
   expanded: Set<string>
   onToggle: (path: string) => void
   renaming: { path: string; val: string } | null
@@ -161,8 +161,8 @@ interface NoteTreeCtxType {
   onNewNote: (folder: string|null) => void
   onCommitAdding: () => void
   onCommitRename: () => void
-  onDropNote: (noteId: number, folder: string | null) => void
-  onReorderNote: (dragId: number, targetId: number, pos: 'before' | 'after') => void
+  onDropNote: (noteId: string, folder: string | null) => void
+  onReorderNote: (dragId: string, targetId: string, pos: 'before' | 'after') => void
 }
 const NoteTreeCtx = createContext<NoteTreeCtxType | null>(null)
 
@@ -182,7 +182,7 @@ function FolderTreeRow({ node, depth }: { node: FolderNode<Note>; depth: number 
         onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'folder', node.path) }}
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false) }}
-        onDrop={e => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('noteId'); if (id) ctx.onDropNote(Number(id), node.path) }}
+        onDrop={e => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('noteId'); if (id) ctx.onDropNote(id, node.path) }}
       >
         <IconChevronRight className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-100 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.5} />
         <IconFolder className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500 flex-shrink-0" strokeWidth={1.75} />
@@ -242,14 +242,15 @@ function FolderTreeRow({ node, depth }: { node: FolderNode<Note>; depth: number 
 
 function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
   const ctx = useContext(NoteTreeCtx)!
-  const active = ctx.selectedId === note.id
+  const noteId = String(note.id)
+  const active = ctx.selectedId === noteId
   const [dropPos, setDropPos] = useState<'before' | 'after' | null>(null)
 
   return (
     <div
       {...(!isTouch && {
         draggable: true,
-        onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('noteId', String(note.id)); e.dataTransfer.effectAllowed = 'move' },
+        onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('noteId', noteId); e.dataTransfer.effectAllowed = 'move' },
         onDragOver: (e: React.DragEvent) => {
           e.preventDefault(); e.stopPropagation()
           const rect = e.currentTarget.getBoundingClientRect()
@@ -259,7 +260,7 @@ function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
         onDrop: (e: React.DragEvent) => {
           e.preventDefault(); e.stopPropagation()
           const id = e.dataTransfer.getData('noteId')
-          if (id && dropPos && Number(id) !== note.id) ctx.onReorderNote(Number(id), note.id, dropPos)
+          if (id && dropPos && id !== noteId) ctx.onReorderNote(id, noteId, dropPos)
           setDropPos(null)
         },
       })}
@@ -267,8 +268,8 @@ function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
       className={`group flex items-center gap-1.5 py-2 pr-1 rounded-lg cursor-pointer relative ${
         active ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'
       }${dropPos === 'before' ? ' border-t-2 border-xero-green' : dropPos === 'after' ? ' border-b-2 border-xero-green' : ''}`}
-      onClick={() => ctx.onSelect(note.id)}
-      onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'note', undefined, note.id) }}
+      onClick={() => ctx.onSelect(noteId)}
+      onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'note', undefined, noteId) }}
     >
       <span className="w-3 flex-shrink-0" />
       <IconNote className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
@@ -276,7 +277,7 @@ function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
         {note.title || 'Untitled'}
       </span>
       <button
-        onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'note', undefined, note.id) }}
+        onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'note', undefined, noteId) }}
         className="p-2 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] font-bold leading-none opacity-30 group-hover:opacity-100"
       >•••</button>
     </div>
@@ -284,6 +285,8 @@ function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
 }
 
 // ─── NotesView ────────────────────────────────────────────────────────────────
+
+const LAST_NOTE_KEY = 'notes:lastSelected'
 
 marked.use({ gfm: true, breaks: true })
 
@@ -296,9 +299,10 @@ function NotesView() {
   const { dark } = useDarkMode()
   const { notes, isLoading, createNote, saveNote, moveNoteToFolder, deleteNote, renameFolder, deleteFolder } = useNotes()
   const [noteParams, setNoteParams] = useSearchParams()
-  const selectedId = noteParams.get('note') ? Number(noteParams.get('note')) : null
-  function setSelectedId(id: number | null) {
-    setNoteParams(p => { id !== null ? p.set('note', String(id)) : p.delete('note'); return p })
+  const selectedId = noteParams.get('note')
+  function setSelectedId(id: string | null) {
+    setNoteParams(p => { id !== null ? p.set('note', id) : p.delete('note'); return p })
+    if (id !== null) { try { localStorage.setItem(LAST_NOTE_KEY, id) } catch { /* ignore */ } }
   }
   const [localTitle, setLocalTitle] = useState('')
   const [localContent, setLocalContent] = useState('')
@@ -347,22 +351,22 @@ function NotesView() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [renaming, setRenaming] = useState<{ path: string; val: string } | null>(null)
   const [addingIn, setAddingIn] = useState<{ parent: string; kind: 'note'|'folder'; val: string } | null>(null)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; type: 'folder'|'note'; folderPath?: string; noteId?: number } | null>(null)
-  const [movingNoteId, setMovingNoteId] = useState<number | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; type: 'folder'|'note'; folderPath?: string; noteId?: string } | null>(null)
+  const [movingNoteId, setMovingNoteId] = useState<string | null>(null)
   const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
   const ctxMenuRef = useRef<HTMLDivElement>(null)
 
   const allFolderPaths = collectFolderPaths(buildFolderTree(notes))
   const folders = allFolderPaths
-  const selectedNote = notes.find(n => n.id === selectedId) ?? null
+  const selectedNote = notes.find(n => String(n.id) === selectedId) ?? null
 
   // Manual order persisted in localStorage
-  const [manualOrder, setManualOrder] = useState<number[]>(() => {
-    try { return JSON.parse(localStorage.getItem('notes:order') ?? '[]') as number[] } catch { return [] }
+  const [manualOrder, setManualOrder] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('notes:order') ?? '[]') as string[] } catch { return [] }
   })
 
-  function reorderNote(dragId: number, targetId: number, pos: 'before' | 'after') {
-    const allIds = notes.map(n => n.id)
+  function reorderNote(dragId: string, targetId: string, pos: 'before' | 'after') {
+    const allIds = notes.map(n => String(n.id))
     const base = [...manualOrder.filter(id => allIds.includes(id)), ...allIds.filter(id => !manualOrder.includes(id))]
     const next = base.filter(id => id !== dragId)
     const idx = next.indexOf(targetId)
@@ -386,9 +390,9 @@ function NotesView() {
   // Apply manual sort outside the hook so it reacts to manualOrder state changes
   const filteredNotes = useMemo(() => {
     if (sortKey !== 'manual') return hookSorted
-    const allIds = notes.map(n => n.id)
+    const allIds = notes.map(n => String(n.id))
     const base = [...manualOrder.filter(id => allIds.includes(id)), ...allIds.filter(id => !manualOrder.includes(id))]
-    return [...hookSorted].sort((a, b) => base.indexOf(a.id) - base.indexOf(b.id))
+    return [...hookSorted].sort((a, b) => base.indexOf(String(a.id)) - base.indexOf(String(b.id)))
   }, [hookSorted, sortKey, manualOrder, notes])
 
   // Build tree from sorted notes so sort order takes effect in the sidebar
@@ -461,15 +465,38 @@ function NotesView() {
     setPreview(p => !p)
   }
 
+  // Tracks which note's content is currently reflected in localTitle/localContent. On a hard
+  // reload, `notes` is still empty on the first pass (SWR hasn't fetched yet), so this effect
+  // must retry once `notes` arrives instead of only running once on `selectedId` change —
+  // otherwise the editor is stuck showing a blank title/content for the pre-selected note forever.
+  const loadedNoteIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
-    if (selectedId === null) return
-    const note = notes.find(n => n.id === selectedId)
+    if (selectedId === null) { loadedNoteIdRef.current = null; return }
+    if (loadedNoteIdRef.current === selectedId) return // already loaded — don't clobber in-progress edits
+    const note = notes.find(n => String(n.id) === selectedId)
     if (note) {
       setLocalTitle(note.title)
       setLocalContent(note.content)
+      loadedNoteIdRef.current = selectedId
     }
-  }, [selectedId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedId, notes])
+
+  // Reopen the last-viewed note when landing on Notes with nothing selected in the URL
+  // (e.g. switching tabs and back, or opening the app fresh) — runs once per mount only,
+  // so it never fights an explicit "back to list" (mobile back button, deleted note, etc.).
+  const restoredLastNoteRef = useRef(false)
+  useEffect(() => {
+    if (restoredLastNoteRef.current || isLoading) return
+    restoredLastNoteRef.current = true
+    if (selectedId !== null) return
+    try {
+      const stored = localStorage.getItem(LAST_NOTE_KEY)
+      if (stored && notes.some(n => String(n.id) === stored)) {
+        setNoteParams(p => { p.set('note', stored); return p }, { replace: true })
+      }
+    } catch { /* ignore */ }
+  }, [isLoading, notes]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
@@ -488,7 +515,7 @@ function NotesView() {
 
   async function handleNew(folder: string | null = null) {
     const note = await createNote(folder)
-    setSelectedId(note.id)
+    setSelectedId(String(note.id))
     if (folder) {
       const ancestors = folder.split('/').map((_, i, a) => a.slice(0, i + 1).join('/'))
       setExpanded(s => new Set([...s, ...ancestors]))
@@ -516,7 +543,7 @@ function NotesView() {
     setExpanded(s => { const n = new Set(s); n.delete(r.path); n.add(newPath); return n })
   }
 
-  function openCtx(e: React.MouseEvent, type: 'folder'|'note', folderPath?: string, noteId?: number) {
+  function openCtx(e: React.MouseEvent, type: 'folder'|'note', folderPath?: string, noteId?: string) {
     const x = Math.min(e.clientX, window.innerWidth - 175)
     const y = Math.min(e.clientY, window.innerHeight - 210)
     setCtxMenu({ x, y, type, folderPath, noteId })
@@ -535,9 +562,9 @@ function NotesView() {
     }
   }, [ctxMenu])
 
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: string) {
     await deleteNote(id)
     if (selectedId === id) setSelectedId(null)
   }
@@ -567,7 +594,7 @@ function NotesView() {
         <div
           className="flex-1 overflow-y-auto py-1 px-1"
           onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('noteId'); if (id) moveNoteToFolder(Number(id), null) }}
+          onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('noteId'); if (id) moveNoteToFolder(id, null) }}
         >
           {isLoading && <p className="text-xs text-gray-400 p-4">Loading…</p>}
           <NoteTreeCtx.Provider value={{
@@ -807,7 +834,7 @@ function NotesView() {
         <ConfirmDialog
           message={`Delete "${deletingFolderPath.split('/').pop()}" and all notes inside?`}
           confirmLabel="Delete"
-          onConfirm={async () => { await deleteFolder(deletingFolderPath); setDeletingFolderPath(null); if (selectedId !== null && notes.find(n => n.id === selectedId)?.folder?.startsWith(deletingFolderPath)) setSelectedId(null) }}
+          onConfirm={async () => { await deleteFolder(deletingFolderPath); setDeletingFolderPath(null); if (selectedId !== null && notes.find(n => String(n.id) === selectedId)?.folder?.startsWith(deletingFolderPath)) setSelectedId(null) }}
           onCancel={() => setDeletingFolderPath(null)}
         />
       )}

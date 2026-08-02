@@ -3,7 +3,7 @@ import useSWR, { mutate as globalMutate } from 'swr'
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 export interface Note {
-  id: number
+  id: number | string // string when the Obsidian vault backend is enabled (UUIDs), number otherwise
   title: string
   content: string
   folder: string | null
@@ -131,7 +131,7 @@ export function useNotes() {
     return note
   }
 
-  async function saveNote(id: number, title: string, content: string) {
+  async function saveNote(id: number | string, title: string, content: string) {
     await fetch(`/api/notebook/notes/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -140,7 +140,7 @@ export function useNotes() {
     await mutate()
   }
 
-  async function moveNoteToFolder(id: number, folder: string | null) {
+  async function moveNoteToFolder(id: number | string, folder: string | null) {
     await fetch(`/api/notebook/notes/${id}/folder`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -149,7 +149,7 @@ export function useNotes() {
     await mutate()
   }
 
-  async function deleteNote(id: number) {
+  async function deleteNote(id: number | string) {
     await fetch(`/api/notebook/notes/${id}`, { method: 'DELETE' })
     await mutate()
   }
