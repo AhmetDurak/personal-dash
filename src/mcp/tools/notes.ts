@@ -27,6 +27,23 @@ export function registerNotesTools(server: McpServer, req: Request, pool: Pool) 
     return json(rows)
   })
 
+  server.registerTool('notes_list_folders', {
+    title: 'List note folders',
+    description: 'List the distinct folder paths currently in use, so a new or moved note can be filed into an existing folder instead of creating a near-duplicate one.',
+    inputSchema: {},
+  }, async () => {
+    const uid = uidOf(req)
+    if (vault.enabled()) {
+      const folders = new Set(vault.list(uid).map(n => n.folder).filter((f): f is string => !!f))
+      return json([...folders].sort())
+    }
+    const { rows } = await pool.query(
+      'SELECT DISTINCT folder FROM notebook_notes WHERE user_id = $1 AND folder IS NOT NULL ORDER BY folder',
+      [uid]
+    )
+    return json(rows.map(r => r.folder as string))
+  })
+
   server.registerTool('notes_get', {
     title: 'Get a note',
     description: 'Get a single note by id.',

@@ -44,6 +44,19 @@ export function registerMindmapTools(server: McpServer, req: Request, pool: Pool
     return json(rows)
   })
 
+  server.registerTool('mindmap_list_folders', {
+    title: 'List mindmap folders',
+    description: 'List the distinct folder paths currently in use, so a new or moved mindmap can be filed into an existing folder instead of creating a near-duplicate one.',
+    inputSchema: {},
+  }, async () => {
+    const uid = uidOf(req)
+    const { rows } = await pool.query(
+      'SELECT DISTINCT folder FROM mindmaps WHERE user_id = $1 AND folder IS NOT NULL ORDER BY folder',
+      [uid]
+    )
+    return json(rows.map(r => r.folder as string))
+  })
+
   server.registerTool('mindmap_get', {
     title: 'Get a mindmap',
     description: 'Get a single mindmap including its full nodes and edges.',
@@ -86,6 +99,22 @@ export function registerMindmapTools(server: McpServer, req: Request, pool: Pool
     const { rows } = await pool.query(
       'UPDATE mindmaps SET title=$1, nodes=$2, edges=$3, updated_at=now() WHERE id=$4 AND user_id=$5 RETURNING *',
       [title, JSON.stringify(nodes), JSON.stringify(edges ?? []), id, uid]
+    )
+    return json(rows[0] ?? null)
+  })
+
+  server.registerTool('mindmap_move_folder', {
+    title: 'Move a mindmap to a folder',
+    description: 'Move a mindmap into a different folder (or to the root by passing null).',
+    inputSchema: {
+      id: z.number().int(),
+      folder: z.string().nullable().describe('Destination folder path, or null for the root folder'),
+    },
+  }, async ({ id, folder }) => {
+    const uid = uidOf(req)
+    const { rows } = await pool.query(
+      'UPDATE mindmaps SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING id, title, folder, created_at, updated_at',
+      [folder, id, uid]
     )
     return json(rows[0] ?? null)
   })

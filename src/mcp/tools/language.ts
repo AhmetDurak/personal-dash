@@ -45,25 +45,55 @@ export function registerLanguageTools(server: McpServer, req: Request, pool: Poo
 
   server.registerTool('language_vocab_add', {
     title: 'Add a vocabulary word',
-    description: 'Add (or update, if the word already exists) a vocabulary flashcard.',
+    description: 'Add (or update, if the word already exists) a vocabulary flashcard, optionally inside a folder.',
     inputSchema: {
       word: z.string(),
       translation: z.string(),
       language: z.string().optional().describe('Source language code, default "de"'),
       translation_language: z.string().optional().describe('Translation language code, default "tr"'),
       example: z.string().optional(),
+      folder: z.string().nullable().optional().describe('Folder path, e.g. "Travel/Food". Omit or null for the root folder.'),
     },
-  }, async ({ word, translation, language, translation_language, example }) => {
+  }, async ({ word, translation, language, translation_language, example, folder }) => {
     const uid = uidOf(req)
     const { rows } = await pool.query(
-      `INSERT INTO vocabulary (word, translation, language, translation_language, example, user_id)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO vocabulary (word, translation, language, translation_language, example, folder, user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
        ON CONFLICT (LOWER(word), language, user_id) DO UPDATE
          SET translation=EXCLUDED.translation, translation_language=EXCLUDED.translation_language, example=EXCLUDED.example
        RETURNING *`,
-      [word.trim(), translation.trim(), language ?? 'de', translation_language ?? 'tr', example ?? null, uid]
+      [word.trim(), translation.trim(), language ?? 'de', translation_language ?? 'tr', example ?? null, folder ?? null, uid]
     )
     return json(rows[0])
+  })
+
+  server.registerTool('language_vocab_move_folder', {
+    title: 'Move a vocabulary word to a folder',
+    description: 'Move a vocabulary flashcard into a different folder (or to the root by passing null).',
+    inputSchema: {
+      id: z.number().int(),
+      folder: z.string().nullable().describe('Destination folder path, or null for the root folder'),
+    },
+  }, async ({ id, folder }) => {
+    const uid = uidOf(req)
+    const { rows } = await pool.query(
+      'UPDATE vocabulary SET folder=$1 WHERE id=$2 AND user_id=$3 RETURNING *',
+      [folder, id, uid]
+    )
+    return json(rows[0] ?? null)
+  })
+
+  server.registerTool('language_vocab_list_folders', {
+    title: 'List vocabulary folders',
+    description: 'List the distinct folder paths currently in use, so a new or moved word can be filed into an existing folder instead of creating a near-duplicate one.',
+    inputSchema: {},
+  }, async () => {
+    const uid = uidOf(req)
+    const { rows } = await pool.query(
+      'SELECT DISTINCT folder FROM vocabulary WHERE user_id = $1 AND folder IS NOT NULL ORDER BY folder',
+      [uid]
+    )
+    return json(rows.map(r => r.folder as string))
   })
 
   server.registerTool('language_vocab_update', {
@@ -127,21 +157,51 @@ export function registerLanguageTools(server: McpServer, req: Request, pool: Poo
 
   server.registerTool('language_sentence_add', {
     title: 'Add a language sentence',
-    description: 'Add a new sentence for language practice.',
+    description: 'Add a new sentence for language practice, optionally inside a folder.',
     inputSchema: {
       source_text: z.string(),
       translation: z.string().optional(),
       source_lang: z.string().optional().describe('Default "de"'),
       target_lang: z.string().optional().describe('Default "tr"'),
+      folder: z.string().nullable().optional().describe('Folder path, e.g. "Travel/Restaurants". Omit or null for the root folder.'),
     },
-  }, async ({ source_text, translation, source_lang, target_lang }) => {
+  }, async ({ source_text, translation, source_lang, target_lang, folder }) => {
     const uid = uidOf(req)
     const { rows } = await pool.query(
-      `INSERT INTO language_sentences (user_id, source_text, translation, source_lang, target_lang)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [uid, source_text, translation ?? null, source_lang ?? 'de', target_lang ?? 'tr']
+      `INSERT INTO language_sentences (user_id, source_text, translation, source_lang, target_lang, folder)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [uid, source_text, translation ?? null, source_lang ?? 'de', target_lang ?? 'tr', folder ?? null]
     )
     return json(rows[0])
+  })
+
+  server.registerTool('language_sentence_move_folder', {
+    title: 'Move a sentence to a folder',
+    description: 'Move a sentence into a different folder (or to the root by passing null).',
+    inputSchema: {
+      id: z.number().int(),
+      folder: z.string().nullable().describe('Destination folder path, or null for the root folder'),
+    },
+  }, async ({ id, folder }) => {
+    const uid = uidOf(req)
+    const { rows } = await pool.query(
+      'UPDATE language_sentences SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING *',
+      [folder, id, uid]
+    )
+    return json(rows[0] ?? null)
+  })
+
+  server.registerTool('language_sentence_list_folders', {
+    title: 'List sentence folders',
+    description: 'List the distinct folder paths currently in use, so a new or moved sentence can be filed into an existing folder instead of creating a near-duplicate one.',
+    inputSchema: {},
+  }, async () => {
+    const uid = uidOf(req)
+    const { rows } = await pool.query(
+      'SELECT DISTINCT folder FROM language_sentences WHERE user_id = $1 AND folder IS NOT NULL ORDER BY folder',
+      [uid]
+    )
+    return json(rows.map(r => r.folder as string))
   })
 
   server.registerTool('language_sentence_update', {
@@ -205,21 +265,51 @@ export function registerLanguageTools(server: McpServer, req: Request, pool: Poo
 
   server.registerTool('language_scenario_add', {
     title: 'Add a language scenario',
-    description: 'Add a new practice scenario (e.g. a dialogue or situational script).',
+    description: 'Add a new practice scenario (e.g. a dialogue or situational script), optionally inside a folder.',
     inputSchema: {
       title: z.string().optional().describe('Defaults to "Untitled"'),
       content: z.string().optional(),
       source_lang: z.string().optional().describe('Default "de"'),
       target_lang: z.string().optional().describe('Default "tr"'),
+      folder: z.string().nullable().optional().describe('Folder path, e.g. "Travel/Airport". Omit or null for the root folder.'),
     },
-  }, async ({ title, content, source_lang, target_lang }) => {
+  }, async ({ title, content, source_lang, target_lang, folder }) => {
     const uid = uidOf(req)
     const { rows } = await pool.query(
-      `INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [uid, title ?? 'Untitled', content ?? '', source_lang ?? 'de', target_lang ?? 'tr']
+      `INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang, folder)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [uid, title ?? 'Untitled', content ?? '', source_lang ?? 'de', target_lang ?? 'tr', folder ?? null]
     )
     return json(rows[0])
+  })
+
+  server.registerTool('language_scenario_move_folder', {
+    title: 'Move a scenario to a folder',
+    description: 'Move a scenario into a different folder (or to the root by passing null).',
+    inputSchema: {
+      id: z.number().int(),
+      folder: z.string().nullable().describe('Destination folder path, or null for the root folder'),
+    },
+  }, async ({ id, folder }) => {
+    const uid = uidOf(req)
+    const { rows } = await pool.query(
+      'UPDATE language_scenarios SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING *',
+      [folder, id, uid]
+    )
+    return json(rows[0] ?? null)
+  })
+
+  server.registerTool('language_scenario_list_folders', {
+    title: 'List scenario folders',
+    description: 'List the distinct folder paths currently in use, so a new or moved scenario can be filed into an existing folder instead of creating a near-duplicate one.',
+    inputSchema: {},
+  }, async () => {
+    const uid = uidOf(req)
+    const { rows } = await pool.query(
+      'SELECT DISTINCT folder FROM language_scenarios WHERE user_id = $1 AND folder IS NOT NULL ORDER BY folder',
+      [uid]
+    )
+    return json(rows.map(r => r.folder as string))
   })
 
   server.registerTool('language_scenario_update', {
