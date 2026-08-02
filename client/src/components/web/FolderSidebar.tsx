@@ -216,6 +216,11 @@ export function NewFolderRow({ parentPath, onCommit, onCancel, depth = 0 }: NewF
   )
 }
 
+const WIDTH_KEY = 'folderSidebar:width'
+const MIN_WIDTH = 160
+const MAX_WIDTH = 400
+const DEFAULT_WIDTH = 176
+
 export function FolderSidebar<T>({
   tree,
   selectedFolder,
@@ -226,8 +231,51 @@ export function FolderSidebar<T>({
   totalCount,
   allLabel = 'All',
 }: Props<T>) {
+  const maxWidthForViewport = () => Math.min(MAX_WIDTH, window.innerWidth - MIN_WIDTH)
+
+  const [width, setWidth] = useState(() => {
+    try {
+      const stored = Number(localStorage.getItem(WIDTH_KEY))
+      return stored >= MIN_WIDTH && stored <= MAX_WIDTH
+        ? Math.min(stored, maxWidthForViewport())
+        : DEFAULT_WIDTH
+    } catch { return DEFAULT_WIDTH }
+  })
+  const widthRef = useRef(width)
+  const draggingRef = useRef(false)
+  const dragStartRef = useRef({ x: 0, width })
+  useEffect(() => { widthRef.current = width }, [width])
+
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      if (!draggingRef.current) return
+      const delta = e.clientX - dragStartRef.current.x
+      setWidth(Math.min(maxWidthForViewport(), Math.max(MIN_WIDTH, dragStartRef.current.width + delta)))
+    }
+    function onUp() {
+      if (!draggingRef.current) return
+      draggingRef.current = false
+      try { localStorage.setItem(WIDTH_KEY, String(widthRef.current)) } catch { /* ignore */ }
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [])
+
+  function onHandlePointerDown(e: React.PointerEvent) {
+    e.preventDefault()
+    draggingRef.current = true
+    dragStartRef.current = { x: e.clientX, width }
+  }
+
   return (
-    <div className="flex flex-col h-full overflow-hidden border-r border-gray-200 dark:border-slate-700 w-44 flex-shrink-0">
+    <div
+      className="flex flex-col h-full border-r border-gray-200 dark:border-slate-700 flex-shrink-0 relative"
+      style={{ width }}
+    >
       <div className="flex items-center justify-between px-3 py-2 flex-shrink-0">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Folders</span>
         <button
@@ -283,6 +331,23 @@ export function FolderSidebar<T>({
             onDeleteFolder={onDeleteFolder}
           />
         ))}
+      </div>
+
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        title="Drag to resize"
+        className="group absolute top-0 h-full w-4 cursor-col-resize touch-none z-10"
+        style={{ right: -12 }}
+        onPointerDown={onHandlePointerDown}
+      >
+        {/* Visual rail sits exactly on the sidebar's true border; most of this
+            handle's hit area bleeds into the neighboring pane's empty padding
+            so it doesn't cover folder-row/header buttons near the edge. */}
+        <div
+          className="absolute top-0 h-full w-0.5 bg-transparent group-hover:bg-xero-green/30 group-active:bg-xero-green/50"
+          style={{ left: 4 }}
+        />
       </div>
     </div>
   )
