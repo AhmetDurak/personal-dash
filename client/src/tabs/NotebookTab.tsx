@@ -78,6 +78,10 @@ function relativeDay(dateStr: string): string {
   return `in ${diff}d`
 }
 
+function fmtCreated(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 // ─── SwipeToDelete ────────────────────────────────────────────────────────────
 
 const DELETE_BTN_W = 72
@@ -2456,9 +2460,12 @@ function VocabView() {
             }`}
           >
             <div className="flex items-start justify-between mb-1.5">
-              <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
-                {LANG_LABELS[card.language] ?? card.language} → {LANG_LABELS[card.translation_language] ?? card.translation_language}
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
+                  {LANG_LABELS[card.language] ?? card.language} → {LANG_LABELS[card.translation_language] ?? card.translation_language}
+                </span>
+                <span className="text-[10px] text-gray-400 dark:text-slate-500">Added {fmtCreated(card.created_at)}</span>
+              </div>
               {selectMode ? (
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                   selectedIds.has(card.id) ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'
@@ -4000,6 +4007,7 @@ function SentenceView() {
                     <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${due ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
                       {due ? '⚡ Due' : nextReviewLabel(s.due_at)}
                     </span>
+                    <span className="text-[10px] text-gray-400 dark:text-slate-500">Added {fmtCreated(s.created_at)}</span>
                   </div>
                   {!selectMode && (
                     <div className="flex gap-2">
@@ -4413,9 +4421,12 @@ function ScenarioView() {
                   <p className="text-[10px] text-violet-500 dark:text-violet-400 mb-1">🏛️ {s.memory_palace}</p>
                 )}
                 <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-2">{s.content || '—'}</p>
-                <span className="mt-2 inline-block text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
-                  {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
-                </span>
+                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                  <span className="inline-block text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
+                    {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
+                  </span>
+                  <span className="text-[10px] text-gray-400 dark:text-slate-500">Added {fmtCreated(s.created_at)}</span>
+                </div>
               </button>
               {!scenSelectMode && (
                 <div className="flex gap-2 mt-2 pt-2 border-t border-gray-50 dark:border-slate-700">
