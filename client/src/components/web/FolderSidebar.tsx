@@ -49,7 +49,7 @@ function FolderRow<T>({
 }: FolderRowProps<T>) {
   const [expanded, setExpanded] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [dropPos, setDropPos] = useState<'before' | 'after' | null>(null)
+  const [dropPos, setDropPos] = useState<'before' | 'after' | 'inside' | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState(node.name)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -93,21 +93,31 @@ function FolderRow<T>({
           onDragOver: (e: React.DragEvent) => {
             e.preventDefault(); e.stopPropagation()
             const rect = e.currentTarget.getBoundingClientRect()
-            setDropPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+            const relY = (e.clientY - rect.top) / rect.height
+            setDropPos(relY < 0.3 ? 'before' : relY > 0.7 ? 'after' : 'inside')
           },
-          onDragLeave: () => setDropPos(null),
+          onDragLeave: (e: React.DragEvent) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropPos(null) },
           onDrop: (e: React.DragEvent) => {
             e.preventDefault(); e.stopPropagation()
             const dragPath = e.dataTransfer.getData('folderPath')
-            if (dragPath && dropPos && dragPath !== node.path) onReorderFolder(dragPath, node.path, dropPos)
+            const pos = dropPos
             setDropPos(null)
+            if (!dragPath || dragPath === node.path) return
+            if (pos === 'inside') {
+              if (node.path.startsWith(dragPath + '/')) return
+              const name = dragPath.split('/').pop()!
+              const newPath = `${node.path}/${name}`
+              if (newPath !== dragPath) onRenameFolder(dragPath, newPath)
+            } else if (pos) {
+              onReorderFolder(dragPath, node.path, pos)
+            }
           },
         })}
         className={`group flex items-center gap-1 rounded-lg cursor-pointer select-none px-2 py-1.5 min-h-[36px] transition-colors ${
           isSelected
             ? 'bg-xero-green/10 text-xero-green dark:text-xero-green'
             : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
-        }${dropPos === 'before' ? ' border-t-2 border-xero-green' : dropPos === 'after' ? ' border-b-2 border-xero-green' : ''}`}
+        }${dropPos === 'before' ? ' border-t-2 border-xero-green' : dropPos === 'after' ? ' border-b-2 border-xero-green' : dropPos === 'inside' ? ' ring-1 ring-inset ring-xero-green bg-xero-green/10' : ''}`}
         style={{ paddingLeft: `${8 + depth * 12}px` }}
         onClick={() => onSelect(isSelected ? null : node.path)}
       >
@@ -258,6 +268,7 @@ export function FolderSidebar<T>({
   orderKey,
 }: Props<T>) {
   const maxWidthForViewport = () => Math.min(MAX_WIDTH, window.innerWidth - MIN_WIDTH)
+  const [rootDragOver, setRootDragOver] = useState(false)
 
   const orderStorageKey = `folderOrder:${orderKey}`
   const [order, setOrder] = useState<string[]>(() => {
@@ -331,14 +342,26 @@ export function FolderSidebar<T>({
       </div>
 
       <div className="flex-1 overflow-y-auto px-1 pb-2">
-        {/* All items row */}
+        {/* All items row — also accepts a dropped folder to move it to the root level */}
         <div
           className={`flex items-center gap-2 rounded-lg cursor-pointer px-2 py-1.5 min-h-[36px] transition-colors mb-0.5 ${
             selectedFolder === null
               ? 'bg-xero-green/10 text-xero-green dark:text-xero-green'
+              : rootDragOver
+              ? 'ring-1 ring-inset ring-xero-green bg-xero-green/10'
               : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
           }`}
           onClick={() => onSelect(null)}
+          onDragOver={e => { e.preventDefault(); setRootDragOver(true) }}
+          onDragLeave={() => setRootDragOver(false)}
+          onDrop={e => {
+            e.preventDefault()
+            setRootDragOver(false)
+            const dragPath = e.dataTransfer.getData('folderPath')
+            if (!dragPath) return
+            const name = dragPath.split('/').pop()!
+            if (name !== dragPath) onRenameFolder(dragPath, name)
+          }}
         >
           <span className="w-3 h-3 block flex-shrink-0" />
           <span className="text-xs flex-1 truncate">{allLabel}</span>

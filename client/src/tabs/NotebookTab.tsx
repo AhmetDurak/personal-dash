@@ -163,6 +163,7 @@ interface NoteTreeCtxType {
   onCommitRename: () => void
   onDropNote: (noteId: string, folder: string | null) => void
   onReorderNote: (dragId: string, targetId: string, pos: 'before' | 'after') => void
+  onMoveFolder: (dragPath: string, targetPath: string | null) => void
 }
 const NoteTreeCtx = createContext<NoteTreeCtxType | null>(null)
 
@@ -176,19 +177,32 @@ function FolderTreeRow({ node, depth }: { node: FolderNode<Note>; depth: number 
   return (
     <>
       <div
+        {...(!isTouch && {
+          draggable: true,
+          onDragStart: (e: React.DragEvent) => { e.stopPropagation(); e.dataTransfer.setData('folderPath', node.path); e.dataTransfer.effectAllowed = 'move' },
+        })}
         style={{ paddingLeft: depth * 14 + 4 }}
         className={`group flex items-center gap-1 py-2 pr-1 rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
         onClick={() => ctx.onToggle(node.path)}
         onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'folder', node.path) }}
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false) }}
-        onDrop={e => { e.preventDefault(); setDragOver(false); const id = e.dataTransfer.getData('noteId'); if (id) ctx.onDropNote(id, node.path) }}
+        onDrop={e => {
+          e.preventDefault(); e.stopPropagation(); setDragOver(false)
+          const noteId = e.dataTransfer.getData('noteId')
+          if (noteId) { ctx.onDropNote(noteId, node.path); return }
+          const folderPath = e.dataTransfer.getData('folderPath')
+          if (folderPath && folderPath !== node.path && !node.path.startsWith(folderPath + '/')) {
+            ctx.onMoveFolder(folderPath, node.path)
+          }
+        }}
       >
         <IconChevronRight className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-100 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.5} />
         <IconFolder className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500 flex-shrink-0" strokeWidth={1.75} />
         {isRenaming ? (
           <input
             autoFocus
+            draggable={false}
             value={ctx.renaming!.val}
             onChange={e => ctx.setRenaming({ path: node.path, val: e.target.value })}
             onKeyDown={e => {
@@ -543,6 +557,15 @@ function NotesView() {
     setExpanded(s => { const n = new Set(s); n.delete(r.path); n.add(newPath); return n })
   }
 
+  async function handleMoveFolder(dragPath: string, targetPath: string | null) {
+    if (targetPath !== null && (targetPath === dragPath || targetPath.startsWith(dragPath + '/'))) return
+    const name = dragPath.split('/').pop()!
+    const newPath = targetPath ? `${targetPath}/${name}` : name
+    if (newPath === dragPath) return
+    await renameFolder(dragPath, newPath)
+    setExpanded(s => { const n = new Set(s); n.delete(dragPath); n.add(newPath); return n })
+  }
+
   function openCtx(e: React.MouseEvent, type: 'folder'|'note', folderPath?: string, noteId?: string) {
     const x = Math.min(e.clientX, window.innerWidth - 175)
     const y = Math.min(e.clientY, window.innerHeight - 210)
@@ -594,7 +617,13 @@ function NotesView() {
         <div
           className="flex-1 overflow-y-auto py-1 px-1"
           onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('noteId'); if (id) moveNoteToFolder(id, null) }}
+          onDrop={e => {
+            e.preventDefault()
+            const noteId = e.dataTransfer.getData('noteId')
+            if (noteId) { moveNoteToFolder(noteId, null); return }
+            const folderPath = e.dataTransfer.getData('folderPath')
+            if (folderPath) handleMoveFolder(folderPath, null)
+          }}
         >
           {isLoading && <p className="text-xs text-gray-400 p-4">Loading…</p>}
           <NoteTreeCtx.Provider value={{
@@ -604,6 +633,7 @@ function NotesView() {
             onNewNote: handleNew, onCommitAdding: commitAdding, onCommitRename: commitRename,
             onDropNote: (noteId, folder) => moveNoteToFolder(noteId, folder),
             onReorderNote: reorderNote,
+            onMoveFolder: handleMoveFolder,
           }}>
             {query ? (
               filteredNotes.length === 0

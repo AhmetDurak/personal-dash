@@ -141,4 +141,19 @@ export const vault = {
     const found = this.find(id, userId)
     if (found) fs.unlinkSync(found.filePath)
   },
+
+  renameFolder(oldPath: string, newPath: string, userId: number): void {
+    for (const fp of walkMd(VAULT)) {
+      const n = readNote(fp)
+      if (!n || n.user_id !== userId) continue
+      if (n.folder !== oldPath && !n.folder?.startsWith(oldPath + '/')) continue
+      const newFolder = n.folder === oldPath ? newPath : newPath + n.folder!.slice(oldPath.length)
+      const now = new Date().toISOString()
+      const updated = { ...n, folder: newFolder, updated_at: now }
+      const newFp = notePath(newFolder, updated.title)
+      fs.mkdirSync(path.dirname(newFp), { recursive: true })
+      fs.writeFileSync(newFp, buildFm(writeMeta(updated), updated.content), 'utf8')
+      if (newFp !== fp) fs.unlinkSync(fp)
+    }
+  },
 }

@@ -76,6 +76,7 @@ export function notebookRouter(pool: Pool): Router {
     const uid = (req.user as Express.User).id
     const { oldPath, newPath } = req.body as { oldPath: string; newPath: string }
     if (!oldPath?.trim() || !newPath?.trim()) { res.status(400).json({ error: 'oldPath and newPath required' }); return }
+    if (vault.enabled()) { vault.renameFolder(oldPath, newPath, uid); res.json({ ok: true }); return }
     await pool.query(
       `UPDATE notebook_notes
        SET folder = CASE
