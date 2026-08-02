@@ -221,6 +221,17 @@ html, body {
 .dark .hljs-addition { color: #aff5b4; background-color: #033a16; }
 .dark .hljs-deletion { color: #ffdcd7; background-color: #67060c; }
 
+/* ── Mermaid diagrams in note preview ────────────────────────────────────────── */
+.mermaid-diagram {
+  margin: 0.75rem 0;
+  padding: 1rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  overflow-x: auto;
+}
+.mermaid-diagram svg { display: block; height: auto; margin: 0 auto; }
+.dark .mermaid-diagram { background: #0F172A; }
+
 /* Scrollbar in dark mode */
 .dark ::-webkit-scrollbar { width: 6px; height: 6px; }
 .dark ::-webkit-scrollbar-track { background: #0F172A; }

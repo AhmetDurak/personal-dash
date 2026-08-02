@@ -9,6 +9,7 @@ import { SortFilterBar } from '../components/web/SortFilterBar'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { hljs } from '../lib/highlight'
+import { renderMermaid } from '../lib/mermaid'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
@@ -292,6 +293,7 @@ function parseMarkdown(src: string): string {
 
 function NotesView() {
   const { t } = useLanguage()
+  const { dark } = useDarkMode()
   const { notes, isLoading, createNote, saveNote, moveNoteToFolder, deleteNote, renameFolder, deleteFolder } = useNotes()
   const [noteParams, setNoteParams] = useSearchParams()
   const selectedId = noteParams.get('note') ? Number(noteParams.get('note')) : null
@@ -399,10 +401,13 @@ function NotesView() {
 
   useEffect(() => {
     if (!preview || !previewRef.current) return
-    previewRef.current.querySelectorAll<HTMLElement>('pre code').forEach(el => {
+    const container = previewRef.current
+
+    container.querySelectorAll<HTMLElement>('pre code').forEach(el => {
       const lang = Array.from(el.classList)
         .find(c => c.startsWith('language-'))
         ?.slice(9)
+      if (lang === 'mermaid') return // rendered as a diagram below, not syntax-highlighted
       if (lang && hljs.getLanguage(lang)) {
         hljs.highlightElement(el)
       } else {
@@ -416,7 +421,39 @@ function NotesView() {
         pre.prepend(badge)
       }
     })
-  }, [preview, localContent])
+
+    async function renderInto(wrapper: HTMLElement, source: string) {
+      try {
+        wrapper.innerHTML = await renderMermaid(source, dark)
+        wrapper.dataset.dark = String(dark)
+        // Mermaid sets width="100%" on the <svg>, which silently shrinks wide diagrams to fit
+        // instead of letting them overflow into the wrapper's scroll area. Pin it to its
+        // natural viewBox width instead so small diagrams stay centered and wide ones scroll.
+        const svgEl = wrapper.querySelector('svg')
+        const vbWidth = svgEl?.viewBox?.baseVal?.width
+        if (svgEl && vbWidth) svgEl.style.width = `${vbWidth}px`
+      } catch (err) {
+        wrapper.innerHTML = `<pre class="text-xs text-red-400 whitespace-pre-wrap break-words">Mermaid error: ${(err as Error).message}</pre>`
+      }
+    }
+
+    // Re-theme already-rendered diagrams if dark mode changed since they were drawn
+    container.querySelectorAll<HTMLElement>('.mermaid-diagram').forEach(wrapper => {
+      if (wrapper.dataset.dark !== String(dark)) renderInto(wrapper, wrapper.dataset.source ?? '')
+    })
+
+    // Convert freshly-parsed mermaid code fences into diagrams
+    container.querySelectorAll<HTMLElement>('pre code.language-mermaid').forEach(code => {
+      const pre = code.parentElement
+      if (!pre) return
+      const source = code.textContent ?? ''
+      const wrapper = document.createElement('div')
+      wrapper.className = 'mermaid-diagram'
+      wrapper.dataset.source = source
+      pre.replaceWith(wrapper)
+      renderInto(wrapper, source)
+    })
+  }, [preview, localContent, dark])
 
   function togglePreview() {
     const el = preview ? previewRef.current : textareaRef.current
