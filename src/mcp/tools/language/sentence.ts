@@ -36,6 +36,33 @@ export function registerSentenceTools(server: McpServer, req: Request, pool: Poo
     return json(rows[0])
   })
 
+  server.registerTool('language_sentence_bulk_add', {
+    title: 'Add multiple language sentences',
+    description: 'Add several sentences for language practice in one call, each optionally inside a folder.',
+    inputSchema: {
+      sentences: z.array(z.object({
+        source_text: z.string(),
+        translation: z.string().optional(),
+        source_lang: z.string().optional().describe('Default "de"'),
+        target_lang: z.string().optional().describe('Default "tr"'),
+        folder: z.string().nullable().optional().describe('Folder path, e.g. "Travel/Restaurants". Omit or null for the root folder.'),
+        due_at: z.string().date().optional().describe('First review date, YYYY-MM-DD. Omit for today.'),
+      })).min(1),
+    },
+  }, async ({ sentences }) => {
+    const uid = uidOf(req)
+    const created = []
+    for (const s of sentences) {
+      const { rows } = await pool.query(
+        `INSERT INTO language_sentences (user_id, source_text, translation, source_lang, target_lang, folder, due_at)
+         VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7, CURRENT_DATE)) RETURNING *`,
+        [uid, s.source_text, s.translation ?? null, s.source_lang ?? 'de', s.target_lang ?? 'tr', s.folder ?? null, s.due_at ?? null]
+      )
+      created.push(rows[0])
+    }
+    return json(created)
+  })
+
   server.registerTool('language_sentence_move_folder', {
     title: 'Move a sentence to a folder',
     description: 'Move a sentence into a different folder (or to the root by passing null).',

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   IconFolder,
   IconChevronRight,
@@ -9,7 +9,9 @@ import {
   IconClose,
 } from '../../lib/icons'
 import type { FolderNode } from '../../lib/folderTree'
-import { countAllItems } from '../../lib/folderTree'
+import { countAllItems, collectFolderPaths, applyManualOrder } from '../../lib/folderTree'
+
+const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
 interface Props<T> {
   tree: FolderNode<T>
@@ -20,6 +22,8 @@ interface Props<T> {
   onDeleteFolder: (path: string) => void
   totalCount: number
   allLabel?: string
+  /** Unique per-view key for persisting manual folder order, e.g. "vocab", "sent", "scen". */
+  orderKey: string
 }
 
 interface FolderRowProps<T> {
@@ -30,6 +34,7 @@ interface FolderRowProps<T> {
   onNewFolder: (parentPath: string) => void
   onRenameFolder: (oldPath: string, newPath: string) => void
   onDeleteFolder: (path: string) => void
+  onReorderFolder: (dragPath: string, targetPath: string, pos: 'before' | 'after') => void
 }
 
 function FolderRow<T>({
@@ -40,9 +45,11 @@ function FolderRow<T>({
   onNewFolder,
   onRenameFolder,
   onDeleteFolder,
+  onReorderFolder,
 }: FolderRowProps<T>) {
   const [expanded, setExpanded] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [dropPos, setDropPos] = useState<'before' | 'after' | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState(node.name)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -80,11 +87,27 @@ function FolderRow<T>({
   return (
     <div>
       <div
+        {...(!isTouch && {
+          draggable: true,
+          onDragStart: (e: React.DragEvent) => { e.stopPropagation(); e.dataTransfer.setData('folderPath', node.path); e.dataTransfer.effectAllowed = 'move' },
+          onDragOver: (e: React.DragEvent) => {
+            e.preventDefault(); e.stopPropagation()
+            const rect = e.currentTarget.getBoundingClientRect()
+            setDropPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
+          },
+          onDragLeave: () => setDropPos(null),
+          onDrop: (e: React.DragEvent) => {
+            e.preventDefault(); e.stopPropagation()
+            const dragPath = e.dataTransfer.getData('folderPath')
+            if (dragPath && dropPos && dragPath !== node.path) onReorderFolder(dragPath, node.path, dropPos)
+            setDropPos(null)
+          },
+        })}
         className={`group flex items-center gap-1 rounded-lg cursor-pointer select-none px-2 py-1.5 min-h-[36px] transition-colors ${
           isSelected
             ? 'bg-xero-green/10 text-xero-green dark:text-xero-green'
             : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
-        }`}
+        }${dropPos === 'before' ? ' border-t-2 border-xero-green' : dropPos === 'after' ? ' border-b-2 border-xero-green' : ''}`}
         style={{ paddingLeft: `${8 + depth * 12}px` }}
         onClick={() => onSelect(isSelected ? null : node.path)}
       >
@@ -105,6 +128,7 @@ function FolderRow<T>({
         {renaming ? (
           <input
             ref={renameRef}
+            draggable={false}
             className="flex-1 min-w-0 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
             value={renameVal}
             onChange={e => setRenameVal(e.target.value)}
@@ -166,6 +190,7 @@ function FolderRow<T>({
           onNewFolder={onNewFolder}
           onRenameFolder={onRenameFolder}
           onDeleteFolder={onDeleteFolder}
+          onReorderFolder={onReorderFolder}
         />
       ))}
     </div>
@@ -230,8 +255,26 @@ export function FolderSidebar<T>({
   onDeleteFolder,
   totalCount,
   allLabel = 'All',
+  orderKey,
 }: Props<T>) {
   const maxWidthForViewport = () => Math.min(MAX_WIDTH, window.innerWidth - MIN_WIDTH)
+
+  const orderStorageKey = `folderOrder:${orderKey}`
+  const [order, setOrder] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(orderStorageKey) ?? '[]') as string[] } catch { return [] }
+  })
+  const sortedTree = useMemo(() => applyManualOrder(tree, order), [tree, order])
+
+  function reorderFolder(dragPath: string, targetPath: string, pos: 'before' | 'after') {
+    const allPaths = collectFolderPaths(tree)
+    const base = [...order.filter(p => allPaths.includes(p)), ...allPaths.filter(p => !order.includes(p))]
+    const next = base.filter(p => p !== dragPath)
+    const idx = next.indexOf(targetPath)
+    if (idx === -1) return
+    next.splice(pos === 'before' ? idx : idx + 1, 0, dragPath)
+    try { localStorage.setItem(orderStorageKey, JSON.stringify(next)) } catch { /* ignore */ }
+    setOrder(next)
+  }
 
   const [width, setWidth] = useState(() => {
     try {
@@ -319,7 +362,7 @@ export function FolderSidebar<T>({
         )}
 
         {/* Folder tree */}
-        {tree.children.map(child => (
+        {sortedTree.children.map(child => (
           <FolderRow
             key={child.path}
             node={child}
@@ -329,6 +372,7 @@ export function FolderSidebar<T>({
             onNewFolder={onNewFolder}
             onRenameFolder={onRenameFolder}
             onDeleteFolder={onDeleteFolder}
+            onReorderFolder={reorderFolder}
           />
         ))}
       </div>

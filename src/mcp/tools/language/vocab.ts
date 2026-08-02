@@ -39,6 +39,36 @@ export function registerVocabTools(server: McpServer, req: Request, pool: Pool) 
     return json(rows[0])
   })
 
+  server.registerTool('language_vocab_bulk_add', {
+    title: 'Add multiple vocabulary words',
+    description: 'Add (or update, for words that already exist) several vocabulary flashcards in one call, each optionally inside a folder.',
+    inputSchema: {
+      words: z.array(z.object({
+        word: z.string(),
+        translation: z.string(),
+        language: z.string().optional().describe('Source language code, default "de"'),
+        translation_language: z.string().optional().describe('Translation language code, default "tr"'),
+        example: z.string().optional(),
+        folder: z.string().nullable().optional().describe('Folder path, e.g. "Travel/Food". Omit or null for the root folder.'),
+      })).min(1),
+    },
+  }, async ({ words }) => {
+    const uid = uidOf(req)
+    const created = []
+    for (const w of words) {
+      const { rows } = await pool.query(
+        `INSERT INTO vocabulary (word, translation, language, translation_language, example, folder, user_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (LOWER(word), language, user_id) DO UPDATE
+           SET translation=EXCLUDED.translation, translation_language=EXCLUDED.translation_language, example=EXCLUDED.example
+         RETURNING *`,
+        [w.word.trim(), w.translation.trim(), w.language ?? 'de', w.translation_language ?? 'tr', w.example ?? null, w.folder ?? null, uid]
+      )
+      created.push(rows[0])
+    }
+    return json(created)
+  })
+
   server.registerTool('language_vocab_move_folder', {
     title: 'Move a vocabulary word to a folder',
     description: 'Move a vocabulary flashcard into a different folder (or to the root by passing null).',

@@ -35,6 +35,32 @@ export function registerScenarioTools(server: McpServer, req: Request, pool: Poo
     return json(rows[0])
   })
 
+  server.registerTool('language_scenario_bulk_add', {
+    title: 'Add multiple language scenarios',
+    description: 'Add several practice scenarios (e.g. dialogues or situational scripts) in one call, each optionally inside a folder.',
+    inputSchema: {
+      scenarios: z.array(z.object({
+        title: z.string().optional().describe('Defaults to "Untitled"'),
+        content: z.string().optional(),
+        source_lang: z.string().optional().describe('Default "de"'),
+        target_lang: z.string().optional().describe('Default "tr"'),
+        folder: z.string().nullable().optional().describe('Folder path, e.g. "Travel/Airport". Omit or null for the root folder.'),
+      })).min(1),
+    },
+  }, async ({ scenarios }) => {
+    const uid = uidOf(req)
+    const created = []
+    for (const s of scenarios) {
+      const { rows } = await pool.query(
+        `INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang, folder)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [uid, s.title ?? 'Untitled', s.content ?? '', s.source_lang ?? 'de', s.target_lang ?? 'tr', s.folder ?? null]
+      )
+      created.push(rows[0])
+    }
+    return json(created)
+  })
+
   server.registerTool('language_scenario_move_folder', {
     title: 'Move a scenario to a folder',
     description: 'Move a scenario into a different folder (or to the root by passing null).',

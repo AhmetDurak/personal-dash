@@ -2354,6 +2354,7 @@ function VocabView() {
           onDeleteFolder={handleDeleteVocabFolder}
           totalCount={vocab.length}
           allLabel="All Words"
+          orderKey="vocab"
         />
         {newFolderParent !== null && (
           <NewFolderRow
@@ -3945,6 +3946,7 @@ function SentenceView() {
           onDeleteFolder={handleDeleteSentFolder}
           totalCount={sentences.length}
           allLabel="All Sentences"
+          orderKey="sent"
         />
         {newFolderParent !== null && (
           <NewFolderRow
@@ -4388,6 +4390,7 @@ function ScenarioView() {
           onDeleteFolder={handleDeleteScenFolder}
           totalCount={scenarios.length}
           allLabel="All Scenarios"
+          orderKey="scen"
         />
         {newFolderParent !== null && (
           <NewFolderRow

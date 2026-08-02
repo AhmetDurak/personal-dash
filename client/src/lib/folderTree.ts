@@ -42,6 +42,19 @@ export function buildFolderTree<T extends { folder: string | null }>(
   return root
 }
 
+// Sorts each level's children according to their position in a flat manual-order
+// list of paths (paths not present fall back to the end, in their existing order).
+export function applyManualOrder<T>(node: FolderNode<T>, order: string[]): FolderNode<T> {
+  const indexOf = (path: string) => {
+    const i = order.indexOf(path)
+    return i === -1 ? order.length : i
+  }
+  const children = [...node.children]
+    .sort((a, b) => indexOf(a.path) - indexOf(b.path))
+    .map(c => applyManualOrder(c, order))
+  return { ...node, children }
+}
+
 export function collectFolderPaths<T>(node: FolderNode<T>): string[] {
   const paths: string[] = []
   function walk(n: FolderNode<T>) {
