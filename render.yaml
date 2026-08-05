@@ -24,6 +24,10 @@ services:
         sync: false
       - key: API_URL
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAGIC_LINK_FROM_EMAIL
+        sync: false
       - key: DB_CLIENT_ID
         sync: false
       - key: DB_CLIENT_SECRET
