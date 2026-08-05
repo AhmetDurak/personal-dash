@@ -2,6 +2,9 @@ import { Router, Request, Response } from 'express'
 import passport from 'passport'
 import { Pool } from 'pg'
 import { seedDemoUser, DEMO_GOOGLE_ID } from '../../db/seed-demo'
+import { requestMagicLink, consumeMagicLinkToken } from '../../auth/magicLink'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function authRouter(pool?: Pool) {
   const router = Router()
@@ -48,6 +51,34 @@ export function authRouter(pool?: Pool) {
       req.login(rows[0], (err) => {
         if (err) return next(err)
         res.redirect(process.env.FRONTEND_URL ?? '/')
+      })
+    } catch (err) { next(err) }
+  })
+
+  // Magic-link (passwordless) email login
+  router.post('/magic-link/request', async (req: Request, res: Response) => {
+    if (!pool) { res.status(503).json({ error: 'Not available' }); return }
+    const email = (req.body?.email as string | undefined)?.trim().toLowerCase()
+    if (!email || !EMAIL_RE.test(email)) {
+      res.status(400).json({ error: 'Please enter a valid email address' })
+      return
+    }
+    await requestMagicLink(pool, email)
+    // Same response whether the request was rate-limited or actually sent — no
+    // signal to the caller either way.
+    res.json({ ok: true })
+  })
+
+  router.get('/magic-link/callback', async (req: Request, res: Response, next) => {
+    if (!pool) { res.redirect('/login'); return }
+    const token = req.query.token as string | undefined
+    if (!token) { res.redirect('/login?error=invalid_link'); return }
+    try {
+      const user = await consumeMagicLinkToken(pool, token)
+      if (!user) { res.redirect('/login?error=invalid_link'); return }
+      req.login(user, (err) => {
+        if (err) return next(err)
+        res.redirect(req.session.mcpAuthRequest ? '/mcp-consent' : (process.env.FRONTEND_URL ?? '/'))
       })
     } catch (err) { next(err) }
   })

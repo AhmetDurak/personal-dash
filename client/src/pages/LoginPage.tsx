@@ -1,4 +1,36 @@
+import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+
 export function LoginPage() {
+  const [params] = useSearchParams()
+  const hasLinkError = params.get('error') === 'invalid_link'
+  const [email, setEmail] = useState('')
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>(hasLinkError ? 'error' : 'idle')
+  const [error, setError] = useState(hasLinkError ? 'That link is invalid or has expired. Please request a new one.' : '')
+
+  async function handleMagicLinkRequest(e: React.FormEvent) {
+    e.preventDefault()
+    setStatus('sending')
+    setError('')
+    try {
+      const res = await fetch('/auth/magic-link/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError(body.error ?? 'Something went wrong. Please try again.')
+        setStatus('error')
+        return
+      }
+      setStatus('sent')
+    } catch {
+      setError('Something went wrong. Please try again.')
+      setStatus('error')
+    }
+  }
+
   return (
     <div className="h-screen flex overflow-hidden bg-gray-950">
 
@@ -79,6 +111,52 @@ export function LoginPage() {
             <GoogleIcon />
             Continue with Google
           </a>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-gray-800" />
+            <span className="text-xs text-gray-600 font-medium">or</span>
+            <div className="flex-1 h-px bg-gray-800" />
+          </div>
+
+          {/* Email magic-link sign-in */}
+          {status === 'sent' ? (
+            <div role="status" aria-live="polite" className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3.5 text-center">
+              <p className="text-sm font-semibold text-white mb-1">Check your email</p>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                We sent a sign-in link to <span className="text-gray-200">{email}</span>. It expires in 15 minutes.
+              </p>
+              <button
+                onClick={() => { setStatus('idle'); setEmail('') }}
+                className="block w-full text-xs text-gray-500 hover:text-gray-300 underline underline-offset-2 py-3.5 mt-1"
+              >
+                Use a different email
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleMagicLinkRequest} className="w-full">
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                inputMode="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full bg-gray-900 border border-gray-700 text-white placeholder-gray-600 px-4 py-3 rounded-xl text-sm outline-none focus:border-gray-500 transition-colors mb-2"
+              />
+              {status === 'error' && (
+                <p role="alert" className="text-xs text-red-400 mb-2">{error}</p>
+              )}
+              <button
+                type="submit"
+                disabled={status === 'sending'}
+                className="w-full flex items-center justify-center gap-2 bg-gray-800/80 border border-gray-700 text-gray-200 px-5 py-3 rounded-xl font-semibold text-sm hover:bg-gray-800 hover:border-gray-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {status === 'sending' ? 'Sending…' : 'Continue with email'}
+              </button>
+            </form>
+          )}
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-4">

@@ -13,6 +13,20 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS bearer_token TEXT UNIQUE DEFAULT gen_random_uuid()::text;
 UPDATE users SET bearer_token = gen_random_uuid()::text WHERE bearer_token IS NULL;
 
+-- Magic-link (passwordless email) login: a user may now exist without a google_id,
+-- and is looked up/created by email, so email must be unique.
+ALTER TABLE users ALTER COLUMN google_id DROP NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email);
+
+CREATE TABLE IF NOT EXISTS magic_link_tokens (
+  token_hash TEXT PRIMARY KEY,
+  email      TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_email ON magic_link_tokens(email, created_at);
+
 CREATE TABLE IF NOT EXISTS sessions (
   sid    TEXT NOT NULL PRIMARY KEY,
   sess   JSONB NOT NULL,

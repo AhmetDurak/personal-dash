@@ -4,7 +4,7 @@ declare global {
   namespace Express {
     interface User {
       id: number
-      google_id: string
+      google_id: string | null
       email: string
       name: string
       picture: string | null
