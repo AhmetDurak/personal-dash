@@ -76,10 +76,29 @@ export function useChains() {
     await mutate()
   }
 
+  async function updateChain(chainId: string, updates: { name?: string; length?: number }) {
+    const current = (data ?? []).find(c => c.id === chainId)
+    if (!current) return
+    const name = updates.name ?? current.name
+    let marks = current.marks
+    const length = updates.length ?? current.length
+    if (length > marks.length) {
+      marks = [...marks, ...Array(length - marks.length).fill(null)]
+    } else if (length < marks.length) {
+      marks = marks.slice(0, length)
+    }
+    await fetch(`/api/chains/${chainId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, length, marks }),
+    })
+    await mutate()
+  }
+
   async function removeChain(chainId: string) {
     await fetch(`/api/chains/${chainId}`, { method: 'DELETE' })
     await mutate()
   }
 
-  return { chains, isLoading, addChain, toggleMark, removeChain }
+  return { chains, isLoading, addChain, toggleMark, updateChain, removeChain }
 }

@@ -455,4 +455,13 @@ html, body {
   100% { transform: scale(1); opacity: 1; }
 }
 .chain-emoji-pop { animation: chain-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.chain-strip {
+  cursor: grab;
+  user-select: none;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
+}
+.chain-strip::-webkit-scrollbar { display: none; }
+.chain-strip.dragging { cursor: grabbing; scroll-behavior: auto; }
 [data-theme="catppuccin"] ::-webkit-scrollbar-thumb { background: #45475A; }
