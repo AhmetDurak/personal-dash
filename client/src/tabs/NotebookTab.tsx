@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode, createContext, useContext } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
-  IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage, IconPalace, IconImage,
+  IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage, IconPalace, IconImage, IconExternalLink,
   IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconChevronLeft, IconUpload } from '../lib/icons'
 import { buildFolderTree, collectFolderPaths, getItemsInFolder, type FolderNode } from '../lib/folderTree'
 import { FolderSidebar, NewFolderRow } from '../components/web/FolderSidebar'
@@ -10,7 +10,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { hljs } from '../lib/highlight'
 import { renderMermaid } from '../lib/mermaid'
-import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
+import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios,
   useMemoryPalaceList, useMemoryPalace } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
@@ -2214,6 +2214,19 @@ function VocabView() {
     })
   }
 
+  // Deep-link support: Memory Palace's "Go to linked item" navigates here with
+  // ?highlight=<id> — open that word's edit panel directly, regardless of folder.
+  const [highlightParams, setHighlightParams] = useSearchParams()
+  useEffect(() => {
+    const hi = highlightParams.get('highlight')
+    if (!hi) return
+    const card = vocab.find(v => v.id === Number(hi))
+    if (card) {
+      openEdit(card)
+      setHighlightParams(p => { p.delete('highlight'); return p }, { replace: true })
+    }
+  }, [highlightParams, vocab]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function toggleFlip(id: number) {
     setFlippedCards(prev => {
       const next = new Set(prev)
@@ -3818,6 +3831,19 @@ function SentenceView() {
     setTranslateResult(null)
   }
 
+  // Deep-link support: Memory Palace's "Go to linked item" navigates here with
+  // ?highlight=<id> — open that sentence's edit panel directly, regardless of folder.
+  const [highlightParams, setHighlightParams] = useSearchParams()
+  useEffect(() => {
+    const hi = highlightParams.get('highlight')
+    if (!hi) return
+    const s = sentences.find(s => s.id === Number(hi))
+    if (s) {
+      openEdit(s)
+      setHighlightParams(p => { p.delete('highlight'); return p }, { replace: true })
+    }
+  }, [highlightParams, sentences]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function scheduleSave(id: number, patch: Partial<LanguageSentence>) {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => saveSentence(id, patch), 1000)
@@ -4257,6 +4283,19 @@ function ScenarioView() {
     setIsEditingContent(false)
   }
 
+  // Deep-link support: Memory Palace's "Go to linked item" navigates here with
+  // ?highlight=<id> — open that scenario directly, regardless of folder.
+  const [highlightParams, setHighlightParams] = useSearchParams()
+  useEffect(() => {
+    const hi = highlightParams.get('highlight')
+    if (!hi) return
+    const s = scenarios.find(s => s.id === Number(hi))
+    if (s) {
+      openScenario(s)
+      setHighlightParams(p => { p.delete('highlight'); return p }, { replace: true })
+    }
+  }, [highlightParams, scenarios]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function scheduleTitle(id: number, title: string) {
     if (titleTimer.current) clearTimeout(titleTimer.current)
     titleTimer.current = setTimeout(() => saveScenario(id, { title }), 800)
@@ -4629,6 +4668,12 @@ function pcWrapLines(text: string, maxChars: number): string[] {
 
 const PALACE_EMOJI_CHOICES = ['🚪', '🛏️', '🍳', '🛋️', '🚿', '🌳', '🍽️', '📚', '🪟', '🔑', '🕯️', '🖼️', '🪑', '🧺', '🧴', '🎒']
 
+// Maps a linked-content type to its Language sub-tab path, so a checkpoint's
+// link can be opened at `/learn/language/<path>?highlight=<id>`.
+function pcContentRoute(type: PalaceContentType): string {
+  return type === 'vocab' ? 'vocab' : type === 'sentence' ? 'sentence' : 'scenario'
+}
+
 // ─── CheckpointEditor (label · linked content · media) ─────────────────────────
 
 function CheckpointEditor({ checkpoint, onSave, onClose }: {
@@ -4637,6 +4682,7 @@ function CheckpointEditor({ checkpoint, onSave, onClose }: {
   onClose: () => void
 }) {
   const { dark } = useDarkMode()
+  const navigate = useNavigate()
   const { vocab } = useVocabulary()
   const { sentences } = useLanguageSentences()
   const { scenarios } = useLanguageScenarios()
@@ -4744,6 +4790,19 @@ function CheckpointEditor({ checkpoint, onSave, onClose }: {
             <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-xero-border dark:border-slate-600 px-3 py-2">
               <span className="text-[10px] font-medium uppercase text-xero-green flex-shrink-0">{content.type}</span>
               <span className="text-xs text-gray-700 dark:text-slate-300 truncate flex-1">{contentLabel(content)}</span>
+              {contentLabel(content) !== '(linked item removed)' && (
+                <button
+                  onClick={() => {
+                    // Persist first — this modal (and its unsaved label/content/media state)
+                    // unmounts as soon as the route changes.
+                    onSave({ ...checkpoint, label: label.trim() || 'Checkpoint', content, media })
+                    navigate(`/learn/language/${pcContentRoute(content.type)}?highlight=${content.id}`)
+                  }}
+                  className="text-gray-400 hover:text-xero-green flex-shrink-0 p-2 -m-2" title="Go to linked item"
+                >
+                  <IconExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+              )}
               <button onClick={() => setContent(null)} className="text-gray-400 hover:text-red-500 flex-shrink-0 p-2 -m-2">
                 <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
               </button>
@@ -4804,6 +4863,7 @@ interface PalaceConnectDrag { sourceId: string; x: number; y: number; targetId: 
 
 function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
   const { dark } = useDarkMode()
+  const navigate = useNavigate()
   const { palace, savePalace } = useMemoryPalace(palaceId)
   const { vocab } = useVocabulary()
   const { sentences } = useLanguageSentences()
@@ -5372,6 +5432,13 @@ function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
             </div>
             {[
               { icon: <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Edit checkpoint', onClick: () => { setEditingId(ctxNode.id); setCtxMenu(null) } },
+              ...(ctxNode.content && pcContentPreview(ctxNode.content) ? [
+                { icon: <IconExternalLink className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Go to linked item', onClick: () => {
+                  const content = ctxNode.content!
+                  setCtxMenu(null)
+                  navigate(`/learn/language/${pcContentRoute(content.type)}?highlight=${content.id}`)
+                }},
+              ] : []),
               { icon: <IconAdd className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Add next checkpoint', onClick: handleAddNext },
               { icon: <IconLink className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Connect', onClick: () => {
                 const node = checkpointsRef.current.find(c => c.id === ctxMenu.nodeId)
