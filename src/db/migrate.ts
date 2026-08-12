@@ -503,6 +503,21 @@ CREATE TABLE IF NOT EXISTS chains (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_chains_user ON chains(user_id);
+
+-- Memory Palace (Language section) — a branching, freely-positioned path of
+-- checkpoints. Same JSONB-blob-per-document shape as mindmaps: checkpoints
+-- and connections are saved as one JSON graph per palace.
+CREATE TABLE IF NOT EXISTS memory_palaces (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  title       TEXT NOT NULL DEFAULT 'New Memory Palace',
+  checkpoints JSONB NOT NULL DEFAULT '[]',
+  connections JSONB NOT NULL DEFAULT '[]',
+  folder      TEXT DEFAULT NULL,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_memory_palaces_user ON memory_palaces(user_id);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]

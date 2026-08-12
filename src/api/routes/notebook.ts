@@ -554,6 +554,87 @@ export function notebookRouter(pool: Pool): Router {
     res.json({ ok: true })
   })
 
+  // ─── Memory Palaces ────────────────────────────────────────────────────────
+
+  router.get('/memory-palaces', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      'SELECT id, title, folder, created_at, updated_at FROM memory_palaces WHERE user_id = $1 ORDER BY updated_at DESC',
+      [uid]
+    )
+    res.json(rows)
+  })
+
+  router.get('/memory-palaces/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      'SELECT * FROM memory_palaces WHERE id=$1 AND user_id=$2',
+      [req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
+  })
+
+  router.post('/memory-palaces', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { title = 'New Memory Palace', checkpoints = [], connections = [], folder = null } = req.body as {
+      title?: string; checkpoints?: unknown[]; connections?: unknown[]; folder?: string | null
+    }
+    const { rows } = await pool.query(
+      'INSERT INTO memory_palaces (title, checkpoints, connections, folder, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [title, JSON.stringify(checkpoints), JSON.stringify(connections), folder, uid]
+    )
+    res.json(rows[0])
+  })
+
+  router.put('/memory-palaces/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { title, checkpoints, connections = [] } = req.body as { title: string; checkpoints: unknown[]; connections?: unknown[] }
+    const { rows } = await pool.query(
+      'UPDATE memory_palaces SET title=$1, checkpoints=$2, connections=$3, updated_at=now() WHERE id=$4 AND user_id=$5 RETURNING *',
+      [title, JSON.stringify(checkpoints), JSON.stringify(connections), req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
+  })
+
+  router.patch('/memory-palaces/folder-rename', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { oldPath, newPath } = req.body as { oldPath: string; newPath: string }
+    if (!oldPath?.trim() || !newPath?.trim()) { res.status(400).json({ error: 'oldPath and newPath required' }); return }
+    await pool.query(
+      `UPDATE memory_palaces SET folder = CASE WHEN folder = $1 THEN $2 ELSE $2 || SUBSTRING(folder FROM LENGTH($1) + 1) END, updated_at = now()
+       WHERE user_id = $3 AND (folder = $1 OR folder LIKE $4)`,
+      [oldPath, newPath, uid, oldPath + '/%']
+    )
+    res.json({ ok: true })
+  })
+
+  router.patch('/memory-palaces/:id/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { folder } = req.body as { folder: string | null }
+    const { rows } = await pool.query(
+      'UPDATE memory_palaces SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING id, title, folder, created_at, updated_at',
+      [folder ?? null, req.params.id, uid]
+    )
+    res.json(rows[0] ?? null)
+  })
+
+  router.delete('/memory-palaces/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { path } = req.query as { path: string }
+    if (!path?.trim()) { res.status(400).json({ error: 'path required' }); return }
+    await pool.query(
+      `DELETE FROM memory_palaces WHERE user_id = $1 AND (folder = $2 OR folder LIKE $3)`,
+      [uid, path, path + '/%']
+    )
+    res.json({ ok: true })
+  })
+
+  router.delete('/memory-palaces/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    await pool.query('DELETE FROM memory_palaces WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
+  })
+
   // ─── Reminders (all — including done) ────────────────────────────────────────
 
   router.get('/reminders', async (req: Request, res: Response) => {

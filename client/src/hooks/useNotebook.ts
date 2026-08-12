@@ -115,6 +115,43 @@ export interface LanguageScenario {
   updated_at:    string
 }
 
+// ─── Memory Palace ──────────────────────────────────────────────────────────
+
+export type PalaceContentType = 'vocab' | 'sentence' | 'scenario'
+export type PalaceMediaType = 'image' | 'gif' | 'emoji'
+export type PalaceSide = 'top' | 'bottom' | 'left' | 'right'
+
+export interface PalaceCheckpoint {
+  id: string
+  label: string
+  x?: number
+  y?: number
+  content?: { type: PalaceContentType; id: number } | null
+  media?: { type: PalaceMediaType; value: string } | null
+}
+
+export interface PalaceConnection {
+  id: string
+  from: string
+  to: string
+  bidirectional?: boolean
+  fromSide?: PalaceSide
+  toSide?: PalaceSide
+}
+
+export interface MemoryPalaceMeta {
+  id: number
+  title: string
+  folder: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MemoryPalace extends MemoryPalaceMeta {
+  checkpoints: PalaceCheckpoint[]
+  connections: PalaceConnection[]
+}
+
 // ─── Notes ────────────────────────────────────────────────────────────────────
 
 export function useNotes() {
@@ -218,6 +255,69 @@ export function useMindmap(id: number) {
   }
 
   return { mindmap: data, saveMindmap }
+}
+
+// ─── Memory Palace list + document ─────────────────────────────────────────────
+
+export function useMemoryPalaceList() {
+  const { data, mutate, isLoading } = useSWR<MemoryPalaceMeta[]>('/api/notebook/memory-palaces', fetcher)
+
+  async function createPalace(title = 'New Memory Palace', folder?: string | null): Promise<MemoryPalace> {
+    const res = await fetch('/api/notebook/memory-palaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, folder: folder ?? null }),
+    })
+    const p = await res.json() as MemoryPalace
+    await mutate()
+    return p
+  }
+
+  async function movePalaceToFolder(id: number, folder: string | null) {
+    await fetch(`/api/notebook/memory-palaces/${id}/folder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    })
+    await mutate()
+  }
+
+  async function renamePalaceFolder(oldPath: string, newPath: string) {
+    await fetch('/api/notebook/memory-palaces/folder-rename', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPath, newPath }),
+    })
+    await mutate()
+  }
+
+  async function deletePalaceFolder(path: string) {
+    await fetch(`/api/notebook/memory-palaces/folder?path=${encodeURIComponent(path)}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  async function deletePalace(id: number) {
+    await fetch(`/api/notebook/memory-palaces/${id}`, { method: 'DELETE' })
+    await mutate()
+  }
+
+  return { palaces: data ?? [], isLoading, createPalace, movePalaceToFolder, renamePalaceFolder, deletePalaceFolder, deletePalace }
+}
+
+export function useMemoryPalace(id: number) {
+  const { data, mutate } = useSWR<MemoryPalace | null>(`/api/notebook/memory-palaces/${id}`, fetcher)
+
+  async function savePalace(title: string, checkpoints: PalaceCheckpoint[], connections: PalaceConnection[] = []) {
+    await fetch(`/api/notebook/memory-palaces/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, checkpoints, connections }),
+    })
+    await mutate()
+    await globalMutate('/api/notebook/memory-palaces')
+  }
+
+  return { palace: data, savePalace }
 }
 
 // ─── Vocabulary ───────────────────────────────────────────────────────────────

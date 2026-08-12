@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode, createContext, useContext } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
-  IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage,
+  IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage, IconPalace, IconImage,
   IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconChevronLeft, IconUpload } from '../lib/icons'
 import { buildFolderTree, collectFolderPaths, getItemsInFolder, type FolderNode } from '../lib/folderTree'
 import { FolderSidebar, NewFolderRow } from '../components/web/FolderSidebar'
@@ -11,11 +11,13 @@ import DOMPurify from 'dompurify'
 import { hljs } from '../lib/highlight'
 import { renderMermaid } from '../lib/mermaid'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom'
-import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios } from '../hooks/useNotebook'
+import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios,
+  useMemoryPalaceList, useMemoryPalace } from '../hooks/useNotebook'
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
-import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, WordLink, Note } from '../hooks/useNotebook'
+import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, WordLink, Note,
+  PalaceCheckpoint, PalaceConnection, PalaceContentType, PalaceSide, MemoryPalaceMeta } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChainsView } from '../components/web/ChainsView'
 import { useLanguage } from '../hooks/useLanguage'
@@ -4564,6 +4566,1191 @@ function ScenarioView() {
   )
 }
 
+// ─── Memory Palace helpers ─────────────────────────────────────────────────────
+
+const PW = 128 // checkpoint card width
+const PH = 128 // checkpoint card height
+
+function pcInitPositions(raw: PalaceCheckpoint[]): PalaceCheckpoint[] {
+  if (raw.length === 0 || raw.every(c => c.x !== undefined)) return raw
+  return raw.map((c, i) => ({ ...c, x: c.x ?? 0, y: c.y ?? i * (PH + 60) }))
+}
+
+function pcAnchor(c: PalaceCheckpoint, side: PalaceSide): { x: number; y: number } {
+  const x = c.x ?? 0, y = c.y ?? 0
+  switch (side) {
+    case 'top':    return { x: x + PW / 2, y }
+    case 'bottom': return { x: x + PW / 2, y: y + PH }
+    case 'left':   return { x, y: y + PH / 2 }
+    case 'right':  return { x: x + PW, y: y + PH / 2 }
+  }
+}
+
+function pcSideNormal(side: PalaceSide): { x: number; y: number } {
+  switch (side) {
+    case 'top':    return { x: 0, y: -1 }
+    case 'bottom': return { x: 0, y: 1 }
+    case 'left':   return { x: -1, y: 0 }
+    case 'right':  return { x: 1, y: 0 }
+  }
+}
+
+function pcOppositeSide(s: PalaceSide): PalaceSide {
+  return s === 'top' ? 'bottom' : s === 'bottom' ? 'top' : s === 'left' ? 'right' : 'left'
+}
+
+// Picks the side of `from` that faces `to` — used to auto-orient a road's
+// arrival pin toward whichever direction the connection is being dragged from.
+function pcPickSide(from: { x: number; y: number }, to: { x: number; y: number }): PalaceSide {
+  const dx = to.x - from.x, dy = to.y - from.y
+  if (Math.abs(dx) > Math.abs(dy)) return dx < 0 ? 'left' : 'right'
+  return dy < 0 ? 'top' : 'bottom'
+}
+
+function pcRoadPath(x1: number, y1: number, side1: PalaceSide, x2: number, y2: number, side2: PalaceSide): string {
+  const n1 = pcSideNormal(side1), n2 = pcSideNormal(side2)
+  const dist = Math.max(60, Math.hypot(x2 - x1, y2 - y1) * 0.5)
+  const c1x = x1 + n1.x * dist, c1y = y1 + n1.y * dist
+  const c2x = x2 + n2.x * dist, c2y = y2 + n2.y * dist
+  return `M ${x1} ${y1} C ${c1x} ${c1y} ${c2x} ${c2y} ${x2} ${y2}`
+}
+
+function pcWrapLines(text: string, maxChars: number): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let cur = ''
+  for (const w of words) {
+    if ((cur + ' ' + w).trim().length > maxChars) { if (cur) lines.push(cur); cur = w }
+    else cur = (cur + ' ' + w).trim()
+  }
+  if (cur) lines.push(cur)
+  return lines
+}
+
+const PALACE_EMOJI_CHOICES = ['🚪', '🛏️', '🍳', '🛋️', '🚿', '🌳', '🍽️', '📚', '🪟', '🔑', '🕯️', '🖼️', '🪑', '🧺', '🧴', '🎒']
+
+// ─── CheckpointEditor (label · linked content · media) ─────────────────────────
+
+function CheckpointEditor({ checkpoint, onSave, onClose }: {
+  checkpoint: PalaceCheckpoint
+  onSave: (next: PalaceCheckpoint) => void
+  onClose: () => void
+}) {
+  const { dark } = useDarkMode()
+  const { vocab } = useVocabulary()
+  const { sentences } = useLanguageSentences()
+  const { scenarios } = useLanguageScenarios()
+  const [label, setLabel] = useState(checkpoint.label)
+  const [content, setContent] = useState(checkpoint.content ?? null)
+  const [media, setMedia] = useState(checkpoint.media ?? null)
+  const [pickerTab, setPickerTab] = useState<PalaceContentType>('vocab')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [mediaKind, setMediaKind] = useState<'image' | 'gif'>(media?.type === 'gif' ? 'gif' : 'image')
+  const [mediaUrl, setMediaUrl] = useState(media && media.type !== 'emoji' ? media.value : '')
+
+  function contentLabel(c: { type: PalaceContentType; id: number } | null): string {
+    if (!c) return ''
+    if (c.type === 'vocab') { const v = vocab.find(v => v.id === c.id); return v ? `${v.word} → ${v.translation}` : '(linked item removed)' }
+    if (c.type === 'sentence') { const s = sentences.find(s => s.id === c.id); return s ? s.source_text : '(linked item removed)' }
+    const s = scenarios.find(s => s.id === c.id); return s ? s.title : '(linked item removed)'
+  }
+
+  const pickerItems: { id: number; label: string }[] =
+    pickerTab === 'vocab'
+      ? vocab.filter(v => v.word.toLowerCase().includes(query.toLowerCase())).map(v => ({ id: v.id, label: `${v.word} → ${v.translation}` }))
+      : pickerTab === 'sentence'
+      ? sentences.filter(s => s.source_text.toLowerCase().includes(query.toLowerCase())).map(s => ({ id: s.id, label: s.source_text }))
+      : scenarios.filter(s => s.title.toLowerCase().includes(query.toLowerCase())).map(s => ({ id: s.id, label: s.title }))
+
+  function handleSave() {
+    onSave({ ...checkpoint, label: label.trim() || 'Checkpoint', content, media })
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className={`w-full max-w-sm rounded-2xl shadow-2xl p-4 space-y-4 max-h-[85vh] overflow-y-auto ${dark ? 'bg-slate-800' : 'bg-white'}`}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-gray-800 dark:text-slate-200">Edit checkpoint</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 p-2.5 -m-2.5">
+            <IconClose className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-slate-500">Label</label>
+          <input
+            value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Kitchen table"
+            className="mt-1 w-full text-sm rounded-lg border border-xero-border dark:border-slate-600 bg-transparent px-3 py-2 outline-none focus:ring-1 focus:ring-xero-green text-gray-800 dark:text-slate-200"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-slate-500">Media</label>
+          <div className="mt-1.5 flex items-start gap-2">
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0 border overflow-hidden ${dark ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-xero-border'}`}>
+              {media?.type === 'emoji' ? media.value
+                : media ? <img src={media.value} alt="" className="w-full h-full object-cover" />
+                : <IconImage className="w-4 h-4 text-gray-300 dark:text-slate-600" strokeWidth={2} />}
+            </div>
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <div className="flex gap-1.5 flex-wrap">
+                {PALACE_EMOJI_CHOICES.map(em => (
+                  <button
+                    key={em} type="button"
+                    onClick={() => { setMedia({ type: 'emoji', value: em }); setMediaUrl('') }}
+                    className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-colors ${media?.type === 'emoji' && media.value === em ? 'bg-xero-green/20 ring-1 ring-xero-green' : 'hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                  >
+                    {em}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <select
+                  value={mediaKind} onChange={e => setMediaKind(e.target.value as 'image' | 'gif')}
+                  className="text-xs rounded-lg border border-xero-border dark:border-slate-600 bg-transparent px-1.5 py-1.5 outline-none text-gray-600 dark:text-slate-300"
+                >
+                  <option value="image">Image</option>
+                  <option value="gif">GIF</option>
+                </select>
+                <input
+                  value={mediaUrl}
+                  onChange={e => {
+                    const v = e.target.value
+                    setMediaUrl(v)
+                    if (v.trim()) setMedia({ type: mediaKind, value: v.trim() })
+                    else if (media?.type !== 'emoji') setMedia(null)
+                  }}
+                  placeholder="Paste image or gif URL…"
+                  className="flex-1 min-w-0 text-xs rounded-lg border border-xero-border dark:border-slate-600 bg-transparent px-2 py-1.5 outline-none focus:ring-1 focus:ring-xero-green text-gray-800 dark:text-slate-200"
+                />
+              </div>
+            </div>
+            {media && (
+              <button type="button" onClick={() => { setMedia(null); setMediaUrl('') }} className="text-gray-400 hover:text-red-500 flex-shrink-0 p-2 -m-2 mt-0" title="Remove media">
+                <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-slate-500">Linked content</label>
+          {content ? (
+            <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-xero-border dark:border-slate-600 px-3 py-2">
+              <span className="text-[10px] font-medium uppercase text-xero-green flex-shrink-0">{content.type}</span>
+              <span className="text-xs text-gray-700 dark:text-slate-300 truncate flex-1">{contentLabel(content)}</span>
+              <button onClick={() => setContent(null)} className="text-gray-400 hover:text-red-500 flex-shrink-0 p-2 -m-2">
+                <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setPickerOpen(o => !o)}
+              className="mt-1.5 w-full text-xs text-left rounded-lg border border-dashed border-xero-border dark:border-slate-600 px-3 py-2 text-gray-400 hover:text-xero-green hover:border-xero-green transition-colors"
+            >
+              + Link a vocabulary word, sentence, or scenario
+            </button>
+          )}
+
+          {pickerOpen && !content && (
+            <div className="mt-1.5 rounded-lg border border-xero-border dark:border-slate-600 overflow-hidden">
+              <div className="flex border-b border-xero-border dark:border-slate-600">
+                {(['vocab', 'sentence', 'scenario'] as PalaceContentType[]).map(tab => (
+                  <button
+                    key={tab} onClick={() => setPickerTab(tab)}
+                    className={`flex-1 text-[11px] font-medium py-2.5 capitalize transition-colors ${pickerTab === tab ? 'bg-xero-green/10 text-xero-green' : 'text-gray-400 hover:text-gray-600 dark:hover:text-slate-300'}`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+              <input
+                value={query} onChange={e => setQuery(e.target.value)} placeholder="Search…" autoFocus
+                className="w-full text-xs px-3 py-2 outline-none bg-transparent border-b border-xero-border dark:border-slate-600 text-gray-800 dark:text-slate-200"
+              />
+              <div className="max-h-40 overflow-y-auto">
+                {pickerItems.length === 0 && <p className="text-xs text-gray-400 px-3 py-3">No matches.</p>}
+                {pickerItems.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => { setContent({ type: pickerTab, id: item.id }); setPickerOpen(false); setQuery('') }}
+                    className="w-full text-left text-xs px-3 py-2 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 truncate"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="text-xs px-3 py-3 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700">Cancel</button>
+          <button onClick={handleSave} className="text-xs px-4 py-3 rounded-lg bg-xero-green text-white font-medium hover:bg-xero-green/90">Save</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── MemoryPalaceCanvas ─────────────────────────────────────────────────────────
+
+interface PalaceConnectDrag { sourceId: string; x: number; y: number; targetId: string | null; side: PalaceSide }
+
+function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
+  const { dark } = useDarkMode()
+  const { palace, savePalace } = useMemoryPalace(palaceId)
+  const { vocab } = useVocabulary()
+  const { sentences } = useLanguageSentences()
+  const { scenarios } = useLanguageScenarios()
+  const [checkpoints, setCheckpoints] = useState<PalaceCheckpoint[]>([])
+  const [connections, setConnections] = useState<PalaceConnection[]>([])
+  const [pTitle, setPTitle] = useState('New Memory Palace')
+  const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
+  const [renaming, setRenaming] = useState<{ id: string; label: string } | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [selectedForConnect, setSelectedForConnect] = useState<string | null>(null)
+  const [connectLine, setConnectLine] = useState<PalaceConnectDrag | null>(null)
+  const [flippedNodes, setFlippedNodes] = useState<Set<string>>(new Set())
+  const longPressTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressOpened = useRef(false)
+  const [pan, setPan] = useState<{ x: number; y: number }>(() => {
+    try {
+      const raw = localStorage.getItem(`palace:pan:${palaceId}`)
+      if (raw) { const p = JSON.parse(raw); if (typeof p?.x === 'number') return p }
+    } catch { /* ignore */ }
+    return { x: 300, y: 80 }
+  })
+  const [scale, setScale] = useState(1)
+  const [isPanning, setIsPanning] = useState(false)
+  const initialized = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const dragRef = useRef<DragState | null>(null)
+  const connectRef = useRef<PalaceConnectDrag | null>(null)
+  const panRef = useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(null)
+  const panStateRef = useRef({ x: pan.x, y: pan.y })
+  const scaleRef = useRef(1)
+  const checkpointsRef = useRef<PalaceCheckpoint[]>([])
+  const connectionsRef = useRef<PalaceConnection[]>([])
+  const titleRef = useRef(pTitle)
+
+  function findNodeAt(svgX: number, svgY: number, excludeId?: string): PalaceCheckpoint | null {
+    return checkpointsRef.current.find(c =>
+      c.id !== excludeId &&
+      svgX >= (c.x ?? 0) && svgX <= (c.x ?? 0) + PW &&
+      svgY >= (c.y ?? 0) && svgY <= (c.y ?? 0) + PH
+    ) ?? null
+  }
+
+  function pcContentPreview(c: { type: PalaceContentType; id: number }): string | null {
+    if (c.type === 'vocab') { const v = vocab.find(v => v.id === c.id); return v ? `${v.word} → ${v.translation}` : null }
+    if (c.type === 'sentence') { const s = sentences.find(s => s.id === c.id); return s ? s.source_text : null }
+    const s = scenarios.find(s => s.id === c.id); return s ? s.title : null
+  }
+
+  useEffect(() => { checkpointsRef.current = checkpoints }, [checkpoints])
+  useEffect(() => { connectionsRef.current = connections }, [connections])
+  useEffect(() => { titleRef.current = pTitle }, [pTitle])
+  useEffect(() => { scaleRef.current = scale }, [scale])
+
+  // Wheel zoom (desktop + trackpad) and two-finger pinch zoom (mobile)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    function handleWheel(e: WheelEvent) {
+      e.preventDefault()
+      const delta = e.ctrlKey ? -e.deltaY * 0.005 : -e.deltaY * 0.0015
+      const factor = Math.exp(delta)
+      const s = scaleRef.current
+      const newScale = Math.max(0.15, Math.min(5, s * factor))
+      const rect = svgRef.current!.getBoundingClientRect()
+      const cx = e.clientX - rect.left
+      const cy = e.clientY - rect.top
+      const newPan = {
+        x: panStateRef.current.x + (cx - panStateRef.current.x) * (1 - newScale / s),
+        y: panStateRef.current.y + (cy - panStateRef.current.y) * (1 - newScale / s),
+      }
+      scaleRef.current = newScale
+      setScale(newScale)
+      panStateRef.current = newPan
+      setPan(newPan)
+    }
+
+    let pinchInitDist = 0
+    let pinchInitScale = 1
+    let pinchInitPan = { x: 0, y: 0 }
+    let pinchMidX = 0
+    let pinchMidY = 0
+
+    function handleTouchStart(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        const [a, b] = [e.touches[0], e.touches[1]]
+        pinchInitDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY)
+        pinchInitScale = scaleRef.current
+        pinchInitPan = { ...panStateRef.current }
+        const rect = svgRef.current!.getBoundingClientRect()
+        pinchMidX = (a.clientX + b.clientX) / 2 - rect.left
+        pinchMidY = (a.clientY + b.clientY) / 2 - rect.top
+        panRef.current = null
+        dragRef.current = null
+      }
+    }
+
+    function handleTouchMove(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        e.preventDefault()
+        const [a, b] = [e.touches[0], e.touches[1]]
+        const newDist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY)
+        const newScale = Math.max(0.15, Math.min(5, pinchInitScale * (newDist / pinchInitDist)))
+        const ratio = newScale / pinchInitScale
+        const newPan = {
+          x: pinchInitPan.x + pinchMidX * (1 - ratio),
+          y: pinchInitPan.y + pinchMidY * (1 - ratio),
+        }
+        scaleRef.current = newScale
+        setScale(newScale)
+        panStateRef.current = newPan
+        setPan(newPan)
+      }
+    }
+
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    el.addEventListener('touchstart', handleTouchStart, { passive: true })
+    el.addEventListener('touchmove', handleTouchMove, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', handleWheel)
+      el.removeEventListener('touchstart', handleTouchStart)
+      el.removeEventListener('touchmove', handleTouchMove)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (initialized.current || palace === undefined) return
+    const raw = palace && palace.checkpoints.length > 0 ? palace.checkpoints : [{ id: 'start', label: 'Front door', x: 0, y: 0 }]
+    const placed = pcInitPositions(raw)
+    setCheckpoints(placed)
+    if (palace) {
+      setPTitle(palace.title)
+      setConnections(palace.connections ?? [])
+    }
+    initialized.current = true
+
+    const hasCached = !!localStorage.getItem(`palace:pan:${palaceId}`)
+    if (!hasCached && placed.length > 0) {
+      const xs = placed.map(c => c.x ?? 0)
+      const ys = placed.map(c => c.y ?? 0)
+      const minX = Math.min(...xs), maxX = Math.max(...xs) + PW
+      const minY = Math.min(...ys), maxY = Math.max(...ys) + PH
+      const cx = (minX + maxX) / 2
+      const cy = (minY + maxY) / 2
+      const rect = containerRef.current?.getBoundingClientRect()
+      const vw = rect?.width  ?? 800
+      const vh = rect?.height ?? 600
+      const centered = { x: vw / 2 - cx, y: vh / 2 - cy }
+      setPan(centered)
+      panStateRef.current = centered
+    }
+  }, [palace, palaceId])
+
+  function persist(newCheckpoints: PalaceCheckpoint[], newConnections = connectionsRef.current) {
+    setCheckpoints(newCheckpoints)
+    checkpointsRef.current = newCheckpoints
+    setConnections(newConnections)
+    connectionsRef.current = newConnections
+    savePalace(titleRef.current, newCheckpoints, newConnections)
+  }
+
+  function clientToSvg(clientX: number, clientY: number) {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return { x: clientX, y: clientY }
+    const p = panStateRef.current
+    const s = scaleRef.current
+    return { x: (clientX - rect.left - p.x) / s, y: (clientY - rect.top - p.y) / s }
+  }
+
+  function handleNodePointerDown(e: React.PointerEvent, id: string) {
+    e.stopPropagation()
+    if (e.button === 2) return
+    const node = checkpointsRef.current.find(c => c.id === id)
+    if (!node) return
+    const { x, y } = clientToSvg(e.clientX, e.clientY)
+    dragRef.current = { id, offsetX: x - (node.x ?? 0), offsetY: y - (node.y ?? 0), startSvgX: x, startSvgY: y, prevX: x, prevY: y, moved: false, pointerType: e.pointerType }
+    setCtxMenu(null)
+    if (e.pointerType === 'touch') {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current)
+      longPressOpened.current = false
+      longPressTimer.current = setTimeout(() => {
+        if (dragRef.current && !dragRef.current.moved) {
+          dragRef.current = null
+          longPressOpened.current = true
+          setCtxMenu({ nodeId: id, screenX: e.clientX, screenY: e.clientY })
+        }
+      }, 500)
+    }
+  }
+
+  function handleSvgPointerMove(e: React.PointerEvent) {
+    if (longPressTimer.current) {
+      const d = dragRef.current
+      if (d) {
+        const { x, y } = clientToSvg(e.clientX, e.clientY)
+        if (Math.hypot(x - d.startSvgX, y - d.startSvgY) > 8) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+      } else { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+    }
+    const p = panRef.current
+    if (p) {
+      const nx = p.tx + (e.clientX - p.startX)
+      const ny = p.ty + (e.clientY - p.startY)
+      panStateRef.current = { x: nx, y: ny }
+      setPan({ x: nx, y: ny })
+      setIsPanning(true)
+      return
+    }
+    const { x, y } = clientToSvg(e.clientX, e.clientY)
+    const d = dragRef.current
+    if (d) {
+      if (!d.moved && Math.hypot(x - d.startSvgX, y - d.startSvgY) > 4) dragRef.current = { ...d, moved: true }
+      const dx = x - d.prevX
+      const dy = y - d.prevY
+      dragRef.current = { ...dragRef.current!, prevX: x, prevY: y }
+      const moved = checkpointsRef.current.map(c => c.id === d.id ? { ...c, x: (c.x ?? 0) + dx, y: (c.y ?? 0) + dy } : c)
+      checkpointsRef.current = moved
+      setCheckpoints(moved)
+      return
+    }
+    const c = connectRef.current
+    if (c) {
+      const target = findNodeAt(x, y, c.sourceId)
+      const updated = { ...c, x, y, targetId: target?.id ?? null }
+      connectRef.current = updated
+      setConnectLine(updated)
+    }
+  }
+
+  function handleSvgPointerUp(e: React.PointerEvent) {
+    if (e.button === 2) { dragRef.current = null; return }
+    if (panRef.current) {
+      const barelyMoved = Math.hypot(e.clientX - panRef.current.startX, e.clientY - panRef.current.startY) < 4
+      panRef.current = null
+      setIsPanning(false)
+      if (barelyMoved) { setSelectedForConnect(null); setCtxMenu(null) }
+      localStorage.setItem(`palace:pan:${palaceId}`, JSON.stringify(panStateRef.current))
+      return
+    }
+    const d = dragRef.current
+    if (d) {
+      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+      dragRef.current = null
+      if (!d.moved) {
+        const isMouseClick = d.pointerType === 'mouse'
+        const isSelected = selectedForConnect === d.id
+        if (isMouseClick || isSelected) {
+          setFlippedNodes(prev => {
+            const next = new Set(prev)
+            if (next.has(d.id)) next.delete(d.id); else next.add(d.id)
+            return next
+          })
+          setSelectedForConnect(null)
+        } else {
+          setSelectedForConnect(d.id)
+        }
+        setCtxMenu(null)
+      } else {
+        setSelectedForConnect(null)
+        savePalace(titleRef.current, checkpointsRef.current, connectionsRef.current)
+      }
+      return
+    }
+    const c = connectRef.current
+    if (c) {
+      connectRef.current = null
+      setConnectLine(null)
+      setHoveredId(null)
+      setSelectedForConnect(null)
+      if (c.targetId && c.targetId !== c.sourceId) {
+        const already = connectionsRef.current.some(cn => cn.from === c.sourceId && cn.to === c.targetId)
+        if (!already) {
+          const tgt = checkpointsRef.current.find(n => n.id === c.targetId)!
+          const tgtCenter = { x: (tgt.x ?? 0) + PW / 2, y: (tgt.y ?? 0) + PH / 2 }
+          const toSide = pcPickSide(tgtCenter, { x: c.x, y: c.y })
+          const newConn: PalaceConnection = { id: `c${Date.now()}`, from: c.sourceId, to: c.targetId, bidirectional: false, fromSide: c.side, toSide }
+          persist(checkpointsRef.current, [...connectionsRef.current, newConn])
+        }
+      }
+      return
+    }
+    if (longPressOpened.current) { longPressOpened.current = false; return }
+    setSelectedForConnect(null)
+    setCtxMenu(null)
+  }
+
+  function handlePinPointerDown(e: React.PointerEvent, sourceId: string, side: PalaceSide) {
+    e.stopPropagation()
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+    dragRef.current = null
+    const { x, y } = clientToSvg(e.clientX, e.clientY)
+    connectRef.current = { sourceId, x, y, targetId: null, side }
+    setConnectLine(connectRef.current)
+    setCtxMenu(null)
+  }
+
+  function handleAddNext() {
+    if (!ctxMenu) return
+    const src = checkpointsRef.current.find(c => c.id === ctxMenu.nodeId)
+    if (!src) return
+    const newId = `p${Date.now()}`
+    const newNode: PalaceCheckpoint = { id: newId, label: 'New checkpoint', x: src.x ?? 0, y: (src.y ?? 0) + PH + 60 }
+    const newConn: PalaceConnection = { id: `c${Date.now()}`, from: src.id, to: newId, bidirectional: false, fromSide: 'bottom', toSide: 'top' }
+    persist([...checkpointsRef.current, newNode], [...connectionsRef.current, newConn])
+    setCtxMenu(null)
+    setRenaming({ id: newId, label: 'New checkpoint' })
+  }
+
+  function handleAddFloating() {
+    const rect = containerRef.current?.getBoundingClientRect()
+    const cx = rect ? rect.left + rect.width / 2 : 300
+    const cy = rect ? rect.top + rect.height / 2 : 300
+    const { x, y } = clientToSvg(cx, cy)
+    const newId = `p${Date.now()}`
+    const newNode: PalaceCheckpoint = { id: newId, label: 'New checkpoint', x: x - PW / 2, y: y - PH / 2 }
+    persist([...checkpointsRef.current, newNode])
+    setRenaming({ id: newId, label: 'New checkpoint' })
+  }
+
+  function handleRenameConfirm() {
+    if (!renaming) return
+    persist(checkpointsRef.current.map(c => c.id === renaming.id ? { ...c, label: renaming.label } : c))
+    setRenaming(null)
+  }
+
+  function handleDelete(id: string) {
+    const newCheckpoints = checkpointsRef.current.filter(c => c.id !== id)
+    const newConnections = connectionsRef.current.filter(cn => cn.from !== id && cn.to !== id)
+    persist(newCheckpoints, newConnections)
+    setConfirmDelete(null)
+    setCtxMenu(null)
+  }
+
+  const ctxNode = ctxMenu ? checkpoints.find(c => c.id === ctxMenu.nodeId) ?? null : null
+  const editingCheckpoint = editingId ? checkpoints.find(c => c.id === editingId) ?? null : null
+
+  return (
+    <div className="flex-1 min-w-0 h-full relative overflow-hidden">
+      <div
+        ref={containerRef}
+        className={`h-full overflow-hidden ${dark ? 'bg-[#0F172A]' : 'bg-[#F8FAFC]'}`}
+        style={{ cursor: isPanning ? 'grabbing' : 'default', touchAction: 'none' }}
+        onPointerMove={handleSvgPointerMove}
+        onPointerUp={handleSvgPointerUp}
+        onPointerLeave={() => {
+          if (panRef.current) { panRef.current = null; setIsPanning(false) }
+          if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+        }}
+        onClick={() => setCtxMenu(null)}
+        onContextMenu={e => e.preventDefault()}
+      >
+        <svg ref={svgRef} width="100%" height="100%" className="block select-none" style={{ touchAction: 'none' }} onContextMenu={e => e.preventDefault()}>
+          <defs>
+            <pattern id="pDots" x={pan.x % (28 * scale)} y={pan.y % (28 * scale)} width={28 * scale} height={28 * scale} patternUnits="userSpaceOnUse">
+              <circle cx={14 * scale} cy={14 * scale} r={Math.max(0.5, scale)} fill={dark ? '#334155' : '#CBD5E1'} />
+            </pattern>
+            <marker id="pArrowEnd" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+              <polygon points="0 0, 7 3.5, 0 7" fill="#94A3B8" />
+            </marker>
+            <marker id="pArrowStart" markerWidth="7" markerHeight="7" refX="1" refY="3.5" orient="auto-start-reverse">
+              <polygon points="0 0, 7 3.5, 0 7" fill="#94A3B8" />
+            </marker>
+          </defs>
+          <rect
+            x="-10000" y="-10000" width="20000" height="20000" fill="url(#pDots)"
+            style={{ cursor: 'grab' }}
+            onPointerDown={e => {
+              if (dragRef.current || connectRef.current) return
+              panRef.current = { startX: e.clientX, startY: e.clientY, tx: panStateRef.current.x, ty: panStateRef.current.y }
+            }}
+          />
+          <g transform={`translate(${pan.x},${pan.y}) scale(${scale})`}>
+
+            {/* Roads — click to remove, right-click to toggle two-way */}
+            {connections.map(cn => {
+              const from = checkpoints.find(c => c.id === cn.from)
+              const to = checkpoints.find(c => c.id === cn.to)
+              if (!from || !to) return null
+              const fromSide = cn.fromSide ?? 'bottom'
+              const toSide = cn.toSide ?? 'top'
+              const p1 = pcAnchor(from, fromSide)
+              const p2 = pcAnchor(to, toSide)
+              const d = pcRoadPath(p1.x, p1.y, fromSide, p2.x, p2.y, toSide)
+              const color = nodeColor(cn.from)
+              return (
+                <g key={cn.id}>
+                  <path d={d} fill="none" stroke="transparent" strokeWidth={12} style={{ cursor: 'pointer' }}
+                    onClick={ev => { ev.stopPropagation(); persist(checkpointsRef.current, connectionsRef.current.filter(x => x.id !== cn.id)) }}
+                    onContextMenu={ev => { ev.preventDefault(); ev.stopPropagation(); persist(checkpointsRef.current, connectionsRef.current.map(x => x.id === cn.id ? { ...x, bidirectional: !x.bidirectional } : x)) }}
+                  />
+                  <path
+                    d={d} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.6} strokeLinecap="round"
+                    markerEnd="url(#pArrowEnd)" markerStart={cn.bidirectional ? 'url(#pArrowStart)' : undefined}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                </g>
+              )
+            })}
+
+            {/* Temp road while dragging a pin */}
+            {connectLine && (() => {
+              const src = checkpoints.find(c => c.id === connectLine.sourceId)
+              if (!src) return null
+              const p1 = pcAnchor(src, connectLine.side)
+              const d = pcRoadPath(p1.x, p1.y, connectLine.side, connectLine.x, connectLine.y, pcOppositeSide(connectLine.side))
+              const color = nodeColor(connectLine.sourceId)
+              return <path d={d} fill="none" stroke={color} strokeWidth={2} strokeDasharray="6 4" strokeOpacity={0.8} style={{ pointerEvents: 'none' }} />
+            })()}
+
+            {/* Checkpoints */}
+            {checkpoints.map(c => {
+              const x = c.x ?? 0, y = c.y ?? 0
+              const color = nodeColor(c.id)
+              const isDragging = dragRef.current?.id === c.id
+              const isRenaming = renaming?.id === c.id
+              const isTarget = connectLine?.targetId === c.id
+              const showPin = hoveredId === c.id || connectLine?.sourceId === c.id || selectedForConnect === c.id
+              const isFlipped = flippedNodes.has(c.id)
+              const hasMedia = !!c.media
+              const labelTrunc = c.label.length > 16 ? c.label.slice(0, 15) + '…' : c.label
+              const contentPreview = c.content ? pcContentPreview(c.content) : null
+              const contentMissing = !!c.content && contentPreview === null
+              return (
+                <g
+                  key={c.id}
+                  onPointerDown={e => handleNodePointerDown(e, c.id)}
+                  onPointerEnter={() => { if (!dragRef.current && !connectRef.current) setHoveredId(c.id) }}
+                  onPointerLeave={() => setHoveredId(null)}
+                  onDoubleClick={e => { e.stopPropagation(); setRenaming({ id: c.id, label: c.label }); setCtxMenu(null) }}
+                  onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ nodeId: c.id, screenX: e.clientX, screenY: e.clientY }) }}
+                  style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+                >
+                  <rect x={x + 3} y={y + 3} width={PW} height={PH} rx={16} fill="rgba(0,0,0,0.06)" />
+                  {isTarget && <rect x={x - 4} y={y - 4} width={PW + 8} height={PH + 8} rx={20} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.6} strokeDasharray="4 3" />}
+                  <clipPath id={`pclip-${c.id}`}><rect x={x} y={y} width={PW} height={PH} rx={16} /></clipPath>
+                  <rect x={x} y={y} width={PW} height={PH} rx={16} fill={isFlipped ? (dark ? '#162032' : '#F1F5F9') : (dark ? '#1E293B' : 'white')} stroke={color} strokeWidth={1.5} />
+
+                  {!isFlipped && hasMedia && c.media!.type !== 'emoji' && (
+                    <image href={c.media!.value} x={x} y={y} width={PW} height={PH} preserveAspectRatio="xMidYMid slice" clipPath={`url(#pclip-${c.id})`} style={{ pointerEvents: 'none' }} />
+                  )}
+                  {!isFlipped && hasMedia && c.media!.type === 'emoji' && (
+                    <text x={x + PW / 2} y={y + PH / 2 - 6} textAnchor="middle" dominantBaseline="central" fontSize={44} style={{ pointerEvents: 'none', userSelect: 'none' }}>{c.media!.value}</text>
+                  )}
+                  {!isFlipped && !hasMedia && (
+                    <text x={x + PW / 2} y={y + PH / 2 - 6} textAnchor="middle" dominantBaseline="central" fontSize={22} fill={dark ? '#334155' : '#CBD5E1'} style={{ pointerEvents: 'none', userSelect: 'none' }}>?</text>
+                  )}
+                  {!isFlipped && (
+                    <>
+                      <rect x={x} y={y + PH - 22} width={PW} height={22} fill={dark ? 'rgba(15,23,42,0.72)' : 'rgba(255,255,255,0.85)'} style={{ pointerEvents: 'none' }} />
+                      {isRenaming ? (
+                        <foreignObject x={x + 8} y={y + PH - 22} width={PW - 16} height={20}>
+                          <input
+                            autoFocus value={renaming!.label}
+                            onChange={e => setRenaming(r => r ? { ...r, label: e.target.value } : r)}
+                            onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') handleRenameConfirm(); if (e.key === 'Escape') setRenaming(null) }}
+                            onBlur={handleRenameConfirm}
+                            style={{ width: '100%', fontSize: 11, border: 'none', outline: 'none', background: 'transparent', fontWeight: 600, color: dark ? '#E2E8F0' : '#1E293B' }}
+                          />
+                        </foreignObject>
+                      ) : (
+                        <text x={x + PW / 2} y={y + PH - 10} textAnchor="middle" fontSize={11} fontWeight={600} fill={dark ? '#E2E8F0' : '#1E293B'} style={{ pointerEvents: 'none', userSelect: 'none' }}>{labelTrunc}</text>
+                      )}
+                    </>
+                  )}
+
+                  {isFlipped && (
+                    <>
+                      {isRenaming ? (
+                        <foreignObject x={x + 10} y={y + 8} width={PW - 20} height={20}>
+                          <input
+                            autoFocus value={renaming!.label}
+                            onChange={e => setRenaming(r => r ? { ...r, label: e.target.value } : r)}
+                            onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') handleRenameConfirm(); if (e.key === 'Escape') setRenaming(null) }}
+                            onBlur={handleRenameConfirm}
+                            style={{ width: '100%', fontSize: 12, fontWeight: 700, border: 'none', outline: 'none', background: 'transparent', color: dark ? '#E2E8F0' : '#1E293B' }}
+                          />
+                        </foreignObject>
+                      ) : (
+                        <text x={x + PW / 2} y={y + 22} textAnchor="middle" fontSize={12} fontWeight={700} fill={dark ? '#E2E8F0' : '#1E293B'} style={{ pointerEvents: 'none', userSelect: 'none' }}>{labelTrunc}</text>
+                      )}
+                      <line x1={x + 16} y1={y + 32} x2={x + PW - 16} y2={y + 32} stroke={dark ? '#334155' : '#E2E8F0'} strokeWidth={1} />
+                      {contentPreview ? (
+                        <>
+                          <text x={x + PW / 2} y={y + 46} textAnchor="middle" fontSize={8.5} fontWeight={700} fill={color} style={{ pointerEvents: 'none', userSelect: 'none' }}>{c.content!.type.toUpperCase()}</text>
+                          {pcWrapLines(contentPreview, 16).slice(0, 3).map((line, i) => (
+                            <text key={i} x={x + PW / 2} y={y + 60 + i * 13} textAnchor="middle" fontSize={10} fill={dark ? '#CBD5E1' : '#475569'} style={{ pointerEvents: 'none', userSelect: 'none' }}>{line}</text>
+                          ))}
+                        </>
+                      ) : (
+                        <text x={x + PW / 2} y={y + 58} textAnchor="middle" fontSize={8.5} fill={dark ? '#475569' : '#94A3B8'} style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                          {contentMissing ? 'linked item removed' : 'no content linked'}
+                        </text>
+                      )}
+                    </>
+                  )}
+
+                  {showPin && (['top', 'bottom', 'left', 'right'] as PalaceSide[]).map(side => {
+                    const p = pcAnchor(c, side)
+                    return (
+                      <g key={side} onPointerDown={e => handlePinPointerDown(e, c.id, side)} style={{ cursor: 'crosshair' }}>
+                        <circle cx={p.x} cy={p.y} r={22} fill="transparent" />
+                        <circle cx={p.x} cy={p.y} r={5} fill={color} stroke="white" strokeWidth={2} style={{ pointerEvents: 'none' }} />
+                      </g>
+                    )
+                  })}
+                </g>
+              )
+            })}
+
+            {checkpoints.length === 0 && (
+              <text x={0} y={0} textAnchor="middle" dominantBaseline="middle" fontSize={14} fill="#94A3B8" style={{ cursor: 'pointer' }}
+                onClick={e => { e.stopPropagation(); persist([{ id: 'start', label: 'Front door', x: -PW / 2, y: -PH / 2 }]) }}
+              >
+                Click to create your first checkpoint
+              </text>
+            )}
+          </g>
+        </svg>
+      </div>
+
+      {/* Floating title */}
+      <div className="absolute top-3 left-3 z-10" onClick={e => e.stopPropagation()}>
+        <input
+          value={pTitle}
+          onChange={e => { setPTitle(e.target.value); savePalace(e.target.value, checkpointsRef.current, connectionsRef.current) }}
+          placeholder="Palace title…"
+          className={`text-sm font-semibold rounded-xl px-3 py-2.5 shadow-sm border focus:outline-none focus:ring-1 focus:ring-xero-green w-44 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white/90 backdrop-blur border-xero-border text-gray-800'}`}
+        />
+      </div>
+
+      {/* Floating add-checkpoint button */}
+      <div className="absolute top-3 right-3 z-10" onClick={e => e.stopPropagation()}>
+        <button
+          onClick={handleAddFloating}
+          className={`text-xs px-3 py-3 rounded-xl font-medium shadow-sm transition-colors border flex items-center gap-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600' : 'bg-white/90 border-xero-border text-gray-600 hover:bg-white'}`}
+        >
+          <IconAdd className="w-3.5 h-3.5" strokeWidth={2.5} /> Checkpoint
+        </button>
+      </div>
+
+      {/* Context menu */}
+      {ctxMenu && ctxNode && (() => {
+        const vw = typeof window !== 'undefined' ? window.innerWidth  : 400
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 700
+        const menuW = Math.min(190, vw - 24)
+        const showAbove = ctxMenu.screenY > vh * 0.5
+        const rawLeft = ctxMenu.screenX - menuW / 2
+        const clampedLeft = Math.max(8, Math.min(rawLeft, vw - menuW - 8))
+        const maxMenuH = showAbove ? ctxMenu.screenY - 12 : vh - ctxMenu.screenY - 12
+        return (
+          <div
+            className="fixed z-40 bg-white dark:bg-slate-800 border border-xero-border dark:border-slate-700 rounded-2xl shadow-2xl flex flex-col"
+            style={{
+              left: clampedLeft, top: ctxMenu.screenY, width: menuW,
+              maxHeight: Math.max(180, maxMenuH), overflowY: 'auto',
+              transform: showAbove ? 'translateY(calc(-100% - 8px))' : 'translateY(8px)',
+            }}
+            onClick={e => e.stopPropagation()}
+            onContextMenu={e => e.preventDefault()}
+          >
+            <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700">
+              <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 truncate">{ctxNode.label}</p>
+            </div>
+            {[
+              { icon: <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Edit checkpoint', onClick: () => { setEditingId(ctxNode.id); setCtxMenu(null) } },
+              { icon: <IconAdd className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Add next checkpoint', onClick: handleAddNext },
+              { icon: <IconLink className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Connect', onClick: () => {
+                const node = checkpointsRef.current.find(c => c.id === ctxMenu.nodeId)
+                if (!node) return
+                setCtxMenu(null)
+                const anchor = pcAnchor(node, 'right')
+                connectRef.current = { sourceId: ctxMenu.nodeId, x: anchor.x, y: anchor.y, targetId: null, side: 'right' }
+                setConnectLine(connectRef.current)
+              }},
+              { icon: <IconCut className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Clear connections', onClick: () => {
+                const id = ctxMenu.nodeId
+                setCtxMenu(null)
+                persist(checkpointsRef.current, connectionsRef.current.filter(cn => cn.from !== id && cn.to !== id))
+              }},
+            ].map(item => (
+              <button key={item.label} onClick={item.onClick}
+                className="flex items-center gap-2.5 w-full text-left text-sm text-gray-700 dark:text-slate-300 px-3 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors border-t border-gray-50 dark:border-slate-700/50">
+                <span className="text-gray-400 dark:text-slate-500 flex-shrink-0">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+            <button
+              onClick={() => { setConfirmDelete(ctxNode.id); setCtxMenu(null) }}
+              className="flex items-center gap-2.5 w-full text-left text-sm text-red-500 px-3 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-t border-gray-100 dark:border-slate-700"
+            >
+              <IconDelete className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2} /> Delete
+            </button>
+          </div>
+        )
+      })()}
+
+      {editingCheckpoint && (
+        <CheckpointEditor
+          checkpoint={editingCheckpoint}
+          onSave={next => persist(checkpointsRef.current.map(c => c.id === next.id ? next : c))}
+          onClose={() => setEditingId(null)}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          message="This checkpoint and its roads will be deleted."
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── MemoryPalaceView (folder tree + canvas) ─────────────────────────────────────
+
+interface PalaceTreeCtxType {
+  selectedId: number | null
+  onSelect: (id: number) => void
+  expanded: Set<string>
+  onToggle: (path: string) => void
+  renaming: { path: string; val: string } | null
+  setRenaming: (v: { path: string; val: string } | null) => void
+  addingFolderIn: string | null
+  setAddingFolderIn: (v: string | null) => void
+  folderInputVal: string
+  setFolderInputVal: (v: string) => void
+  onCommitFolderAdd: () => void
+  onCommitRename: () => void
+  onNewPalace: (folder: string | null) => void
+  onDropPalace: (id: number, folder: string | null) => void
+  onMoveFolder: (dragPath: string, targetPath: string | null) => void
+  onCtx: (e: React.MouseEvent, type: 'folder' | 'palace', folderPath?: string, palaceId?: number) => void
+}
+const PalaceTreeCtx = createContext<PalaceTreeCtxType | null>(null)
+
+function PalaceFolderTreeRow({ node, depth }: { node: FolderNode<MemoryPalaceMeta>; depth: number }) {
+  const ctx = useContext(PalaceTreeCtx)!
+  const isOpen = ctx.expanded.has(node.path)
+  const isRenaming = ctx.renaming?.path === node.path
+  const [dragOver, setDragOver] = useState(false)
+  return (
+    <>
+      <div
+        {...(!isTouch && {
+          draggable: true,
+          onDragStart: (e: React.DragEvent) => { e.stopPropagation(); e.dataTransfer.setData('folderPath', node.path); e.dataTransfer.effectAllowed = 'move' },
+        })}
+        style={{ paddingLeft: depth * 14 + 4 }}
+        className={`group flex items-center gap-1 py-2 pr-1 rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+        onClick={() => ctx.onToggle(node.path)}
+        onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'folder', node.path) }}
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false) }}
+        onDrop={e => {
+          e.preventDefault(); e.stopPropagation(); setDragOver(false)
+          const palaceId = e.dataTransfer.getData('palaceId')
+          if (palaceId) { ctx.onDropPalace(Number(palaceId), node.path); return }
+          const folderPath = e.dataTransfer.getData('folderPath')
+          if (folderPath && folderPath !== node.path && !node.path.startsWith(folderPath + '/')) ctx.onMoveFolder(folderPath, node.path)
+        }}
+      >
+        <IconChevronRight className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-100 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.5} />
+        <IconFolder className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500 flex-shrink-0" strokeWidth={1.75} />
+        {isRenaming ? (
+          <input
+            autoFocus draggable={false}
+            value={ctx.renaming!.val}
+            onChange={e => ctx.setRenaming({ path: node.path, val: e.target.value })}
+            onKeyDown={e => { e.stopPropagation(); if (e.key === 'Escape') ctx.setRenaming(null) }}
+            onBlur={ctx.onCommitRename}
+            onClick={e => e.stopPropagation()}
+            className="flex-1 min-w-0 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
+          />
+        ) : (
+          <span className="text-xs flex-1 truncate text-gray-700 dark:text-slate-300">{node.name}</span>
+        )}
+        {!isRenaming && (
+          <div className={`flex items-center gap-0.5 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
+            <button title="New palace" onClick={e => { e.stopPropagation(); ctx.onNewPalace(node.path) }} className="p-2 -m-1 rounded text-gray-400 hover:text-xero-green">
+              <IconAdd className="w-3 h-3" strokeWidth={2.5} />
+            </button>
+            <button title="More" onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'folder', node.path) }} className="p-2 -m-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold">•••</button>
+          </div>
+        )}
+      </div>
+      {isOpen && (
+        <>
+          {ctx.addingFolderIn === node.path && (
+            <div style={{ paddingLeft: (depth + 1) * 14 + 4 }} className="flex items-center gap-1 py-0.5 pr-1">
+              <span className="w-3 flex-shrink-0" />
+              <IconFolder className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" strokeWidth={1.75} />
+              <input
+                autoFocus value={ctx.folderInputVal}
+                onChange={e => ctx.setFolderInputVal(e.target.value)}
+                onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') ctx.onCommitFolderAdd(); if (e.key === 'Escape') ctx.setAddingFolderIn(null) }}
+                onBlur={ctx.onCommitFolderAdd}
+                placeholder="Folder name…"
+                className="flex-1 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
+              />
+            </div>
+          )}
+          {node.children.map(c => <PalaceFolderTreeRow key={c.path} node={c} depth={depth + 1} />)}
+          {node.items.map(p => <PalaceTreeRow key={p.id} palace={p} depth={depth + 1} />)}
+        </>
+      )}
+    </>
+  )
+}
+
+function PalaceTreeRow({ palace, depth }: { palace: MemoryPalaceMeta; depth: number }) {
+  const ctx = useContext(PalaceTreeCtx)!
+  const active = ctx.selectedId === palace.id
+  return (
+    <div
+      {...(!isTouch && {
+        draggable: true,
+        onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('palaceId', String(palace.id)); e.dataTransfer.effectAllowed = 'move' },
+      })}
+      style={{ paddingLeft: depth * 14 + 4 }}
+      className={`group flex items-center gap-1.5 py-2 pr-1 rounded-lg cursor-pointer ${active ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+      onClick={() => ctx.onSelect(palace.id)}
+      onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'palace', undefined, palace.id) }}
+    >
+      <span className="w-3 flex-shrink-0" />
+      <IconPalace className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+      <span className={`text-xs flex-1 truncate ${active ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{palace.title || 'Untitled'}</span>
+      <button onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'palace', undefined, palace.id) }}
+        className={`p-2 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] font-bold leading-none ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>•••</button>
+    </div>
+  )
+}
+
+function MemoryPalaceView() {
+  const { palaces, isLoading, createPalace, movePalaceToFolder, renamePalaceFolder, deletePalaceFolder, deletePalace } = useMemoryPalaceList()
+  const [palaceParams, setPalaceParams] = useSearchParams()
+  const selectedId = palaceParams.get('palace') ? Number(palaceParams.get('palace')) : null
+  function setSelectedId(id: number | null) {
+    setPalaceParams(p => { id !== null ? p.set('palace', String(id)) : p.delete('palace'); return p })
+  }
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [renaming, setRenaming] = useState<{ path: string; val: string } | null>(null)
+  const [addingFolderIn, setAddingFolderIn] = useState<string | null>(null)
+  const [folderInputVal, setFolderInputVal] = useState('')
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; type: 'folder' | 'palace'; folderPath?: string; palaceId?: number } | null>(null)
+  const [folderPickerFor, setFolderPickerFor] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
+  const ctxMenuRef = useRef<HTMLDivElement>(null)
+
+  const tree = buildFolderTree(palaces)
+  const allFolderPaths = collectFolderPaths(tree)
+
+  useEffect(() => {
+    if (!ctxMenu) return
+    function dismiss(ev: MouseEvent) { if (!ctxMenuRef.current?.contains(ev.target as Node)) { setCtxMenu(null); setFolderPickerFor(null) } }
+    document.addEventListener('mousedown', dismiss)
+    return () => document.removeEventListener('mousedown', dismiss)
+  }, [ctxMenu])
+
+  async function handleNewPalace(folder: string | null = null) {
+    const p = await createPalace('New Memory Palace', folder)
+    setSelectedId(p.id)
+    if (folder) {
+      const ancestors = folder.split('/').map((_, i, a) => a.slice(0, i + 1).join('/'))
+      setExpanded(s => new Set([...s, ...ancestors]))
+    }
+    setMobileOpen(false)
+  }
+
+  async function commitFolderAdd() {
+    if (addingFolderIn === null) return
+    if (!folderInputVal.trim()) { setAddingFolderIn(null); return }
+    const name = folderInputVal.trim()
+    const newPath = addingFolderIn ? `${addingFolderIn}/${name}` : name
+    setAddingFolderIn(null)
+    setFolderInputVal('')
+    await handleNewPalace(newPath)
+  }
+
+  async function commitRename() {
+    const r = renaming
+    setRenaming(null)
+    if (!r) return
+    const newName = r.val.trim()
+    if (!newName || newName === r.path.split('/').pop()) return
+    const parts = r.path.split('/')
+    parts[parts.length - 1] = newName
+    const newPath = parts.join('/')
+    await renamePalaceFolder(r.path, newPath)
+    setExpanded(s => { const n = new Set(s); n.delete(r.path); n.add(newPath); return n })
+  }
+
+  async function handleMoveFolder(dragPath: string, targetPath: string | null) {
+    if (targetPath !== null && (targetPath === dragPath || targetPath.startsWith(dragPath + '/'))) return
+    const name = dragPath.split('/').pop()!
+    const newPath = targetPath ? `${targetPath}/${name}` : name
+    if (newPath === dragPath) return
+    await renamePalaceFolder(dragPath, newPath)
+    setExpanded(s => { const n = new Set(s); n.delete(dragPath); n.add(newPath); return n })
+  }
+
+  function openCtx(e: React.MouseEvent, type: 'folder' | 'palace', folderPath?: string, palaceId?: number) {
+    const x = Math.min(e.clientX, window.innerWidth - 175)
+    const y = Math.min(e.clientY, window.innerHeight - 160)
+    setCtxMenu({ x, y, type, folderPath, palaceId })
+  }
+
+  const treeCtx: PalaceTreeCtxType = {
+    selectedId, onSelect: id => { setSelectedId(id); setMobileOpen(false) },
+    expanded, onToggle: path => setExpanded(s => { const n = new Set(s); n.has(path) ? n.delete(path) : n.add(path); return n }),
+    renaming, setRenaming,
+    addingFolderIn, setAddingFolderIn: v => { setAddingFolderIn(v); setFolderInputVal('') }, folderInputVal, setFolderInputVal,
+    onCommitFolderAdd: commitFolderAdd, onCommitRename: commitRename,
+    onNewPalace: handleNewPalace,
+    onDropPalace: (id, folder) => { movePalaceToFolder(id, folder) },
+    onMoveFolder: handleMoveFolder,
+    onCtx: openCtx,
+  }
+
+  const selectedTitle = palaces.find(p => p.id === selectedId)?.title ?? 'Memory Palace'
+
+  function TreePane() {
+    return (
+      <PalaceTreeCtx.Provider value={treeCtx}>
+        <div className="flex-1 overflow-y-auto p-2">
+          <button onClick={() => handleNewPalace(null)} className="w-full text-left text-xs text-gray-400 hover:text-xero-green transition-colors px-2 py-2 flex items-center gap-1.5">
+            <IconAdd className="w-3.5 h-3.5" strokeWidth={2.5} /> New palace
+          </button>
+          {isLoading && <p className="text-xs text-gray-400 px-2 py-2">Loading…</p>}
+          {addingFolderIn === '' && (
+            <div className="flex items-center gap-1 py-0.5 pr-1 pl-2">
+              <IconFolder className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" strokeWidth={1.75} />
+              <input
+                autoFocus value={folderInputVal}
+                onChange={e => setFolderInputVal(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') commitFolderAdd(); if (e.key === 'Escape') setAddingFolderIn(null) }}
+                onBlur={commitFolderAdd}
+                placeholder="Folder name…"
+                className="flex-1 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
+              />
+            </div>
+          )}
+          {tree.children.map(c => <PalaceFolderTreeRow key={c.path} node={c} depth={0} />)}
+          {tree.items.map(p => <PalaceTreeRow key={p.id} palace={p} depth={0} />)}
+          <button onClick={() => setAddingFolderIn('')} className="w-full text-left text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors px-2 py-1.5 mt-1 flex items-center gap-1.5">
+            <IconFolder className="w-3 h-3" strokeWidth={2} /> New folder
+          </button>
+          {!isLoading && palaces.length === 0 && <p className="text-xs text-gray-400 px-2 py-2">No memory palaces yet.</p>}
+        </div>
+      </PalaceTreeCtx.Provider>
+    )
+  }
+
+  return (
+    <div className="flex h-full overflow-hidden relative">
+      <div className="hidden md:flex w-52 flex-shrink-0 flex-col border-r border-xero-border dark:border-slate-700 bg-white dark:bg-slate-900">
+        <TreePane />
+      </div>
+
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
+          <div className="relative w-64 h-full bg-white dark:bg-slate-900 flex flex-col shadow-2xl">
+            <TreePane />
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="md:hidden flex items-center gap-2 px-3 py-2 border-b border-xero-border dark:border-slate-700 flex-shrink-0">
+          <button onClick={() => setMobileOpen(true)} className="text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-3 -m-1">
+            <IconMenu className="w-4 h-4" strokeWidth={2} />
+          </button>
+          <span className="text-sm text-gray-700 dark:text-slate-200 font-medium truncate">{selectedTitle}</span>
+        </div>
+
+        {selectedId !== null ? (
+          <MemoryPalaceCanvas key={selectedId} palaceId={selectedId} />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm px-6 text-center">
+            {isLoading ? 'Loading…' : 'Select or create a memory palace to get started.'}
+          </div>
+        )}
+      </div>
+
+      {ctxMenu && (
+        <div ref={ctxMenuRef} className="fixed z-40 bg-white dark:bg-slate-800 border border-xero-border dark:border-slate-700 rounded-xl shadow-2xl py-1 min-w-[160px]"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={e => e.stopPropagation()}>
+          {ctxMenu.type === 'folder' ? (
+            <>
+              <button onClick={() => { setAddingFolderIn(ctxMenu.folderPath!); setExpanded(s => new Set([...s, ctxMenu.folderPath!])); setCtxMenu(null) }}
+                className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">New subfolder</button>
+              <button onClick={() => { setRenaming({ path: ctxMenu.folderPath!, val: ctxMenu.folderPath!.split('/').pop()! }); setCtxMenu(null) }}
+                className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">Rename</button>
+              <button onClick={() => { setConfirmDeleteFolder(ctxMenu.folderPath!); setCtxMenu(null) }}
+                className="w-full text-left text-xs px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">Delete folder</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setFolderPickerFor(folderPickerFor === ctxMenu.palaceId ? null : ctxMenu.palaceId!)}
+                className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center justify-between">
+                Move to folder <IconChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${folderPickerFor === ctxMenu.palaceId ? 'rotate-90' : ''}`} strokeWidth={2.5} />
+              </button>
+              {folderPickerFor === ctxMenu.palaceId && (
+                <div className="bg-gray-50 dark:bg-slate-900/50 max-h-40 overflow-y-auto border-y border-gray-100 dark:border-slate-700">
+                  <button onClick={() => { movePalaceToFolder(ctxMenu.palaceId!, null); setFolderPickerFor(null); setCtxMenu(null) }}
+                    className="w-full text-left text-xs pl-6 pr-3 py-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700">No folder</button>
+                  {allFolderPaths.map(f => (
+                    <button key={f} onClick={() => { movePalaceToFolder(ctxMenu.palaceId!, f); setFolderPickerFor(null); setCtxMenu(null) }}
+                      className="w-full text-left text-xs pl-6 pr-3 py-2 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 truncate">{f}</button>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => { setConfirmDeleteId(ctxMenu.palaceId!); setCtxMenu(null) }}
+                className="w-full text-left text-xs px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {confirmDeleteId !== null && (
+        <ConfirmDialog
+          message="This memory palace and all its checkpoints will be deleted."
+          confirmLabel="Delete"
+          onConfirm={async () => { await deletePalace(confirmDeleteId); if (selectedId === confirmDeleteId) setSelectedId(null); setConfirmDeleteId(null) }}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
+      {confirmDeleteFolder !== null && (
+        <ConfirmDialog
+          message={`Delete folder "${confirmDeleteFolder}" and everything inside it?`}
+          confirmLabel="Delete"
+          onConfirm={async () => { await deletePalaceFolder(confirmDeleteFolder); setConfirmDeleteFolder(null) }}
+          onCancel={() => setConfirmDeleteFolder(null)}
+        />
+      )}
+    </div>
+  )
+}
+
 // ─── LanguageTab (inner: Vocabulary · Sentence · Scenario) ───────────────────
 
 function LanguageTab() {
@@ -4571,9 +5758,10 @@ function LanguageTab() {
   const { dark } = useDarkMode()
 
   const LANG_VIEWS = [
-    { path: 'scenario', label: t.scenario, icon: <IconLayers   className="w-3.5 h-3.5" strokeWidth={2} /> },
-    { path: 'sentence', label: t.sentence, icon: <IconMessage  className="w-3.5 h-3.5" strokeWidth={2} /> },
-    { path: 'vocab',    label: t.vocab,    icon: <IconBook     className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { path: 'scenario', label: t.scenario,      icon: <IconLayers   className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { path: 'sentence', label: t.sentence,      icon: <IconMessage  className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { path: 'vocab',    label: t.vocab,         icon: <IconBook     className="w-3.5 h-3.5" strokeWidth={2} /> },
+    { path: 'palace',   label: t.memoryPalace,  icon: <IconPalace   className="w-3.5 h-3.5" strokeWidth={2} /> },
   ]
 
   return (
@@ -4602,6 +5790,7 @@ function LanguageTab() {
           <Route path="vocab"    element={<VocabView />} />
           <Route path="sentence" element={<SentenceView />} />
           <Route path="scenario" element={<ScenarioView />} />
+          <Route path="palace"   element={<MemoryPalaceView />} />
           <Route index element={<Navigate to="scenario" replace />} />
         </Routes>
       </div>

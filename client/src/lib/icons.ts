@@ -107,6 +107,8 @@ export { Sunrise     as IconSunrise     } from 'lucide-react'
 export { Cookie      as IconCookie      } from 'lucide-react'
 export { Utensils    as IconMeal        } from 'lucide-react'
 export { Network     as IconMindmap     } from 'lucide-react'
+export { Landmark    as IconPalace      } from 'lucide-react'
+export { Image        as IconImage      } from 'lucide-react'
 export { UtensilsCrossed as IconRecipes } from 'lucide-react'
 
 // ── Misc ──────────────────────────────────────────────────────────────────────

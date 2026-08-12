@@ -16,6 +16,7 @@ export const TRANSLATIONS = {
     mindmap: 'Mindmap',
     chains: 'Chains',
     vocab: 'Vocabulary',
+    memoryPalace: 'Memory Palace',
     reminders: 'Reminders',
     // actions
     save: 'Save',
@@ -208,6 +209,7 @@ export const TRANSLATIONS = {
     mindmap: 'Mindmap',
     chains: 'Ketten',
     vocab: 'Wortschatz',
+    memoryPalace: 'Gedächtnispalast',
     reminders: 'Erinnerungen',
     save: 'Speichern',
     cancel: 'Abbrechen',
@@ -389,6 +391,7 @@ export const TRANSLATIONS = {
     mindmap: 'Zihin Haritası',
     chains: 'Zincirler',
     vocab: 'Kelimeler',
+    memoryPalace: 'Hafıza Sarayı',
     reminders: 'Hatırlatıcılar',
     save: 'Kaydet',
     cancel: 'İptal',
