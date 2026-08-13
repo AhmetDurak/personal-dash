@@ -11,9 +11,24 @@ const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep
 
 type ChainStatus = 'broken' | 'complete' | 'progress'
 
+// A day that has fully elapsed with no explicit mark is a miss, not a neutral
+// blank — "no answer" defaults to "didn't happen" rather than staying ambiguous.
+// Today itself is excluded since it isn't over yet.
+function effectiveMark(mark: ChainMark, date: Date): ChainMark {
+  if (mark !== null) return mark
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const day = new Date(date); day.setHours(0, 0, 0, 0)
+  return day < today ? 'cross' : null
+}
+
+function getEffectiveMarks(chain: Chain): ChainMark[] {
+  return chain.marks.map((m, i) => effectiveMark(m, dayIndexToDate(chain.createdAt, i)))
+}
+
 function getStatus(chain: Chain): ChainStatus {
-  if (chain.marks.some(m => m === 'cross')) return 'broken'
-  if (chain.marks.every(m => m === 'check')) return 'complete'
+  const marks = getEffectiveMarks(chain)
+  if (marks.some(m => m === 'cross')) return 'broken'
+  if (marks.every(m => m === 'check')) return 'complete'
   return 'progress'
 }
 
@@ -147,6 +162,7 @@ function ChainLink({ mark, index, createdAt, onToggle }: {
   const date = dayIndexToDate(createdAt, index)
   const isToday = isSameDay(date, new Date())
   const showMonth = index === 0 || date.getDate() === 1
+  const displayMark = effectiveMark(mark, date)
 
   return (
     <div className="flex-shrink-0 flex flex-col items-center w-[38px]">
@@ -161,12 +177,12 @@ function ChainLink({ mark, index, createdAt, onToggle }: {
         className="relative w-[38px] h-[60px] flex-shrink-0 flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
       >
         <svg viewBox="0 0 34 54" className="w-10 h-[60px] drop-shadow-sm">
-          <ellipse cx="17" cy="27" rx="11" ry="23" fill="none" stroke={`url(#${gradientId(mark)})`} strokeWidth="7" />
+          <ellipse cx="17" cy="27" rx="11" ry="23" fill="none" stroke={`url(#${gradientId(displayMark)})`} strokeWidth="7" />
         </svg>
         <span className={`absolute inset-0 flex items-center justify-center text-base font-bold pointer-events-none drop-shadow-sm ${
-          mark === 'check' ? 'text-emerald-700 dark:text-emerald-300' : mark === 'cross' ? 'text-red-700 dark:text-red-300' : ''
+          displayMark === 'check' ? 'text-emerald-700 dark:text-emerald-300' : displayMark === 'cross' ? 'text-red-700 dark:text-red-300' : ''
         }`}>
-          {mark === 'check' ? '✓' : mark === 'cross' ? '✗' : ''}
+          {displayMark === 'check' ? '✓' : displayMark === 'cross' ? '✗' : ''}
         </span>
         {isToday && (
           <span
@@ -188,8 +204,9 @@ function ChainCard({ chain, onToggle, onUpdate, onDeleteClick }: {
   onDeleteClick: () => void
 }) {
   const status = getStatus(chain)
-  const checkedCount = chain.marks.filter(m => m === 'check').length
-  const brokenCount = chain.marks.filter(m => m === 'cross').length
+  const effectiveMarks = getEffectiveMarks(chain)
+  const checkedCount = effectiveMarks.filter(m => m === 'check').length
+  const brokenCount = effectiveMarks.filter(m => m === 'cross').length
 
   const [editing, setEditing] = useState(false)
   const [nameDraft, setNameDraft] = useState(chain.name)
