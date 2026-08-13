@@ -1,9 +1,8 @@
-import { useState, useRef, useEffect, useLayoutEffect, useMemo, type ReactNode, createContext, useContext } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage, IconPalace, IconImage, IconExternalLink,
-  IconBook, IconMessage, IconLayers, IconMenu, IconCheck, IconChevronRight, IconChevronLeft, IconUpload } from '../lib/icons'
-import { buildFolderTree, collectFolderPaths, getItemsInFolder, type FolderNode } from '../lib/folderTree'
-import { FolderSidebar, NewFolderRow } from '../components/web/FolderSidebar'
+  IconBook, IconMessage, IconLayers, IconMenu, IconChevronRight, IconChevronLeft, IconUpload } from '../lib/icons'
+import { buildFolderTree, collectFolderPaths } from '../lib/folderTree'
 import { useSortFilter } from '../hooks/useSortFilter'
 import { SortFilterBar } from '../components/web/SortFilterBar'
 import { marked } from 'marked'
@@ -20,6 +19,7 @@ import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, Wor
   PalaceCheckpoint, PalaceConnection, PalaceContentType, PalaceSide, MemoryPalaceMeta } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChainsView } from '../components/web/ChainsView'
+import { ItemFolderTree } from '../components/web/ItemFolderTree'
 import { useLanguage } from '../hooks/useLanguage'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { AreaChart, Area, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContainer } from 'recharts'
@@ -68,21 +68,6 @@ function fmtDueLabel(due: string, group: 'overdue' | 'today' | 'upcoming'): stri
   if (group === 'today') return time || 'All day'
   const date = d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
   return time ? `${date} · ${time}` : date
-}
-
-function relativeDay(dateStr: string): string {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const d = new Date(dateStr); d.setHours(0, 0, 0, 0)
-  const diff = Math.round((d.getTime() - today.getTime()) / 86400000)
-  if (diff === 0)  return 'today'
-  if (diff === -1) return 'yesterday'
-  if (diff === 1)  return 'tomorrow'
-  if (diff < -1)   return `${Math.abs(diff)}d ago`
-  return `in ${diff}d`
-}
-
-function fmtCreated(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 // ─── SwipeToDelete ────────────────────────────────────────────────────────────
@@ -142,160 +127,6 @@ function SwipeToDelete({ onDelete, children, resetKey, contentBg = '' }: { onDel
       >
         {children}
       </div>
-    </div>
-  )
-}
-
-// ─── File tree ────────────────────────────────────────────────────────────────
-
-const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
-
-interface NoteTreeCtxType {
-  selectedId: string | null
-  onSelect: (id: string) => void
-  onCtx: (e: React.MouseEvent, type: 'folder'|'note', folderPath?: string, noteId?: string) => void
-  expanded: Set<string>
-  onToggle: (path: string) => void
-  renaming: { path: string; val: string } | null
-  setRenaming: (v: { path: string; val: string } | null) => void
-  addingIn: { parent: string; kind: 'note'|'folder'; val: string } | null
-  setAddingIn: (v: { parent: string; kind: 'note'|'folder'; val: string } | null) => void
-  onNewNote: (folder: string|null) => void
-  onCommitAdding: () => void
-  onCommitRename: () => void
-  onDropNote: (noteId: string, folder: string | null) => void
-  onReorderNote: (dragId: string, targetId: string, pos: 'before' | 'after') => void
-  onMoveFolder: (dragPath: string, targetPath: string | null) => void
-}
-const NoteTreeCtx = createContext<NoteTreeCtxType | null>(null)
-
-function FolderTreeRow({ node, depth }: { node: FolderNode<Note>; depth: number }) {
-  const ctx = useContext(NoteTreeCtx)!
-  const isOpen = ctx.expanded.has(node.path)
-  const isRenaming = ctx.renaming?.path === node.path
-  const cancelledRef = useRef(false)
-  const [dragOver, setDragOver] = useState(false)
-
-  return (
-    <>
-      <div
-        {...(!isTouch && {
-          draggable: true,
-          onDragStart: (e: React.DragEvent) => { e.stopPropagation(); e.dataTransfer.setData('folderPath', node.path); e.dataTransfer.effectAllowed = 'move' },
-        })}
-        style={{ paddingLeft: depth * 14 + 4 }}
-        className={`group flex items-center gap-1 py-2 pr-1 rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
-        onClick={() => ctx.onToggle(node.path)}
-        onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'folder', node.path) }}
-        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false) }}
-        onDrop={e => {
-          e.preventDefault(); e.stopPropagation(); setDragOver(false)
-          const noteId = e.dataTransfer.getData('noteId')
-          if (noteId) { ctx.onDropNote(noteId, node.path); return }
-          const folderPath = e.dataTransfer.getData('folderPath')
-          if (folderPath && folderPath !== node.path && !node.path.startsWith(folderPath + '/')) {
-            ctx.onMoveFolder(folderPath, node.path)
-          }
-        }}
-      >
-        <IconChevronRight className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-100 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.5} />
-        <IconFolder className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500 flex-shrink-0" strokeWidth={1.75} />
-        {isRenaming ? (
-          <input
-            autoFocus
-            draggable={false}
-            value={ctx.renaming!.val}
-            onChange={e => ctx.setRenaming({ path: node.path, val: e.target.value })}
-            onKeyDown={e => {
-              e.stopPropagation()
-              if (e.key === 'Escape') { cancelledRef.current = true; ctx.setRenaming(null) }
-            }}
-            onBlur={() => { if (cancelledRef.current) { cancelledRef.current = false; return }; ctx.onCommitRename() }}
-            onClick={e => e.stopPropagation()}
-            className="flex-1 min-w-0 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
-          />
-        ) : (
-          <span className="text-xs flex-1 truncate text-gray-700 dark:text-slate-300">{node.name}</span>
-        )}
-        {!isRenaming && (
-          <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto opacity-30 group-hover:opacity-100">
-            <button title="New note" onClick={e => { e.stopPropagation(); ctx.onNewNote(node.path) }}
-              className="p-0.5 rounded text-gray-400 hover:text-xero-green">
-              <IconAdd className="w-3 h-3" strokeWidth={2.5} />
-            </button>
-            <button title="More" onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'folder', node.path) }}
-              className="p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold">
-              •••
-            </button>
-          </div>
-        )}
-      </div>
-      {isOpen && (
-        <>
-          {ctx.addingIn?.parent === node.path && ctx.addingIn?.kind === 'folder' && (
-            <div style={{ paddingLeft: (depth + 1) * 14 + 4 }} className="flex items-center gap-1 py-0.5 pr-1">
-              <span className="w-3 flex-shrink-0" />
-              <IconFolder className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" strokeWidth={1.75} />
-              <input
-                autoFocus
-                value={ctx.addingIn.val}
-                onChange={e => ctx.setAddingIn({ ...ctx.addingIn!, val: e.target.value })}
-                onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') ctx.onCommitAdding(); if (e.key === 'Escape') ctx.setAddingIn(null) }}
-                onBlur={ctx.onCommitAdding}
-                placeholder="Folder name…"
-                className="flex-1 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
-              />
-            </div>
-          )}
-          {node.children.map(c => <FolderTreeRow key={c.path} node={c} depth={depth + 1} />)}
-          {node.items.map(n => <NoteTreeRow key={n.id} note={n} depth={depth + 1} />)}
-        </>
-      )}
-    </>
-  )
-}
-
-function NoteTreeRow({ note, depth }: { note: Note; depth: number }) {
-  const ctx = useContext(NoteTreeCtx)!
-  const noteId = String(note.id)
-  const active = ctx.selectedId === noteId
-  const [dropPos, setDropPos] = useState<'before' | 'after' | null>(null)
-
-  return (
-    <div
-      {...(!isTouch && {
-        draggable: true,
-        onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('noteId', noteId); e.dataTransfer.effectAllowed = 'move' },
-        onDragOver: (e: React.DragEvent) => {
-          e.preventDefault(); e.stopPropagation()
-          const rect = e.currentTarget.getBoundingClientRect()
-          setDropPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after')
-        },
-        onDragLeave: () => setDropPos(null),
-        onDrop: (e: React.DragEvent) => {
-          e.preventDefault(); e.stopPropagation()
-          const id = e.dataTransfer.getData('noteId')
-          if (id && dropPos && id !== noteId) ctx.onReorderNote(id, noteId, dropPos)
-          setDropPos(null)
-        },
-      })}
-      style={{ paddingLeft: depth * 14 + 4 }}
-      className={`group flex items-center gap-1.5 py-2 pr-1 rounded-lg cursor-pointer relative ${
-        active ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'
-      }${dropPos === 'before' ? ' border-t-2 border-xero-green' : dropPos === 'after' ? ' border-b-2 border-xero-green' : ''}`}
-      onClick={() => ctx.onSelect(noteId)}
-      onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'note', undefined, noteId) }}
-    >
-      <span className="w-3 flex-shrink-0" />
-      <IconNote className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
-      <span className={`text-xs flex-1 truncate ${active ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>
-        {note.title || 'Untitled'}
-      </span>
-      <button
-        onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'note', undefined, noteId) }}
-        className="p-2 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] font-bold leading-none opacity-30 group-hover:opacity-100"
-      >•••</button>
     </div>
   )
 }
@@ -363,53 +194,21 @@ function NotesView() {
     if (failed.length) setUploadError(`Failed: ${failed.join(', ')}`)
   }
 
-  // Tree state
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [renaming, setRenaming] = useState<{ path: string; val: string } | null>(null)
-  const [addingIn, setAddingIn] = useState<{ parent: string; kind: 'note'|'folder'; val: string } | null>(null)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; type: 'folder'|'note'; folderPath?: string; noteId?: string } | null>(null)
-  const [movingNoteId, setMovingNoteId] = useState<string | null>(null)
   const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
-  const ctxMenuRef = useRef<HTMLDivElement>(null)
 
   const allFolderPaths = collectFolderPaths(buildFolderTree(notes))
   const folders = allFolderPaths
   const selectedNote = notes.find(n => String(n.id) === selectedId) ?? null
 
-  // Manual order persisted in localStorage
-  const [manualOrder, setManualOrder] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('notes:order') ?? '[]') as string[] } catch { return [] }
-  })
-
-  function reorderNote(dragId: string, targetId: string, pos: 'before' | 'after') {
-    const allIds = notes.map(n => String(n.id))
-    const base = [...manualOrder.filter(id => allIds.includes(id)), ...allIds.filter(id => !manualOrder.includes(id))]
-    const next = base.filter(id => id !== dragId)
-    const idx = next.indexOf(targetId)
-    next.splice(pos === 'before' ? idx : idx + 1, 0, dragId)
-    localStorage.setItem('notes:order', JSON.stringify(next))
-    setManualOrder(next)
-    setSortKey('manual')
-  }
-
-  const { query, setQuery, sortKey, setSortKey, result: hookSorted, sortOptions } = useSortFilter(notes, {
+  const { query, setQuery, sortKey, setSortKey, result: filteredNotes, sortOptions } = useSortFilter(notes, {
     search: (n: Note) => n.title || 'Untitled',
     defaultSort: 'updated',
     sorts: [
       { value: 'updated',  label: 'Last edited',   compare: (a: Note, b: Note) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() },
       { value: 'created',  label: 'Date created',   compare: (a: Note, b: Note) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime() },
       { value: 'az',       label: 'A → Z',          compare: (a: Note, b: Note) => (a.title || '').localeCompare(b.title || '') },
-      { value: 'manual',   label: 'Manual order',   compare: () => 0 },
     ],
   })
-
-  // Apply manual sort outside the hook so it reacts to manualOrder state changes
-  const filteredNotes = useMemo(() => {
-    if (sortKey !== 'manual') return hookSorted
-    const allIds = notes.map(n => String(n.id))
-    const base = [...manualOrder.filter(id => allIds.includes(id)), ...allIds.filter(id => !manualOrder.includes(id))]
-    return [...hookSorted].sort((a, b) => base.indexOf(String(a.id)) - base.indexOf(String(b.id)))
-  }, [hookSorted, sortKey, manualOrder, notes])
 
   // Build tree from sorted notes so sort order takes effect in the sidebar
   const tree = buildFolderTree(query ? notes : filteredNotes)
@@ -532,60 +331,7 @@ function NotesView() {
   async function handleNew(folder: string | null = null) {
     const note = await createNote(folder)
     setSelectedId(String(note.id))
-    if (folder) {
-      const ancestors = folder.split('/').map((_, i, a) => a.slice(0, i + 1).join('/'))
-      setExpanded(s => new Set([...s, ...ancestors]))
-    }
   }
-
-  async function commitAdding() {
-    if (!addingIn || !addingIn.val.trim()) { setAddingIn(null); return }
-    const name = addingIn.val.trim()
-    const newPath = addingIn.parent ? `${addingIn.parent}/${name}` : name
-    setAddingIn(null)
-    await handleNew(newPath)
-  }
-
-  async function commitRename() {
-    const r = renaming
-    setRenaming(null)
-    if (!r) return
-    const newName = r.val.trim()
-    if (!newName || newName === r.path.split('/').pop()) return
-    const parts = r.path.split('/')
-    parts[parts.length - 1] = newName
-    const newPath = parts.join('/')
-    await renameFolder(r.path, newPath)
-    setExpanded(s => { const n = new Set(s); n.delete(r.path); n.add(newPath); return n })
-  }
-
-  async function handleMoveFolder(dragPath: string, targetPath: string | null) {
-    if (targetPath !== null && (targetPath === dragPath || targetPath.startsWith(dragPath + '/'))) return
-    const name = dragPath.split('/').pop()!
-    const newPath = targetPath ? `${targetPath}/${name}` : name
-    if (newPath === dragPath) return
-    await renameFolder(dragPath, newPath)
-    setExpanded(s => { const n = new Set(s); n.delete(dragPath); n.add(newPath); return n })
-  }
-
-  function openCtx(e: React.MouseEvent, type: 'folder'|'note', folderPath?: string, noteId?: string) {
-    const x = Math.min(e.clientX, window.innerWidth - 175)
-    const y = Math.min(e.clientY, window.innerHeight - 210)
-    setCtxMenu({ x, y, type, folderPath, noteId })
-  }
-
-  useEffect(() => {
-    if (!ctxMenu) return
-    function dismiss(ev: MouseEvent | TouchEvent) {
-      if (!ctxMenuRef.current?.contains(ev.target as Node)) setCtxMenu(null)
-    }
-    document.addEventListener('mousedown', dismiss)
-    document.addEventListener('touchstart', dismiss as EventListener, { passive: true })
-    return () => {
-      document.removeEventListener('mousedown', dismiss)
-      document.removeEventListener('touchstart', dismiss as EventListener)
-    }
-  }, [ctxMenu])
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
@@ -598,17 +344,6 @@ function NotesView() {
     <div className="flex h-full">
       {/* File tree sidebar */}
       <div className={`${selectedId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-gray-100 dark:border-slate-700 flex-col bg-gray-50 dark:bg-slate-900 flex-shrink-0`}>
-        <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
-          <button onClick={() => handleNew(null)}
-            className="flex-1 text-xs bg-xero-green text-white rounded-lg py-2.5 font-medium hover:bg-xero-green-dark transition-colors min-h-[44px]">
-            + {t.newNote}
-          </button>
-          <button onClick={() => setAddingIn({ parent: '', kind: 'folder', val: '' })}
-            className="text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 hover:bg-gray-300 dark:hover:bg-slate-600 rounded-lg px-2.5 py-2.5 min-h-[44px] transition-colors"
-            title="New folder">
-            <IconFolder className="w-3.5 h-3.5" strokeWidth={2} />
-          </button>
-        </div>
         <SortFilterBar
           query={query} onQuery={setQuery}
           sortKey={sortKey} onSort={setSortKey}
@@ -616,54 +351,38 @@ function NotesView() {
           placeholder="Search notes…"
           className="border-b border-gray-100 dark:border-slate-700 flex-shrink-0"
         />
-        <div
-          className="flex-1 overflow-y-auto py-1 px-1"
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => {
-            e.preventDefault()
-            const noteId = e.dataTransfer.getData('noteId')
-            if (noteId) { moveNoteToFolder(noteId, null); return }
-            const folderPath = e.dataTransfer.getData('folderPath')
-            if (folderPath) handleMoveFolder(folderPath, null)
-          }}
-        >
-          {isLoading && <p className="text-xs text-gray-400 p-4">Loading…</p>}
-          <NoteTreeCtx.Provider value={{
-            selectedId, onSelect: setSelectedId, onCtx: openCtx,
-            expanded, onToggle: p => setExpanded(s => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n }),
-            renaming, setRenaming, addingIn, setAddingIn,
-            onNewNote: handleNew, onCommitAdding: commitAdding, onCommitRename: commitRename,
-            onDropNote: (noteId, folder) => moveNoteToFolder(noteId, folder),
-            onReorderNote: reorderNote,
-            onMoveFolder: handleMoveFolder,
-          }}>
-            {query ? (
-              filteredNotes.length === 0
-                ? <p className="text-xs text-gray-400 px-3 py-2">No notes found</p>
-                : filteredNotes.map(n => <NoteTreeRow key={n.id} note={n} depth={0} />)
-            ) : (
-              <>
-                {addingIn?.parent === '' && addingIn?.kind === 'folder' && (
-                  <div className="flex items-center gap-1 py-0.5 px-1">
-                    <span className="w-3 flex-shrink-0" />
-                    <IconFolder className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" strokeWidth={1.75} />
-                    <input
-                      autoFocus
-                      value={addingIn.val}
-                      onChange={e => setAddingIn(a => a && { ...a, val: e.target.value })}
-                      onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') commitAdding(); if (e.key === 'Escape') setAddingIn(null) }}
-                      onBlur={commitAdding}
-                      placeholder="Folder name…"
-                      className="flex-1 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
-                    />
-                  </div>
-                )}
-                {tree.children.map(n => <FolderTreeRow key={n.path} node={n} depth={0} />)}
-                {tree.items.map(n => <NoteTreeRow key={n.id} note={n} depth={0} />)}
-              </>
-            )}
-          </NoteTreeCtx.Provider>
-        </div>
+        {isLoading ? (
+          <p className="text-xs text-gray-400 p-4">Loading…</p>
+        ) : query ? (
+          <div className="flex-1 overflow-y-auto py-1 px-1">
+            {filteredNotes.length === 0
+              ? <p className="text-xs text-gray-400 px-3 py-2">No notes found</p>
+              : filteredNotes.map(n => (
+                <div
+                  key={n.id}
+                  onClick={() => setSelectedId(String(n.id))}
+                  className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${String(n.id) === selectedId ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+                >
+                  <IconNote className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+                  <span className={`text-xs flex-1 truncate ${String(n.id) === selectedId ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{n.title || 'Untitled'}</span>
+                </div>
+              ))}
+          </div>
+        ) : (
+          <ItemFolderTree<Note>
+            tree={tree}
+            selectedId={selectedId}
+            itemLabel={n => n.title || 'Untitled'}
+            itemIcon={<IconNote className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
+            newItemLabel={`+ ${t.newNote}`}
+            onSelectItem={n => setSelectedId(String(n.id))}
+            onNewItem={handleNew}
+            onDeleteItem={n => setConfirmDeleteId(String(n.id))}
+            onRenameFolder={renameFolder}
+            onDeleteFolder={path => setDeletingFolderPath(path)}
+            onMoveItemToFolder={(id, folder) => moveNoteToFolder(id, folder)}
+          />
+        )}
       </div>
 
       {/* Editor — hidden on mobile when no note is open */}
@@ -791,75 +510,6 @@ function NotesView() {
           </>
         )}
       </div>
-
-      {/* Context menu */}
-      {ctxMenu && (
-        <div
-          ref={ctxMenuRef}
-          className="fixed z-50 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-xl py-1 min-w-[160px] text-xs"
-          style={{ top: ctxMenu.y, left: ctxMenu.x }}
-        >
-          {ctxMenu.type === 'folder' ? (
-            <>
-              <button onClick={() => { handleNew(ctxMenu.folderPath ?? null); setCtxMenu(null) }}
-                className="w-full text-left px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2 text-gray-700 dark:text-slate-300">
-                <IconAdd className="w-3.5 h-3.5" strokeWidth={2} /> New note
-              </button>
-              <button onClick={() => { if (ctxMenu.folderPath) setExpanded(s => new Set([...s, ctxMenu.folderPath!])); setAddingIn({ parent: ctxMenu.folderPath ?? '', kind: 'folder', val: '' }); setCtxMenu(null) }}
-                className="w-full text-left px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2 text-gray-700 dark:text-slate-300">
-                <IconFolder className="w-3.5 h-3.5" strokeWidth={2} /> New subfolder
-              </button>
-              <div className="border-t border-gray-100 dark:border-slate-700 my-1" />
-              <button onClick={() => { const fp = ctxMenu.folderPath!; setExpanded(s => new Set([...s, fp])); setRenaming({ path: fp, val: fp.split('/').pop()! }); setCtxMenu(null) }}
-                className="w-full text-left px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2 text-gray-700 dark:text-slate-300">
-                <IconEdit className="w-3.5 h-3.5" strokeWidth={2} /> Rename
-              </button>
-              <button onClick={() => { setDeletingFolderPath(ctxMenu.folderPath!); setCtxMenu(null) }}
-                className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 text-red-500">
-                <IconDelete className="w-3.5 h-3.5" strokeWidth={2} /> Delete folder
-              </button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => { setMovingNoteId(ctxMenu.noteId!); setCtxMenu(null) }}
-                className="w-full text-left px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2 text-gray-700 dark:text-slate-300">
-                <IconCut className="w-3.5 h-3.5" strokeWidth={2} /> Move to…
-              </button>
-              <div className="border-t border-gray-100 dark:border-slate-700 my-1" />
-              <button onClick={() => { handleDelete(ctxMenu.noteId!); setCtxMenu(null) }}
-                className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 text-red-500">
-                <IconDelete className="w-3.5 h-3.5" strokeWidth={2} /> Delete
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Move note modal */}
-      {movingNoteId !== null && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center" onClick={() => setMovingNoteId(null)}>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 w-64 shadow-xl" onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 mb-3">Move to…</p>
-            <div className="max-h-52 overflow-y-auto space-y-0.5">
-              <button
-                onClick={() => { moveNoteToFolder(movingNoteId, null); setMovingNoteId(null) }}
-                className="w-full text-left text-xs px-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 flex items-center gap-1.5"
-              ><IconFolder className="w-3.5 h-3.5 text-gray-400" strokeWidth={1.75} /> Root (no folder)</button>
-              {allFolderPaths.map(fp => (
-                <button key={fp}
-                  onClick={() => { moveNoteToFolder(movingNoteId, fp); setMovingNoteId(null) }}
-                  className="w-full text-left text-xs py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 flex items-center gap-1.5"
-                  style={{ paddingLeft: (fp.split('/').length - 1) * 12 + 12 }}
-                >
-                  <IconFolder className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" strokeWidth={1.75} />
-                  {fp.split('/').pop()}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setMovingNoteId(null)} className="mt-3 w-full text-xs text-gray-400 hover:text-gray-600 py-1">Cancel</button>
-          </div>
-        </div>
-      )}
 
       {/* Delete folder confirm */}
       {deletingFolderPath !== null && (
@@ -1974,13 +1624,6 @@ function RateTooltip({ children, text }: { children: ReactNode; text: string }) 
 // SM-2 targets 90% retention at due_at. Solve: 0.9 = e^(-1/k) → k = -1/ln(0.9) ≈ 9.49
 const LN09K = -1 / Math.log(0.9)
 
-function retentionPct(card: VocabCard): number {
-  const lastReview = new Date(card.due_at)
-  lastReview.setDate(lastReview.getDate() - card.interval)
-  const daysSince = (Date.now() - lastReview.getTime()) / 86_400_000
-  return Math.max(0, Math.round(Math.exp(-daysSince / (card.interval * LN09K)) * 100))
-}
-
 function forgettingCurveData(card: VocabCard): { day: string; pct: number }[] {
   return Array.from({ length: 31 }, (_, i) => ({
     day: i === 0 ? '0' : `+${i}d`,
@@ -2061,11 +1704,7 @@ function VocabView() {
   const { t } = useLanguage()
   const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord, moveVocabToFolder, renameVocabFolder, deleteVocabFolder } = useVocabulary()
   const [confirmDeleteVocabId, setConfirmDeleteVocabId] = useState<number | null>(null)
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
-  const [extraFolders, setExtraFolders] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('vocab:extraFolders') ?? '[]') as string[] } catch { return [] }
-  })
-  const [newFolderParent, setNewFolderParent] = useState<string | null>(null)
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
   const [reviewMode, setReviewMode] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [reviewIdx, setReviewIdx] = useState(0)
@@ -2074,6 +1713,7 @@ function VocabView() {
   const [answerResult, setAnswerResult] = useState<{ correct: boolean; pct: number } | null>(null)
   const answerRef = useRef<HTMLInputElement>(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [addFolder, setAddFolder] = useState<string | null>(null)
   const [newWord, setNewWord] = useState<NewWord>({ word: '', translation: '', language: 'de', translation_language: 'tr', example: '' })
   const [deConj, setDeConj] = useState<DeConjugation | null | 'loading' | 'none'>(null)
   const [translating, setTranslating] = useState(false)
@@ -2094,17 +1734,12 @@ function VocabView() {
       return await res.json() as { translation: string; alternatives: string[]; examples: { source: string; target: string }[] }
     } catch { return null } finally { setTranslating(false) }
   }
-  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set())
   const [editCard, setEditCard] = useState<EditCard | null>(null)
   const [csvTooltipOpen, setCsvTooltipOpen] = useState(false)
   const csvInputRef = useRef<HTMLInputElement>(null)
   const csvTooltipRef = useRef<HTMLDivElement>(null)
-  const [sortBy, setSortBy] = useState<'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc'|'rep-asc'|'rep-desc'>(() => (localStorage.getItem('vocab:sortBy') as 'newest'|'oldest'|'word-asc'|'word-desc'|'due-asc'|'due-desc'|'rep-asc'|'rep-desc') ?? 'newest')
-  const [selectMode, setSelectMode] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
-  const [movePicking, setMovePicking] = useState(false)
   const [vocabSearch, setVocabSearch] = useState('')
-  const vocabTree = useMemo(() => buildFolderTree(vocab, extraFolders), [vocab, extraFolders])
+  const vocabTree = buildFolderTree(vocab)
 
   useEffect(() => {
     if (!csvTooltipOpen) return
@@ -2135,20 +1770,8 @@ function VocabView() {
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const dueCards = vocab.filter(v => new Date(v.due_at) <= today)
-  const base = getItemsInFolder(vocabTree, selectedFolder)
   const q = vocabSearch.trim().toLowerCase()
-  const filtered = [...base].filter(v => !q || [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))).sort((a, b) => {
-    switch (sortBy) {
-      case 'word-asc':  return a.word.localeCompare(b.word)
-      case 'word-desc': return b.word.localeCompare(a.word)
-      case 'due-asc':   return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
-      case 'due-desc':  return new Date(b.due_at).getTime() - new Date(a.due_at).getTime()
-      case 'rep-asc':   return a.repetitions - b.repetitions
-      case 'rep-desc':  return b.repetitions - a.repetitions
-      case 'oldest':    return a.id - b.id
-      default:          return b.id - a.id
-    }
-  })
+  const searchResults = q ? vocab.filter(v => [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))) : []
   const reviewCard: VocabCard | null = dueCards[reviewIdx] ?? null
 
   async function handleRate(quality: number) {
@@ -2177,13 +1800,18 @@ function VocabView() {
     if (!newWord.word.trim() || !newWord.translation.trim()) return
     const existing = vocab.find(v => v.word.toLowerCase() === newWord.word.trim().toLowerCase() && v.language === newWord.language)
     const payload = { ...newWord, example: newWord.example.trim() || undefined }
+    let card: VocabCard
     if (existing) {
       await updateWord(existing.id, payload)
+      card = { ...existing, ...payload, example: payload.example ?? null }
     } else {
-      await addWord(payload)
+      card = await addWord(payload)
     }
+    if (addFolder) await moveVocabToFolder(card.id, addFolder)
     setNewWord({ word: '', translation: '', language: newWord.language, translation_language: newWord.translation_language, example: '' })
     setShowAdd(false)
+    setAddFolder(null)
+    openEdit(card)
   }
 
   async function handleEditSave(e: React.FormEvent) {
@@ -2226,24 +1854,6 @@ function VocabView() {
       setHighlightParams(p => { p.delete('highlight'); return p }, { replace: true })
     }
   }, [highlightParams, vocab]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function toggleFlip(id: number) {
-    setFlippedCards(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  function toggleSelect(id: number) {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-
 
   if (reviewMode) {
     return (
@@ -2346,596 +1956,373 @@ function VocabView() {
     )
   }
 
-  function handleNewFolder(parentPath: string) {
-    setNewFolderParent(parentPath)
+  // "+ New word" in the tree can't create immediately like Notes/Sentence/Scenario do —
+  // word + translation are required by the backend — so it opens the quick-add form
+  // instead, targeted at the folder the user clicked from.
+  function handleNewItemRequest(folder: string | null) {
+    setAddFolder(folder)
+    setNewWord({ word: '', translation: '', language: 'de', translation_language: 'tr', example: '' })
+    setShowAdd(true)
   }
-
-  function commitNewFolder(name: string, parentPath: string) {
-    const path = parentPath ? `${parentPath}/${name}` : name
-    const next = [...extraFolders, path]
-    setExtraFolders(next)
-    localStorage.setItem('vocab:extraFolders', JSON.stringify(next))
-    setNewFolderParent(null)
-    setSelectedFolder(path)
-  }
-
-  async function handleMoveToFolder(folderPath: string | null) {
-    for (const id of selectedIds) {
-      await moveVocabToFolder(id, folderPath)
-    }
-    setMovePicking(false)
-    setSelectMode(false)
-    setSelectedIds(new Set())
-  }
-
-  async function handleRenameVocabFolder(oldPath: string, newPath: string) {
-    const updated = extraFolders.map(p => p === oldPath ? newPath : p.startsWith(oldPath + '/') ? newPath + p.slice(oldPath.length) : p)
-    setExtraFolders(updated)
-    localStorage.setItem('vocab:extraFolders', JSON.stringify(updated))
-    if (selectedFolder === oldPath || selectedFolder?.startsWith(oldPath + '/')) setSelectedFolder(null)
-    await renameVocabFolder(oldPath, newPath)
-  }
-
-  async function handleDeleteVocabFolder(path: string) {
-    const updated = extraFolders.filter(p => p !== path && !p.startsWith(path + '/'))
-    setExtraFolders(updated)
-    localStorage.setItem('vocab:extraFolders', JSON.stringify(updated))
-    if (selectedFolder === path || selectedFolder?.startsWith(path + '/')) setSelectedFolder(null)
-    await deleteVocabFolder(path)
-  }
-
-  const folderPaths = collectFolderPaths(vocabTree)
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Folder sidebar */}
-      <div className="flex flex-col">
-        <FolderSidebar
-          tree={vocabTree}
-          selectedFolder={selectedFolder}
-          onSelect={setSelectedFolder}
-          onNewFolder={handleNewFolder}
-          onRenameFolder={handleRenameVocabFolder}
-          onDeleteFolder={handleDeleteVocabFolder}
-          totalCount={vocab.length}
-          allLabel="All Words"
-          orderKey="vocab"
-        />
-        {newFolderParent !== null && (
-          <NewFolderRow
-            parentPath={newFolderParent}
-            onCommit={commitNewFolder}
-            onCancel={() => setNewFolderParent(null)}
+      {/* Sidebar: toolbar + folder tree */}
+      <div className={`${editCard !== null ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-gray-100 dark:border-slate-700 flex-col bg-gray-50 dark:bg-slate-900 flex-shrink-0`}>
+        <div className="flex items-center gap-2 flex-wrap px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          {dueCards.length > 0 && (
+            <button
+              onClick={() => setReviewMode(true)}
+              className="text-xs bg-xero-green text-white px-2.5 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+            >
+              {t.reviewNow} ({dueCards.length})
+            </button>
+          )}
+          <div className="relative ml-auto" ref={csvTooltipRef}>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => csvInputRef.current?.click()}
+                onMouseEnter={() => setCsvTooltipOpen(true)}
+                onMouseLeave={() => setCsvTooltipOpen(false)}
+                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              >
+                {t.importCsv}
+              </button>
+              <button
+                onClick={() => setCsvTooltipOpen(v => !v)}
+                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
+                aria-label="CSV format info"
+              >
+                ?
+              </button>
+            </div>
+            {csvTooltipOpen && (
+              <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
+                <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
+                  <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`word,translation,language,example\nApfel,Apple,de,Der Apfel ist rot 🍎\nWasser,Water,de,`}</code>
+                  <div className="mt-2 space-y-0.5">
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">word</span> &amp; <span className="text-white font-medium">translation</span> — required</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">language</span> — <code className="text-green-300">en</code> / <code className="text-green-300">de</code> / <code className="text-green-300">tr</code> (optional)</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">example</span> — text or emoji hint (optional)</p>
+                  </div>
+                  <div className="absolute bottom-full right-4 border-4 border-transparent border-b-gray-900" />
+                </div>
+              </div>
+            )}
+          </div>
+          <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvImport} />
+        </div>
+
+        <div className="relative px-2 pt-2">
+          <input
+            value={vocabSearch}
+            onChange={e => setVocabSearch(e.target.value)}
+            placeholder="Search…"
+            className="w-full text-xs border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-1 focus:ring-xero-green bg-white dark:bg-slate-800 dark:text-slate-100 placeholder-gray-400"
+          />
+          {vocabSearch && (
+            <button onClick={() => setVocabSearch('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+              <IconClose className="w-3 h-3" strokeWidth={2} />
+            </button>
+          )}
+        </div>
+
+        {importMsg && <p className="text-xs text-xero-green font-medium px-3 pt-1.5">{importMsg}</p>}
+
+        {isLoading ? (
+          <p className="text-xs text-gray-400 p-4">Loading…</p>
+        ) : vocabSearch.trim() ? (
+          <div className="flex-1 overflow-y-auto py-1 px-1">
+            {searchResults.length === 0 ? (
+              <p className="text-xs text-gray-400 px-3 py-2">No words found</p>
+            ) : (
+              searchResults.map(v => (
+                <div
+                  key={v.id}
+                  onClick={() => openEdit(v)}
+                  className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${editCard?.id === v.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+                >
+                  <IconBook className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+                  <span className={`text-xs flex-1 truncate ${editCard?.id === v.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{v.word}</span>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <ItemFolderTree<VocabCard>
+            tree={vocabTree}
+            selectedId={editCard?.id ?? null}
+            itemLabel={c => c.word}
+            itemIcon={<IconBook className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
+            newItemLabel={`+ ${t.addWord}`}
+            onSelectItem={openEdit}
+            onNewItem={handleNewItemRequest}
+            onDeleteItem={c => setConfirmDeleteVocabId(c.id)}
+            onRenameFolder={renameVocabFolder}
+            onDeleteFolder={path => setConfirmDeleteFolder(path)}
+            onMoveItemToFolder={(id, folder) => moveVocabToFolder(id, folder)}
           />
         )}
       </div>
 
-      {/* Main content */}
-      <div className={`flex-1 overflow-y-auto p-6 ${selectMode ? 'pb-24' : ''}`}>
-      {/* Header: row 1 — stats + actions */}
-      <div className="mb-5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-gray-500 dark:text-slate-400">
-              {dueCards.length} card{dueCards.length !== 1 ? 's' : ''} due
-            </p>
-            {dueCards.length > 0 && (
-              <button
-                onClick={() => setReviewMode(true)}
-                className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
-              >
-                {t.reviewNow}
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Search */}
-            <div className="relative">
-              <input
-                value={vocabSearch}
-                onChange={e => setVocabSearch(e.target.value)}
-                placeholder="Search…"
-                className="text-xs border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 pr-6 w-36 focus:outline-none focus:ring-1 focus:ring-xero-green bg-white dark:bg-slate-800 dark:text-slate-100 placeholder-gray-400"
-              />
-              {vocabSearch && (
-                <button onClick={() => setVocabSearch('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
-                  <IconClose className="w-3 h-3" strokeWidth={2} />
-                </button>
-              )}
-            </div>
-            {/* Sort */}
-            <select
-              value={sortBy}
-              onChange={e => { const v = e.target.value as typeof sortBy; setSortBy(v); localStorage.setItem('vocab:sortBy', v) }}
-              className="text-xs border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-lg px-2 py-1.5 focus:outline-none"
-            >
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="word-asc">A → Z</option>
-              <option value="word-desc">Z → A</option>
-              <option value="due-asc">Due soon</option>
-              <option value="due-desc">Due late</option>
-              <option value="rep-asc">Least repeated</option>
-              <option value="rep-desc">Most repeated</option>
-            </select>
-            {/* Select mode toggle */}
-            <button
-              onClick={() => { setSelectMode(v => !v); setSelectedIds(new Set()) }}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${selectMode ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-            >
-              {selectMode ? 'Done' : 'Select'}
-            </button>
-            <button
-              onClick={() => setShowAdd(v => !v)}
-              className="text-xs bg-xero-green text-white px-3 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
-            >
-              + {t.addWord}
-            </button>
-            <div className="relative" ref={csvTooltipRef}>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => csvInputRef.current?.click()}
-                  onMouseEnter={() => setCsvTooltipOpen(true)}
-                  onMouseLeave={() => setCsvTooltipOpen(false)}
-                  className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-                >
-                  {t.importCsv}
-                </button>
-                <button
-                  onClick={() => setCsvTooltipOpen(v => !v)}
-                  className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
-                  aria-label="CSV format info"
-                >
-                  ?
-                </button>
-              </div>
-              {csvTooltipOpen && (
-                <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
-                  <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
-                    <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`word,translation,language,example\nApfel,Apple,de,Der Apfel ist rot 🍎\nWasser,Water,de,`}</code>
-                    <div className="mt-2 space-y-0.5">
-                      <p className="text-[10px] text-gray-300"><span className="text-white font-medium">word</span> &amp; <span className="text-white font-medium">translation</span> — required</p>
-                      <p className="text-[10px] text-gray-300"><span className="text-white font-medium">language</span> — <code className="text-green-300">en</code> / <code className="text-green-300">de</code> / <code className="text-green-300">tr</code> (optional)</p>
-                      <p className="text-[10px] text-gray-300"><span className="text-white font-medium">example</span> — text or emoji hint (optional)</p>
-                    </div>
-                    <div className="absolute bottom-full right-4 border-4 border-transparent border-b-gray-900" />
-                  </div>
-                </div>
-              )}
-            </div>
-            <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvImport} />
-            {importMsg && (
-              <span className="text-xs text-xero-green font-medium">{importMsg}</span>
-            )}
-          </div>
-        </div>
+      {/* Detail / edit pane */}
+      <div className={`${editCard === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
+      {editCard ? (
+        <form onSubmit={handleEditSave} className="p-4 max-w-lg mx-auto space-y-3 w-full">
+          <button type="button" onClick={() => setEditCard(null)}
+            className="md:hidden text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors -ml-3 p-3 min-w-[44px] min-h-[44px] flex items-center">
+            ← {t.vocab}
+          </button>
 
-      </div>
-
-      {/* Add form */}
-      {showAdd && (
-        <form onSubmit={handleAdd} className="bg-gray-50 rounded-xl p-4 mb-5 flex flex-wrap items-center gap-3">
           <input
-            value={newWord.word}
-            onChange={e => setNewWord(p => ({ ...p, word: e.target.value }))}
+            value={editCard.word}
+            onChange={e => setEditCard(p => p && ({ ...p, word: e.target.value }))}
             placeholder="Word"
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-36 focus:outline-none focus:ring-1 focus:ring-xero-green"
+            className="text-sm border border-gray-200 dark:border-slate-600 bg-transparent dark:text-slate-100 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
           />
-          <input
-            value={newWord.translation}
-            onChange={e => setNewWord(p => ({ ...p, translation: e.target.value }))}
-            placeholder="Translation"
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-36 focus:outline-none focus:ring-1 focus:ring-xero-green"
-          />
-          <input
-            value={newWord.example}
-            onChange={e => setNewWord(p => ({ ...p, example: e.target.value }))}
-            placeholder="Example sentence (optional)"
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 flex-1 min-w-[160px] focus:outline-none focus:ring-1 focus:ring-xero-green"
-          />
-          <div className="flex items-center gap-1">
-            <select
-              value={newWord.language}
-              onChange={e => setNewWord(p => ({ ...p, language: e.target.value }))}
-              className="text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg px-2 py-2 focus:outline-none"
+          <div className="flex gap-2 items-center">
+            <input
+              value={editCard.translation}
+              onChange={e => setEditCard(p => p && ({ ...p, translation: e.target.value }))}
+              placeholder="Translation"
+              className="text-sm border border-gray-200 dark:border-slate-600 bg-transparent dark:text-slate-100 rounded-lg px-3 py-2 flex-1 focus:outline-none focus:ring-1 focus:ring-xero-green"
+            />
+            <button
+              type="button"
+              disabled={translating}
+              onClick={async () => {
+                const result = await translateWord(editCard.word, editCard.language, editCard.translation_language)
+                if (result) {
+                  setEditCard(p => p && ({ ...p, translation: result.translation }))
+                  setTranslateResult({ alternatives: result.alternatives, examples: result.examples })
+                }
+              }}
+              className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 transition-colors flex-shrink-0"
+              title="Translate with DeepL"
             >
-              {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
-            </select>
-            <span className="text-gray-400 text-xs px-0.5">→</span>
-            <select
-              value={newWord.translation_language}
-              onChange={e => setNewWord(p => ({ ...p, translation_language: e.target.value }))}
-              className="text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg px-2 py-2 focus:outline-none"
-            >
-              {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
-            </select>
+              {translating ? '…' : '🌐'}
+            </button>
           </div>
-          <button type="submit" className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium">Add</button>
-          <button type="button" onClick={() => setShowAdd(false)} className="text-sm text-gray-400 hover:text-gray-600 px-1">Cancel</button>
-        </form>
-      )}
-
-      {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {filtered.map(card => (
-          <div
-            key={card.id}
-            onClick={selectMode ? () => toggleSelect(card.id) : undefined}
-            className={`bg-slate-50 dark:bg-slate-800 rounded-xl p-4 relative group hover:shadow-sm transition-all ${
-              selectMode
-                ? `cursor-pointer border-2 ${selectedIds.has(card.id) ? 'border-xero-green ring-2 ring-xero-green/20' : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-500'}`
-                : 'border border-gray-200 dark:border-slate-700'
-            }`}
-          >
-            <div className="flex items-start justify-between mb-1.5">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
-                  {LANG_LABELS[card.language] ?? card.language} → {LANG_LABELS[card.translation_language] ?? card.translation_language}
-                </span>
-                <span className="text-[10px] text-gray-400 dark:text-slate-500">Added {fmtCreated(card.created_at)}</span>
-              </div>
-              {selectMode ? (
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                  selectedIds.has(card.id) ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'
-                }`}>
-                  {selectedIds.has(card.id) && (
-                    <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />
-                  )}
-                </div>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setConfirmDeleteVocabId(card.id)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none"
-                  >
-                    ×
-                  </button>
-                </>
-              )}
-            </div>
-            {/* Front / Back faces */}
-            <div
-              className="mt-1 cursor-pointer select-none"
-              onClick={selectMode ? undefined : () => toggleFlip(card.id)}
-              onDoubleClick={selectMode ? undefined : e => { e.stopPropagation(); openEdit(card) }}
-            >
-              {flippedCards.has(card.id) ? (
-                <div className="min-h-[64px] flex flex-col gap-1">
-                  <div className="flex items-start gap-1">
-                    <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-300 flex-1">{card.translation}</p>
+          {translateResult && (translateResult.alternatives.length > 0 || translateResult.examples.length > 0) && (
+            <div className="space-y-2 px-1">
+              {translateResult.alternatives.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {translateResult.alternatives.map((alt, i) => (
                     <button
-                      onClick={e => { e.stopPropagation(); speak(card.translation, card.translation_language) }}
-                      className="text-indigo-300 dark:text-indigo-500 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors text-sm flex-shrink-0 leading-none"
-                      aria-label="Pronounce translation"
-                    >🔊</button>
-                  </div>
-                  {card.example && (
-                    <p className="text-[10px] text-gray-400 dark:text-slate-400 italic">"{card.example}"</p>
-                  )}
-                  {card.image_url && (
-                    <img src={card.image_url} alt="" className="mt-1.5 rounded-lg w-full object-cover max-h-24" />
-                  )}
-                  <p className="text-[9px] text-indigo-300 dark:text-indigo-500 mt-auto pt-1">{t.tapFlipBack}</p>
-                </div>
-              ) : (
-                <div className="min-h-[64px] flex flex-col gap-1">
-                  <div className="flex items-start gap-1">
-                    <p className="text-base font-bold text-gray-900 dark:text-slate-100 flex-1">{card.word}</p>
-                    <button
-                      onClick={e => { e.stopPropagation(); speak(card.word, card.language) }}
-                      className="text-gray-300 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors text-sm flex-shrink-0 leading-none"
-                      aria-label="Pronounce word"
-                    >🔊</button>
-                  </div>
-                  <p className="text-[9px] text-gray-300 dark:text-slate-500 mt-auto pt-1">{t.tapReveal}</p>
-                </div>
-              )}
-            </div>
-            {/* Footer: rating buttons when flipped, retention bar when front */}
-            {flippedCards.has(card.id) ? (
-              <div className="mt-2 pt-1.5 border-t border-gray-50">
-                <p className="text-[9px] text-gray-400 mb-1.5 text-center">How well did you know it?</p>
-                <div className="flex gap-1">
-                  {([
-                    { q: 2, label: t.hard, cls: 'bg-red-50 text-red-600 hover:bg-red-100' },
-                    { q: 4, label: t.good, cls: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
-                    { q: 5, label: t.easy, cls: 'bg-sky-50 text-sky-600 hover:bg-sky-100' },
-                  ] as const).map(({ q, label, cls }) => (
-                    <button
-                      key={q}
-                      onClick={e => { e.stopPropagation(); review(card.id, q); toggleFlip(card.id) }}
-                      className={`flex-1 text-[10px] font-semibold py-1.5 rounded-lg transition-colors ${cls}`}
+                      key={i}
+                      type="button"
+                      onClick={() => setEditCard(p => p && ({ ...p, translation: alt }))}
+                      className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors border border-blue-100 dark:border-blue-800/50"
                     >
-                      {label}
+                      {alt}
                     </button>
                   ))}
                 </div>
-              </div>
-            ) : (() => {
-              const pct = retentionPct(card)
-              const color = pct >= 90 ? '#10B981' : pct >= 70 ? '#F59E0B' : '#EF4444'
-              return (
-                <div className="mt-2 pt-1.5 border-t border-gray-50 dark:border-slate-700">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] text-gray-300 dark:text-slate-500">×{card.repetitions}</span>
-                    <span className="text-[10px] font-bold" style={{ color }}>{pct}%</span>
-                  </div>
-                  <div className="h-1 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-                  </div>
-                  <span className={`text-[9px] mt-0.5 block ${new Date(card.due_at) <= today ? 'text-red-400' : 'text-gray-300 dark:text-slate-500'}`}>
-                    Due {relativeDay(card.due_at)}, {new Date(card.due_at).toLocaleDateString('de-DE')}
-                  </span>
+              )}
+              {translateResult.examples.length > 0 && (
+                <div className="space-y-1.5">
+                  {translateResult.examples.map((ex, i) => (
+                    <div key={i} className="text-[11px] text-gray-500 dark:text-slate-400 leading-tight">
+                      <span className="italic">{ex.source}</span>
+                      <span className="mx-1 text-gray-300 dark:text-slate-600">→</span>
+                      <span>{ex.target}</span>
+                    </div>
+                  ))}
                 </div>
-              )
-            })()}
-          </div>
-        ))}
-      </div>
-
-      {filtered.length === 0 && !isLoading && (
-        <p className="text-sm text-gray-400 text-center py-12">No words yet. Add your first word!</p>
-      )}
-
-      {/* Selection bottom bar */}
-      {selectMode && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3 z-40 shadow-lg">
-          <span className="text-sm text-gray-700 dark:text-slate-300 flex-shrink-0">
-            {selectedIds.size} selected
-          </span>
-          <button
-            onClick={() => {
-              if (selectedIds.size === filtered.length) setSelectedIds(new Set())
-              else setSelectedIds(new Set(filtered.map(c => c.id)))
-            }}
-            className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 transition-colors"
-          >
-            {selectedIds.size === filtered.length ? 'Deselect All' : 'Select All'}
-          </button>
-          <div className="flex-1" />
-          {selectedIds.size > 0 && (
-            <button
-              onClick={() => setMovePicking(true)}
-              className="text-xs bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
-            >
-              Move to…
-            </button>
+              )}
+            </div>
           )}
-          <button
-            onClick={() => { setSelectMode(false); setSelectedIds(new Set()) }}
-            className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {/* Move to folder picker */}
-      {movePicking && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4" onClick={() => setMovePicking(false)}>
-          <div
-            className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm space-y-3"
-            onClick={e => e.stopPropagation()}
-          >
-            <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">Move to folder</p>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              <button
-                onClick={() => handleMoveToFolder(null)}
-                className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-slate-300 w-full"
-              >
-                No folder (unsorted)
-              </button>
-              {folderPaths.map(fp => (
+          <input
+            value={editCard.example}
+            onChange={e => setEditCard(p => p && ({ ...p, example: e.target.value }))}
+            placeholder="Example / emoji hint (optional)"
+            className="text-sm border border-gray-200 dark:border-slate-600 bg-transparent dark:text-slate-100 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          <input
+            value={editCard.image_url}
+            onChange={e => setEditCard(p => p && ({ ...p, image_url: e.target.value }))}
+            placeholder="Image / GIF URL (optional)"
+            className="text-sm border border-gray-200 dark:border-slate-600 bg-transparent dark:text-slate-100 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
+          />
+          {editCard.image_url && (
+            <img src={editCard.image_url} alt="preview" className="w-full rounded-lg max-h-32 object-cover" />
+          )}
+          {/* Forgetting curve chart */}
+          {(() => {
+            const vocabCard = vocab.find(c => c.id === editCard.id)
+            if (!vocabCard) return null
+            return (
+              <div className="pt-3 border-t border-gray-100 dark:border-slate-700">
+                <p className="text-xs text-gray-400 dark:text-slate-500 mb-1.5">{t.forgettingCurve}</p>
+                <ResponsiveContainer width="100%" height={80}>
+                  <AreaChart data={forgettingCurveData(vocabCard)} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                    <defs>
+                      <linearGradient id="retGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Area type="monotone" dataKey="pct" stroke="#10B981" strokeWidth={1.5} fill="url(#retGrad)" dot={false} />
+                    <XAxis dataKey="day" fontSize={8} tickLine={false} axisLine={false} interval={4} />
+                    <YAxis domain={[0, 100]} fontSize={8} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}%`} />
+                    <ReferenceLine y={90} stroke="#F59E0B" strokeDasharray="3 3" />
+                    <Tooltip formatter={(v: number) => [`${v}%`, t.retentionLabel]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <p className="text-[10px] text-amber-500 mt-0.5">─ ─ {t.reviewThreshold} (90%)</p>
+              </div>
+            )
+          })()}
+          {/* Conjugation panel — DE only */}
+          {editCard.language === 'de' && (
+            <div className="pt-3 border-t border-gray-100 dark:border-slate-700">
+              {deConj === null && (
                 <button
-                  key={fp}
-                  onClick={() => handleMoveToFolder(fp)}
-                  className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-slate-300 w-full"
+                  type="button"
+                  onClick={async () => {
+                    setDeConj('loading')
+                    const c = await fetchDeConj(editCard.word)
+                    setDeConj(c ?? 'none')
+                  }}
+                  className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
                 >
-                  {fp}
+                  📖 Load conjugation
                 </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setMovePicking(false)}
-              className="w-full text-sm text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 py-1 transition-colors"
-            >
-              {t.cancel}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Edit modal */}
-      {editCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditCard(null)}>
-          <form
-            onSubmit={handleEditSave}
-            className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm space-y-3"
-            onClick={e => e.stopPropagation()}
-          >
-            <p className="text-sm font-semibold text-gray-800">{t.editWord}</p>
-            <input
-              value={editCard.word}
-              onChange={e => setEditCard(p => p && ({ ...p, word: e.target.value }))}
-              placeholder="Word"
-              className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
-            />
-            <div className="flex gap-2 items-center">
-              <input
-                value={editCard.translation}
-                onChange={e => setEditCard(p => p && ({ ...p, translation: e.target.value }))}
-                placeholder="Translation"
-                className="text-sm border border-gray-200 rounded-lg px-3 py-2 flex-1 focus:outline-none focus:ring-1 focus:ring-xero-green"
-              />
-              <button
-                type="button"
-                disabled={translating}
-                onClick={async () => {
-                  const result = await translateWord(editCard.word, editCard.language, editCard.translation_language)
-                  if (result) {
-                    setEditCard(p => p && ({ ...p, translation: result.translation }))
-                    setTranslateResult({ alternatives: result.alternatives, examples: result.examples })
-                  }
-                }}
-                className="text-xs px-2.5 py-2 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 disabled:opacity-50 transition-colors flex-shrink-0"
-                title="Translate with DeepL"
-              >
-                {translating ? '…' : '🌐'}
-              </button>
-            </div>
-            {translateResult && (translateResult.alternatives.length > 0 || translateResult.examples.length > 0) && (
-              <div className="space-y-2 px-1">
-                {translateResult.alternatives.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {translateResult.alternatives.map((alt, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setEditCard(p => p && ({ ...p, translation: alt }))}
-                        className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100"
-                      >
-                        {alt}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {translateResult.examples.length > 0 && (
-                  <div className="space-y-1.5">
-                    {translateResult.examples.map((ex, i) => (
-                      <div key={i} className="text-[11px] text-gray-500 dark:text-slate-400 leading-tight">
-                        <span className="italic">{ex.source}</span>
-                        <span className="mx-1 text-gray-300 dark:text-slate-600">→</span>
-                        <span>{ex.target}</span>
+              )}
+              {deConj === 'loading' && <p className="text-xs text-gray-400 dark:text-slate-500">Loading…</p>}
+              {deConj === 'none' && <p className="text-xs text-gray-400 dark:text-slate-500">No verb conjugation found.</p>}
+              {deConj && typeof deConj === 'object' && (
+                <div>
+                  <p className="text-[10px] text-gray-400 dark:text-slate-500 mb-1.5 uppercase tracking-wider">Konjugation</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs mb-2">
+                    {([
+                      ['ich', deConj.ichPräsens],
+                      ['du', deConj.duPräsens],
+                      ['er/sie/es', deConj.erPräsens],
+                      ['ich (Prät.)', deConj.ichPräteritum],
+                      ['Partizip II', deConj.partizipII],
+                      ['Hilfsverb', deConj.hilfsverb],
+                    ] as [string, string][]).filter(([, v]) => v).map(([label, value]) => (
+                      <div key={label} className="flex gap-2">
+                        <span className="text-gray-400 dark:text-slate-500 w-20 flex-shrink-0">{label}</span>
+                        <span className="font-medium text-gray-700 dark:text-slate-300">{value}</span>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
-            <input
-              value={editCard.example}
-              onChange={e => setEditCard(p => p && ({ ...p, example: e.target.value }))}
-              placeholder="Example / emoji hint (optional)"
-              className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
-            />
-            <input
-              value={editCard.image_url}
-              onChange={e => setEditCard(p => p && ({ ...p, image_url: e.target.value }))}
-              placeholder="Image / GIF URL (optional)"
-              className="text-sm border border-gray-200 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
-            />
-            {editCard.image_url && (
-              <img src={editCard.image_url} alt="preview" className="w-full rounded-lg max-h-32 object-cover" />
-            )}
-            {/* Forgetting curve chart */}
-            {(() => {
-              const vocabCard = vocab.find(c => c.id === editCard.id)
-              if (!vocabCard) return null
-              return (
-                <div className="pt-3 border-t border-gray-100">
-                  <p className="text-xs text-gray-400 mb-1.5">{t.forgettingCurve}</p>
-                  <ResponsiveContainer width="100%" height={80}>
-                    <AreaChart data={forgettingCurveData(vocabCard)} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                      <defs>
-                        <linearGradient id="retGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <Area type="monotone" dataKey="pct" stroke="#10B981" strokeWidth={1.5} fill="url(#retGrad)" dot={false} />
-                      <XAxis dataKey="day" fontSize={8} tickLine={false} axisLine={false} interval={4} />
-                      <YAxis domain={[0, 100]} fontSize={8} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}%`} />
-                      <ReferenceLine y={90} stroke="#F59E0B" strokeDasharray="3 3" />
-                      <Tooltip formatter={(v: number) => [`${v}%`, t.retentionLabel]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                  <p className="text-[10px] text-amber-500 mt-0.5">─ ─ {t.reviewThreshold} (90%)</p>
-                </div>
-              )
-            })()}
-            {/* Conjugation panel — DE only */}
-            {editCard.language === 'de' && (
-              <div className="pt-3 border-t border-gray-100">
-                {deConj === null && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setDeConj('loading')
-                      const c = await fetchDeConj(editCard.word)
-                      setDeConj(c ?? 'none')
-                    }}
-                    className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  <a
+                    href={`https://www.verbformen.de/?w=${encodeURIComponent(editCard.word)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="text-[10px] text-blue-400 hover:text-blue-600 transition-colors"
                   >
-                    📖 Load conjugation
-                  </button>
-                )}
-                {deConj === 'loading' && <p className="text-xs text-gray-400">Loading…</p>}
-                {deConj === 'none' && <p className="text-xs text-gray-400">No verb conjugation found.</p>}
-                {deConj && typeof deConj === 'object' && (
-                  <div>
-                    <p className="text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Konjugation</p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs mb-2">
-                      {([
-                        ['ich', deConj.ichPräsens],
-                        ['du', deConj.duPräsens],
-                        ['er/sie/es', deConj.erPräsens],
-                        ['ich (Prät.)', deConj.ichPräteritum],
-                        ['Partizip II', deConj.partizipII],
-                        ['Hilfsverb', deConj.hilfsverb],
-                      ] as [string, string][]).filter(([, v]) => v).map(([label, value]) => (
-                        <div key={label} className="flex gap-2">
-                          <span className="text-gray-400 w-20 flex-shrink-0">{label}</span>
-                          <span className="font-medium text-gray-700">{value}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <a
-                      href={`https://www.verbformen.de/?w=${encodeURIComponent(editCard.word)}`}
-                      target="_blank" rel="noopener noreferrer"
-                      className="text-[10px] text-blue-400 hover:text-blue-600 transition-colors"
-                    >
-                      Full table on verbformen.de →
-                    </a>
-                  </div>
-                )}
-              </div>
-            )}
-            {/* Language pair selectors */}
-            <div className="flex items-center gap-2">
+                    Full table on verbformen.de →
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+          {/* Language pair selectors */}
+          <div className="flex items-center gap-2">
+            <select
+              value={editCard.language}
+              onChange={e => setEditCard(p => p && ({ ...p, language: e.target.value }))}
+              className="text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg px-2 py-2 flex-1 focus:outline-none"
+            >
+              {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+            </select>
+            <span className="text-gray-400 text-xs">→</span>
+            <select
+              value={editCard.translation_language}
+              onChange={e => setEditCard(p => p && ({ ...p, translation_language: e.target.value }))}
+              className="text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg px-2 py-2 flex-1 focus:outline-none"
+            >
+              {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">{t.save}</button>
+            <button type="button" onClick={() => setConfirmDeleteVocabId(editCard.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors flex-shrink-0">{t.delete}</button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm px-6 text-center">
+          {isLoading ? 'Loading…' : 'Select or add a word to get started.'}
+        </div>
+      )}
+      </div>
+
+      {/* Quick-add-word modal — word + translation are required before a word (or a
+          brand-new folder) can exist, so this gathers them up front. */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => { setShowAdd(false); setAddFolder(null) }}>
+          <form
+            onSubmit={handleAdd}
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm space-y-3 overflow-y-auto max-h-[calc(100dvh-2rem)]"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-gray-800 dark:text-slate-100">
+              {t.addWord}{addFolder ? <span className="text-gray-400 dark:text-slate-500 font-normal"> — {addFolder}</span> : null}
+            </p>
+            <input
+              autoFocus
+              value={newWord.word}
+              onChange={e => setNewWord(p => ({ ...p, word: e.target.value }))}
+              placeholder="Word"
+              className="text-sm border border-gray-200 dark:border-slate-600 bg-transparent dark:text-slate-100 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
+            />
+            <input
+              value={newWord.translation}
+              onChange={e => setNewWord(p => ({ ...p, translation: e.target.value }))}
+              placeholder="Translation"
+              className="text-sm border border-gray-200 dark:border-slate-600 bg-transparent dark:text-slate-100 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
+            />
+            <input
+              value={newWord.example}
+              onChange={e => setNewWord(p => ({ ...p, example: e.target.value }))}
+              placeholder="Example sentence (optional)"
+              className="text-sm border border-gray-200 dark:border-slate-600 bg-transparent dark:text-slate-100 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-xero-green"
+            />
+            <div className="flex items-center gap-1">
               <select
-                value={editCard.language}
-                onChange={e => setEditCard(p => p && ({ ...p, language: e.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-2 py-2 flex-1 focus:outline-none"
+                value={newWord.language}
+                onChange={e => setNewWord(p => ({ ...p, language: e.target.value }))}
+                className="text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg px-2 py-2 min-h-[44px] flex-1 focus:outline-none"
               >
                 {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
               </select>
-              <span className="text-gray-400 text-xs">→</span>
+              <span className="text-gray-400 text-xs px-0.5">→</span>
               <select
-                value={editCard.translation_language}
-                onChange={e => setEditCard(p => p && ({ ...p, translation_language: e.target.value }))}
-                className="text-sm border border-gray-200 rounded-lg px-2 py-2 flex-1 focus:outline-none"
+                value={newWord.translation_language}
+                onChange={e => setNewWord(p => ({ ...p, translation_language: e.target.value }))}
+                className="text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 rounded-lg px-2 py-2 min-h-[44px] flex-1 focus:outline-none"
               >
                 {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
               </select>
             </div>
             <div className="flex gap-2 pt-1">
-              <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">{t.save}</button>
-              <button type="button" onClick={() => setEditCard(null)} className="flex-1 text-sm bg-gray-100 text-gray-600 py-2 rounded-lg font-medium">{t.cancel}</button>
+              <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">Add</button>
+              <button type="button" onClick={() => { setShowAdd(false); setAddFolder(null) }} className="flex-1 text-sm bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 py-2 rounded-lg font-medium">{t.cancel}</button>
             </div>
           </form>
         </div>
       )}
+
       {confirmDeleteVocabId !== null && (
         <ConfirmDialog
           message={`"${vocab.find((c: VocabCard) => c.id === confirmDeleteVocabId)?.word ?? ''}" will be permanently deleted.`}
           confirmLabel="Delete"
-          onConfirm={() => { deleteWord(confirmDeleteVocabId); setConfirmDeleteVocabId(null) }}
+          onConfirm={() => { deleteWord(confirmDeleteVocabId); if (editCard?.id === confirmDeleteVocabId) setEditCard(null); setConfirmDeleteVocabId(null) }}
           onCancel={() => setConfirmDeleteVocabId(null)}
         />
       )}
-      </div>
+      {confirmDeleteFolder !== null && (
+        <ConfirmDialog
+          message={`Delete folder "${confirmDeleteFolder}" and all words inside?`}
+          confirmLabel="Delete"
+          onConfirm={async () => { await deleteVocabFolder(confirmDeleteFolder); setConfirmDeleteFolder(null) }}
+          onCancel={() => setConfirmDeleteFolder(null)}
+        />
+      )}
     </div>
   )
 }
@@ -3740,13 +3127,18 @@ function ReviewSession({
 function SentenceView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { sentences, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences, renameSentenceFolder, deleteSentenceFolder } = useLanguageSentences()
+  const { sentences, isLoading, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences, moveSentenceToFolder, renameSentenceFolder, deleteSentenceFolder } = useLanguageSentences()
   const { vocab } = useVocabulary()
-  const [editingId, setEditingId]   = useState<number | 'new' | null>(null)
+  const [sentParams, setSentParams] = useSearchParams()
+  const editingId = sentParams.get('sentence') ? Number(sentParams.get('sentence')) : null
+  function setEditingId(id: number | null) {
+    setSentParams(p => { id !== null ? p.set('sentence', String(id)) : p.delete('sentence'); return p })
+  }
   const [draft, setDraft]           = useState<Partial<LanguageSentence>>({})
   const [translating, setTranslating] = useState(false)
   const [translateResult, setTranslateResult] = useState<{ translation: string; alternatives: string[] } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
   const [reviewMode, setReviewMode]   = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sentImportMsg, setSentImportMsg] = useState<string | null>(null)
@@ -3758,18 +3150,6 @@ function SentenceView() {
     function h(e: MouseEvent) { if (!sentCsvTooltipRef.current?.contains(e.target as Node)) setSentCsvTooltipOpen(false) }
     document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
   }, [sentCsvTooltipOpen])
-  const [selectMode, setSelectMode] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
-  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
-
-  function toggleSelect(id: number) {
-    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  }
-
-  async function deleteSelected() {
-    for (const id of selectedIds) await deleteSentence(id)
-    setSelectedIds(new Set()); setSelectMode(false); setConfirmBulkDelete(false)
-  }
 
   async function handleSentCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -3787,41 +3167,17 @@ function SentenceView() {
     e.target.value = ''
   }
 
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
-  const [extraFolders, setExtraFolders] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('sent:extraFolders') ?? '[]') as string[] } catch { return [] }
-  })
-  const [newFolderParent, setNewFolderParent] = useState<string | null>(null)
   const [singleReviewItem, setSingleReviewItem] = useState<LanguageSentence | null>(null)
 
-  const sentTree = useMemo(() => buildFolderTree(sentences, extraFolders), [sentences, extraFolders])
-  const filtered = getItemsInFolder(sentTree, selectedFolder)
-  const dueItems = filtered.filter(s => isDueSR(s.due_at))
+  const sentTree = buildFolderTree(sentences)
+  const dueItems = sentences.filter(s => isDueSR(s.due_at))
+  const activeSentence = sentences.find(s => s.id === editingId) ?? null
 
-  function commitSentFolder(name: string, parentPath: string) {
-    const path = parentPath ? `${parentPath}/${name}` : name
-    const next = [...extraFolders, path]
-    setExtraFolders(next); localStorage.setItem('sent:extraFolders', JSON.stringify(next))
-    setNewFolderParent(null); setSelectedFolder(path)
-  }
-
-  async function handleRenameSentFolder(oldPath: string, newPath: string) {
-    const updated = extraFolders.map(p => p === oldPath ? newPath : p.startsWith(oldPath + '/') ? newPath + p.slice(oldPath.length) : p)
-    setExtraFolders(updated); localStorage.setItem('sent:extraFolders', JSON.stringify(updated))
-    if (selectedFolder === oldPath || selectedFolder?.startsWith(oldPath + '/')) setSelectedFolder(null)
-    await renameSentenceFolder(oldPath, newPath)
-  }
-
-  async function handleDeleteSentFolder(path: string) {
-    const updated = extraFolders.filter(p => p !== path && !p.startsWith(path + '/'))
-    setExtraFolders(updated); localStorage.setItem('sent:extraFolders', JSON.stringify(updated))
-    if (selectedFolder === path || selectedFolder?.startsWith(path + '/')) setSelectedFolder(null)
-    await deleteSentenceFolder(path)
-  }
-
-  function openNew() {
-    setDraft({ source_text: '', translation: null, source_lang: 'de', target_lang: 'tr', word_links: [], memory_palace: null })
-    setEditingId('new')
+  async function handleNew(folder: string | null = null) {
+    const s = await createSentence()
+    if (folder) await moveSentenceToFolder(s.id, folder)
+    setDraft({ ...s, folder: folder ?? s.folder })
+    setEditingId(s.id)
     setTranslateResult(null)
   }
 
@@ -3846,18 +3202,7 @@ function SentenceView() {
 
   function scheduleSave(id: number, patch: Partial<LanguageSentence>) {
     if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => saveSentence(id, patch), 1000)
-  }
-
-  async function handleSave() {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    if (editingId === 'new') {
-      const s = await createSentence()
-      await saveSentence(s.id, draft)
-    } else if (editingId !== null) {
-      await saveSentence(editingId, draft)
-    }
-    setEditingId(null)
+    saveTimer.current = setTimeout(() => saveSentence(id, patch), 800)
   }
 
   async function handleTranslate() {
@@ -3872,6 +3217,7 @@ function SentenceView() {
         const data = await res.json() as { translation: string; alternatives: string[] }
         setDraft(d => ({ ...d, translation: data.translation }))
         setTranslateResult(data)
+        if (editingId) scheduleSave(editingId, { translation: data.translation })
       }
     } finally { setTranslating(false) }
   }
@@ -3879,29 +3225,29 @@ function SentenceView() {
   function handleAddLink(link: WordLink) {
     const links = [...(draft.word_links ?? []), link]
     setDraft(d => ({ ...d, word_links: links }))
-    if (editingId && editingId !== 'new') saveSentence(editingId, { word_links: links })
+    if (editingId) saveSentence(editingId, { word_links: links })
   }
 
   function handleRemoveLink(vocabId: number, start: number) {
     const links = (draft.word_links ?? []).filter(l => !(l.vocab_id === vocabId && l.start === start))
     setDraft(d => ({ ...d, word_links: links }))
-    if (editingId && editingId !== 'new') saveSentence(editingId, { word_links: links })
+    if (editingId) saveSentence(editingId, { word_links: links })
   }
 
   const inputCls = `text-sm border rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-1 focus:ring-blue-400 ${dark ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400' : 'border-gray-200'}`
-  const cardCls = `rounded-2xl border p-4 ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'}`
 
-  // Reusable edit form fields (shared between new-card and inline edit)
-  function editFormFields(isInline = false) {
+  // Detail-pane edit form — every field autosaves, there's no separate Save/Cancel.
+  function editFormFields() {
+    if (editingId === null) return null
     return (
       <div className="space-y-2">
         <textarea
-          autoFocus={!isInline}
+          autoFocus
           value={draft.source_text ?? ''}
           onChange={e => {
             const v = e.target.value
             setDraft(d => ({ ...d, source_text: v }))
-            if (isInline && editingId && editingId !== 'new') scheduleSave(editingId as number, { source_text: v })
+            scheduleSave(editingId, { source_text: v })
           }}
           placeholder="Ich laufe jeden Tag…"
           rows={2}
@@ -3910,7 +3256,11 @@ function SentenceView() {
         <div className="flex gap-2 items-center">
           <input
             value={draft.translation ?? ''}
-            onChange={e => setDraft(d => ({ ...d, translation: e.target.value }))}
+            onChange={e => {
+              const v = e.target.value
+              setDraft(d => ({ ...d, translation: v }))
+              scheduleSave(editingId, { translation: v })
+            }}
             placeholder={t.translation}
             className={inputCls + ' flex-1'}
           />
@@ -3921,7 +3271,7 @@ function SentenceView() {
         {translateResult && translateResult.alternatives.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {translateResult.alternatives.map((alt, i) => (
-              <button key={i} type="button" onClick={() => setDraft(d => ({ ...d, translation: alt }))}
+              <button key={i} type="button" onClick={() => { setDraft(d => ({ ...d, translation: alt })); scheduleSave(editingId, { translation: alt }) }}
                 className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-100 dark:border-blue-800/50">{alt}</button>
             ))}
           </div>
@@ -3931,19 +3281,23 @@ function SentenceView() {
           <span className="text-sm flex-shrink-0">🏛️</span>
           <input
             value={draft.memory_palace ?? ''}
-            onChange={e => setDraft(d => ({ ...d, memory_palace: e.target.value || null }))}
+            onChange={e => {
+              const v = e.target.value || null
+              setDraft(d => ({ ...d, memory_palace: v }))
+              scheduleSave(editingId, { memory_palace: v })
+            }}
             placeholder="Memory palace — where will you use this? (optional)"
             list="palace-suggestions"
             className={inputCls}
           />
         </div>
         <div className="flex gap-2 text-xs">
-          <select value={draft.source_lang ?? 'de'} onChange={e => setDraft(d => ({ ...d, source_lang: e.target.value }))}
+          <select value={draft.source_lang ?? 'de'} onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, source_lang: v })); saveSentence(editingId, { source_lang: v }) }}
             className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
             {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
           </select>
           <span className="text-gray-400 self-center">→</span>
-          <select value={draft.target_lang ?? 'tr'} onChange={e => setDraft(d => ({ ...d, target_lang: e.target.value }))}
+          <select value={draft.target_lang ?? 'tr'} onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, target_lang: v })); saveSentence(editingId, { target_lang: v }) }}
             className={`border rounded-lg px-2 py-1.5 ${dark ? 'bg-slate-700 border-slate-600 text-slate-200' : 'border-gray-200'}`}>
             {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
           </select>
@@ -3961,10 +3315,6 @@ function SentenceView() {
             />
           </div>
         )}
-        <div className="flex gap-2 pt-1">
-          <button onClick={handleSave} className="flex-1 text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 py-2 rounded-xl font-medium">{t.save}</button>
-          <button onClick={() => setEditingId(null)} className="flex-1 text-sm bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 py-2 rounded-xl font-medium">{t.cancel}</button>
-        </div>
       </div>
     )
   }
@@ -3993,60 +3343,28 @@ function SentenceView() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Folder sidebar */}
-      <div className="flex flex-col">
-        <FolderSidebar
-          tree={sentTree}
-          selectedFolder={selectedFolder}
-          onSelect={setSelectedFolder}
-          onNewFolder={p => setNewFolderParent(p)}
-          onRenameFolder={handleRenameSentFolder}
-          onDeleteFolder={handleDeleteSentFolder}
-          totalCount={sentences.length}
-          allLabel="All Sentences"
-          orderKey="sent"
-        />
-        {newFolderParent !== null && (
-          <NewFolderRow
-            parentPath={newFolderParent}
-            onCommit={commitSentFolder}
-            onCancel={() => setNewFolderParent(null)}
-          />
-        )}
-      </div>
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-      {/* Autocomplete list for memory palace suggestions */}
       <datalist id="palace-suggestions">
         {PALACE_SUGGESTIONS.map(p => <option key={p} value={p} />)}
       </datalist>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={openNew} className="text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 px-3 py-1.5 rounded-xl font-medium">
-          + {t.addSentence}
-        </button>
-        <button
-          onClick={() => { setSelectMode(m => !m); setSelectedIds(new Set()) }}
-          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${selectMode ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-        >{selectMode ? 'Done' : 'Select'}</button>
-        {dueItems.length > 0 && (
-          <button
-            onClick={() => setReviewMode(true)}
-            className="text-sm font-semibold px-3 py-1.5 rounded-xl bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1.5"
-          >
-            🏛️ Review {dueItems.length} due
-          </button>
-        )}
-        <div className="flex items-center gap-2 ml-auto">
-          {sentImportMsg && <span className="text-xs text-xero-green font-medium">{sentImportMsg}</span>}
-          <div className="relative" ref={sentCsvTooltipRef}>
+      {/* Sidebar: toolbar + folder tree */}
+      <div className={`${editingId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-gray-100 dark:border-slate-700 flex-col bg-gray-50 dark:bg-slate-900 flex-shrink-0`}>
+        <div className="flex items-center gap-2 flex-wrap px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          {dueItems.length > 0 && (
+            <button
+              onClick={() => setReviewMode(true)}
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1"
+            >
+              🏛️ {dueItems.length} due
+            </button>
+          )}
+          <div className="relative ml-auto" ref={sentCsvTooltipRef}>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => sentCsvRef.current?.click()}
                 onMouseEnter={() => setSentCsvTooltipOpen(true)}
                 onMouseLeave={() => setSentCsvTooltipOpen(false)}
-                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
               >Import CSV</button>
               <button
                 onClick={() => setSentCsvTooltipOpen(v => !v)}
@@ -4068,118 +3386,80 @@ function SentenceView() {
             )}
           </div>
           <input ref={sentCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleSentCsvImport} />
-          <span className="text-xs text-gray-400 dark:text-slate-500">
-            {filtered.length} sentences
-          </span>
         </div>
+        {sentImportMsg && <p className="text-xs text-xero-green font-medium px-3 pt-1.5">{sentImportMsg}</p>}
+        {isLoading ? (
+          <p className="text-xs text-gray-400 p-4">Loading…</p>
+        ) : (
+          <ItemFolderTree<LanguageSentence>
+            tree={sentTree}
+            selectedId={editingId}
+            itemLabel={s => s.source_text || t.untitled}
+            itemIcon={<IconMessage className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
+            newItemLabel={`+ ${t.addSentence}`}
+            onSelectItem={openEdit}
+            onNewItem={handleNew}
+            onDeleteItem={s => setConfirmDeleteId(s.id)}
+            onRenameFolder={renameSentenceFolder}
+            onDeleteFolder={path => setConfirmDeleteFolder(path)}
+            onMoveItemToFolder={(id, folder) => moveSentenceToFolder(id, folder)}
+          />
+        )}
       </div>
 
-      {editingId === 'new' && (
-        <div className={cardCls}>
-          <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-2">{t.addSentence}</p>
-          {editFormFields()}
-        </div>
-      )}
+      {/* Detail / edit pane */}
+      <div className={`${editingId === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
+      {editingId !== null && activeSentence ? (
+      <div className="p-4 max-w-2xl mx-auto space-y-3 w-full">
+        <button onClick={() => setEditingId(null)}
+          className="md:hidden text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors -ml-3 p-3 min-w-[44px] min-h-[44px] flex items-center">
+          ← {t.sentence}
+        </button>
 
-      {filtered.length === 0 && editingId !== 'new' && (
-        <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">{t.noSentencesYet}</p>
-      )}
+        {editFormFields()}
 
-      {filtered.map(s => {
-        const due = isDueSR(s.due_at)
-        const isSelected = selectedIds.has(s.id)
-        return (
-          <div
-            key={s.id}
-            onClick={selectMode ? () => toggleSelect(s.id) : undefined}
-            className={`${cardCls} ${selectMode ? 'cursor-pointer' : ''} ${selectMode && isSelected ? 'ring-2 ring-xero-green border-xero-green' : ''}`}
-          >
-            {editingId === s.id && !selectMode ? (
-              editFormFields(true)
-            ) : (
-              <div>
-                {selectMode && (
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mb-2 transition-colors ${isSelected ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'}`}>
-                    {isSelected && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
-                  </div>
-                )}
-                {/* Memory palace badge */}
-                {s.memory_palace && (
-                  <div className="inline-flex items-center gap-1 text-[10px] font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 px-2 py-0.5 rounded-full mb-2">
-                    🏛️ {s.memory_palace}
-                  </div>
-                )}
-
-                <div className="text-sm mb-1 text-gray-800 dark:text-slate-100">
-                  <WordLinker
-                    text={s.source_text || '—'}
-                    links={mergeLinks(s.word_links ?? [], autoLink(s.source_text || '', vocab, s.source_lang))}
-                    vocab={vocab}
-                    sourceLang={s.source_lang}
-                    onAddLink={() => {}}
-                    onRemoveLink={() => {}}
-                    readOnly
-                  />
-                </div>
-                {s.translation && <p className="text-xs text-gray-400 dark:text-slate-500 mb-2">{s.translation}</p>}
-
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
-                      {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
-                    </span>
-                    <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${due ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
-                      {due ? '⚡ Due' : nextReviewLabel(s.due_at)}
-                    </span>
-                    <span className="text-[10px] text-gray-400 dark:text-slate-500">Added {fmtCreated(s.created_at)}</span>
-                  </div>
-                  {!selectMode && (
-                    <div className="flex gap-2">
-                      <button onClick={() => setSingleReviewItem(s)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
-                      <button onClick={() => openEdit(s)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">{t.edit}</button>
-                      <button onClick={() => setConfirmDeleteId(s.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+        {/* Due status */}
+        <div className="flex items-center justify-between">
+          <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${isDueSR(activeSentence.due_at) ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
+            {isDueSR(activeSentence.due_at) ? '⚡ Due for review' : `Next review: ${nextReviewLabel(activeSentence.due_at)}`}
+          </span>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSingleReviewItem(activeSentence)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
+            <button onClick={() => setConfirmDeleteId(activeSentence.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
           </div>
-        )
-      })}
+        </div>
 
-      {confirmDeleteId !== null && (
-        <ConfirmDialog
-          message="Delete this sentence?"
-          onConfirm={async () => { if (confirmDeleteId !== null) { await deleteSentence(confirmDeleteId); setConfirmDeleteId(null) } }}
-          onCancel={() => setConfirmDeleteId(null)}
-        />
-      )}
-
-      {selectMode && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3 z-40 shadow-lg">
-          <span className="text-sm text-gray-700 dark:text-slate-300 flex-shrink-0">{selectedIds.size} selected</span>
-          <button
-            onClick={() => selectedIds.size === filtered.length ? setSelectedIds(new Set()) : setSelectedIds(new Set(filtered.map(s => s.id)))}
-            className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 transition-colors"
-          >{selectedIds.size === filtered.length ? 'Deselect All' : 'Select All'}</button>
-          <div className="flex-1" />
-          {selectedIds.size > 0 && (
-            <button onClick={() => setConfirmBulkDelete(true)} className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors">
-              Delete {selectedIds.size}
+        {confirmDeleteId !== null && (
+          <ConfirmDialog
+            message="Delete this sentence?"
+            onConfirm={async () => { if (confirmDeleteId !== null) { await deleteSentence(confirmDeleteId); if (editingId === confirmDeleteId) setEditingId(null); setConfirmDeleteId(null) } }}
+            onCancel={() => setConfirmDeleteId(null)}
+          />
+        )}
+      </div>
+      ) : (
+        <div className="flex-1 flex flex-col">
+          {editingId !== null && (
+            <button onClick={() => setEditingId(null)}
+              className="md:hidden self-start text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors p-3 -ml-1 mt-1 min-w-[44px] min-h-[44px] flex items-center">
+              ← {t.sentence}
             </button>
           )}
-          <button onClick={() => { setSelectMode(false); setSelectedIds(new Set()); setConfirmBulkDelete(false) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
+          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm px-6 text-center">
+            {isLoading ? 'Loading…' : 'Select or create a sentence to get started.'}
+          </div>
         </div>
       )}
+      </div>
 
-      {confirmBulkDelete && (
+      {confirmDeleteFolder !== null && (
         <ConfirmDialog
-          message={`Delete ${selectedIds.size} sentence${selectedIds.size !== 1 ? 's' : ''}?`}
-          onConfirm={deleteSelected}
-          onCancel={() => setConfirmBulkDelete(false)}
+          message={`Delete folder "${confirmDeleteFolder}" and all sentences inside?`}
+          confirmLabel="Delete"
+          onConfirm={async () => { await deleteSentenceFolder(confirmDeleteFolder); setConfirmDeleteFolder(null) }}
+          onCancel={() => setConfirmDeleteFolder(null)}
         />
       )}
-      </div>
     </div>
   )
 }
@@ -4189,13 +3469,18 @@ function SentenceView() {
 function ScenarioView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { scenarios, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios, renameScenarioFolder, deleteScenarioFolder } = useLanguageScenarios()
+  const { scenarios, isLoading, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios, moveScenarioToFolder, renameScenarioFolder, deleteScenarioFolder } = useLanguageScenarios()
   const { vocab } = useVocabulary()
-  const [activeId, setActiveId]         = useState<number | null>(null)
+  const [scenParams, setScenParams] = useSearchParams()
+  const activeId = scenParams.get('scenario') ? Number(scenParams.get('scenario')) : null
+  function setActiveId(id: number | null) {
+    setScenParams(p => { id !== null ? p.set('scenario', String(id)) : p.delete('scenario'); return p })
+  }
   const [draft, setDraft]               = useState<Partial<LanguageScenario>>({})
   const [isEditingContent, setIsEditingContent] = useState(false)
   const [translating, setTranslating]   = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
   const [reviewMode, setReviewMode]     = useState(false)
   const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -4208,18 +3493,6 @@ function ScenarioView() {
     function h(e: MouseEvent) { if (!scenCsvTooltipRef.current?.contains(e.target as Node)) setScenCsvTooltipOpen(false) }
     document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
   }, [scenCsvTooltipOpen])
-  const [scenSelectMode, setScenSelectMode] = useState(false)
-  const [scenSelectedIds, setScenSelectedIds] = useState<Set<number>>(new Set())
-  const [confirmScenBulkDelete, setConfirmScenBulkDelete] = useState(false)
-
-  function toggleScenSelect(id: number) {
-    setScenSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  }
-
-  async function deleteScenSelected() {
-    for (const id of scenSelectedIds) await deleteScenario(id)
-    setScenSelectedIds(new Set()); setScenSelectMode(false); setConfirmScenBulkDelete(false)
-  }
 
   async function handleScenCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
@@ -4237,42 +3510,16 @@ function ScenarioView() {
     e.target.value = ''
   }
 
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
-  const [extraFolders, setExtraFolders] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('scen:extraFolders') ?? '[]') as string[] } catch { return [] }
-  })
-  const [newFolderParent, setNewFolderParent] = useState<string | null>(null)
   const [singleReviewItem, setSingleReviewItem] = useState<LanguageScenario | null>(null)
 
-  const scenTree = useMemo(() => buildFolderTree(scenarios, extraFolders), [scenarios, extraFolders])
-  const filteredScenarios = getItemsInFolder(scenTree, selectedFolder)
+  const scenTree = buildFolderTree(scenarios)
   const active   = scenarios.find(s => s.id === activeId) ?? null
-  const dueItems = filteredScenarios.filter(s => isDueSR(s.due_at))
+  const dueItems = scenarios.filter(s => isDueSR(s.due_at))
 
-  function commitScenFolder(name: string, parentPath: string) {
-    const path = parentPath ? `${parentPath}/${name}` : name
-    const next = [...extraFolders, path]
-    setExtraFolders(next); localStorage.setItem('scen:extraFolders', JSON.stringify(next))
-    setNewFolderParent(null); setSelectedFolder(path)
-  }
-
-  async function handleRenameScenFolder(oldPath: string, newPath: string) {
-    const updated = extraFolders.map(p => p === oldPath ? newPath : p.startsWith(oldPath + '/') ? newPath + p.slice(oldPath.length) : p)
-    setExtraFolders(updated); localStorage.setItem('scen:extraFolders', JSON.stringify(updated))
-    if (selectedFolder === oldPath || selectedFolder?.startsWith(oldPath + '/')) setSelectedFolder(null)
-    await renameScenarioFolder(oldPath, newPath)
-  }
-
-  async function handleDeleteScenFolder(path: string) {
-    const updated = extraFolders.filter(p => p !== path && !p.startsWith(path + '/'))
-    setExtraFolders(updated); localStorage.setItem('scen:extraFolders', JSON.stringify(updated))
-    if (selectedFolder === path || selectedFolder?.startsWith(path + '/')) setSelectedFolder(null)
-    await deleteScenarioFolder(path)
-  }
-
-  async function handleNew() {
+  async function handleNew(folder: string | null = null) {
     const s = await createScenario()
-    setDraft({ ...s })
+    if (folder) await moveScenarioToFolder(s.id, folder)
+    setDraft({ ...s, folder: folder ?? s.folder })
     setActiveId(s.id)
     setIsEditingContent(true)
   }
@@ -4356,12 +3603,78 @@ function ScenarioView() {
     )
   }
 
-  // ── Detail / edit view ───────────────────────────────────────────────────────
-  if (activeId !== null && active) {
-    return (
-      <div className="p-4 max-w-2xl mx-auto space-y-3">
+  return (
+    <div className="flex h-full overflow-hidden">
+      <datalist id="palace-suggestions">
+        {PALACE_SUGGESTIONS.map(p => <option key={p} value={p} />)}
+      </datalist>
+
+      {/* Sidebar: toolbar + folder tree */}
+      <div className={`${activeId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-gray-100 dark:border-slate-700 flex-col bg-gray-50 dark:bg-slate-900 flex-shrink-0`}>
+        <div className="flex items-center gap-2 flex-wrap px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          {dueItems.length > 0 && (
+            <button
+              onClick={() => setReviewMode(true)}
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1"
+            >
+              🏛️ {dueItems.length} due
+            </button>
+          )}
+          <div className="relative ml-auto" ref={scenCsvTooltipRef}>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => scenCsvRef.current?.click()}
+                onMouseEnter={() => setScenCsvTooltipOpen(true)}
+                onMouseLeave={() => setScenCsvTooltipOpen(false)}
+                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              >Import CSV</button>
+              <button
+                onClick={() => setScenCsvTooltipOpen(v => !v)}
+                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
+              >?</button>
+            </div>
+            {scenCsvTooltipOpen && (
+              <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
+                <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
+                  <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`title,content,source_lang,target_lang\nAt the café,"Einen Kaffee, bitte.",de,en\nAt the doctor,,de,tr`}</code>
+                  <div className="mt-2 space-y-0.5">
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">title</span> — required</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">content</span> — optional (use quotes if it contains commas)</p>
+                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">source_lang / target_lang</span> — <code className="text-green-300">de</code> / <code className="text-green-300">en</code> / <code className="text-green-300">tr</code> / <code className="text-green-300">ja</code></p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <input ref={scenCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleScenCsvImport} />
+        </div>
+        {scenImportMsg && <p className="text-xs text-xero-green font-medium px-3 pt-1.5">{scenImportMsg}</p>}
+        {isLoading ? (
+          <p className="text-xs text-gray-400 p-4">Loading…</p>
+        ) : (
+          <ItemFolderTree<LanguageScenario>
+            tree={scenTree}
+            selectedId={activeId}
+            itemLabel={s => s.title || t.untitled}
+            itemIcon={<IconLayers className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
+            newItemLabel={`+ ${t.addScenario}`}
+            onSelectItem={openScenario}
+            onNewItem={handleNew}
+            onDeleteItem={s => setConfirmDeleteId(s.id)}
+            onRenameFolder={renameScenarioFolder}
+            onDeleteFolder={path => setConfirmDeleteFolder(path)}
+            onMoveItemToFolder={(id, folder) => moveScenarioToFolder(id, folder)}
+          />
+        )}
+      </div>
+
+      {/* Detail / edit pane */}
+      <div className={`${activeId === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
+      {activeId !== null && active ? (
+      <div className="p-4 max-w-2xl mx-auto space-y-3 w-full">
         <button onClick={() => { setActiveId(null); setIsEditingContent(false) }}
-          className="text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors mb-1">
+          className="md:hidden text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors -ml-3 p-3 min-w-[44px] min-h-[44px] flex items-center">
           ← {t.scenario}
         </button>
 
@@ -4433,174 +3746,43 @@ function ScenarioView() {
           <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${isDueSR(active.due_at) ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
             {isDueSR(active.due_at) ? '⚡ Due for review' : `Next review: ${nextReviewLabel(active.due_at)}`}
           </span>
-          <button onClick={() => setConfirmDeleteId(active.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSingleReviewItem(active)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
+            <button onClick={() => setConfirmDeleteId(active.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
+          </div>
         </div>
 
         {confirmDeleteId !== null && (
           <ConfirmDialog
             message="Delete this scenario?"
-            onConfirm={async () => { if (confirmDeleteId !== null) { await deleteScenario(confirmDeleteId); setActiveId(null); setConfirmDeleteId(null) } }}
+            onConfirm={async () => { if (confirmDeleteId !== null) { await deleteScenario(confirmDeleteId); if (activeId === confirmDeleteId) setActiveId(null); setConfirmDeleteId(null) } }}
             onCancel={() => setConfirmDeleteId(null)}
           />
         )}
       </div>
-    )
-  }
-
-  // ── List view ────────────────────────────────────────────────────────────────
-  return (
-    <div className="flex h-full overflow-hidden">
-      {/* Folder sidebar */}
-      <div className="flex flex-col">
-        <FolderSidebar
-          tree={scenTree}
-          selectedFolder={selectedFolder}
-          onSelect={setSelectedFolder}
-          onNewFolder={p => setNewFolderParent(p)}
-          onRenameFolder={handleRenameScenFolder}
-          onDeleteFolder={handleDeleteScenFolder}
-          totalCount={scenarios.length}
-          allLabel="All Scenarios"
-          orderKey="scen"
-        />
-        {newFolderParent !== null && (
-          <NewFolderRow
-            parentPath={newFolderParent}
-            onCommit={commitScenFolder}
-            onCancel={() => setNewFolderParent(null)}
-          />
-        )}
-      </div>
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-      {/* Autocomplete shared with SentenceView */}
-      <datalist id="palace-suggestions">
-        {PALACE_SUGGESTIONS.map(p => <option key={p} value={p} />)}
-      </datalist>
-
-      <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={handleNew} className="text-sm bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900 px-3 py-1.5 rounded-xl font-medium">+ {t.addScenario}</button>
-        <button
-          onClick={() => { setScenSelectMode(m => !m); setScenSelectedIds(new Set()) }}
-          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${scenSelectMode ? 'bg-gray-800 dark:bg-slate-200 text-white dark:text-slate-900' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-        >{scenSelectMode ? 'Done' : 'Select'}</button>
-        {dueItems.length > 0 && (
-          <button
-            onClick={() => setReviewMode(true)}
-            className="text-sm font-semibold px-3 py-1.5 rounded-xl bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1.5"
-          >
-            🏛️ Review {dueItems.length} due
-          </button>
-        )}
-        <div className="flex items-center gap-2 ml-auto">
-          {scenImportMsg && <span className="text-xs text-xero-green font-medium">{scenImportMsg}</span>}
-          <div className="relative" ref={scenCsvTooltipRef}>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => scenCsvRef.current?.click()}
-                onMouseEnter={() => setScenCsvTooltipOpen(true)}
-                onMouseLeave={() => setScenCsvTooltipOpen(false)}
-                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-              >Import CSV</button>
-              <button
-                onClick={() => setScenCsvTooltipOpen(v => !v)}
-                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
-              >?</button>
-            </div>
-            {scenCsvTooltipOpen && (
-              <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
-                <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">CSV Format</p>
-                  <code className="block bg-black/30 rounded-lg px-2.5 py-2 text-[11px] font-mono text-green-300 leading-relaxed whitespace-pre">{`title,content,source_lang,target_lang\nAt the café,"Einen Kaffee, bitte.",de,en\nAt the doctor,,de,tr`}</code>
-                  <div className="mt-2 space-y-0.5">
-                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">title</span> — required</p>
-                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">content</span> — optional (use quotes if it contains commas)</p>
-                    <p className="text-[10px] text-gray-300"><span className="text-white font-medium">source_lang / target_lang</span> — <code className="text-green-300">de</code> / <code className="text-green-300">en</code> / <code className="text-green-300">tr</code> / <code className="text-green-300">ja</code></p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          <input ref={scenCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleScenCsvImport} />
-          <span className="text-xs text-gray-400 dark:text-slate-500">
-            {filteredScenarios.length} scenarios
-          </span>
-        </div>
-      </div>
-
-      {filteredScenarios.length === 0 && (
-        <p className="text-sm text-gray-400 dark:text-slate-500 text-center py-8">{t.noScenariosYet}</p>
-      )}
-      <div className="space-y-2">
-        {filteredScenarios.map(s => {
-          const due = isDueSR(s.due_at)
-          const isSel = scenSelectedIds.has(s.id)
-          return (
-            <div
-              key={s.id}
-              className={`rounded-2xl border p-4 transition-colors ${dark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100'} ${scenSelectMode && isSel ? 'ring-2 ring-xero-green !border-xero-green' : ''}`}
-            >
-              <button
-                className="w-full text-left"
-                onClick={() => scenSelectMode ? toggleScenSelect(s.id) : openScenario(s)}
-              >
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  {scenSelectMode && (
-                    <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors mt-0.5 ${isSel ? 'bg-xero-green border-xero-green' : 'border-gray-300 dark:border-slate-500'}`}>
-                      {isSel && <IconCheck className="w-3 h-3 text-white" strokeWidth={3} />}
-                    </div>
-                  )}
-                  <p className={`text-sm font-semibold flex-1 ${dark ? 'text-slate-100' : 'text-gray-800'}`}>{s.title || t.untitled}</p>
-                  <span className={`text-[9px] rounded-full px-1.5 py-0.5 font-semibold flex-shrink-0 ${due ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
-                    {due ? '⚡ Due' : nextReviewLabel(s.due_at)}
-                  </span>
-                </div>
-                {s.memory_palace && (
-                  <p className="text-[10px] text-violet-500 dark:text-violet-400 mb-1">🏛️ {s.memory_palace}</p>
-                )}
-                <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-2">{s.content || '—'}</p>
-                <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                  <span className="inline-block text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400 rounded-full px-2 py-0.5">
-                    {LANG_LABELS[s.source_lang] ?? s.source_lang} → {LANG_LABELS[s.target_lang] ?? s.target_lang}
-                  </span>
-                  <span className="text-[10px] text-gray-400 dark:text-slate-500">Added {fmtCreated(s.created_at)}</span>
-                </div>
-              </button>
-              {!scenSelectMode && (
-                <div className="flex gap-2 mt-2 pt-2 border-t border-gray-50 dark:border-slate-700">
-                  <button onClick={() => setSingleReviewItem(s)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {scenSelectMode && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-3 z-40 shadow-lg">
-          <span className="text-sm text-gray-700 dark:text-slate-300 flex-shrink-0">{scenSelectedIds.size} selected</span>
-          <button
-            onClick={() => scenSelectedIds.size === filteredScenarios.length ? setScenSelectedIds(new Set()) : setScenSelectedIds(new Set(filteredScenarios.map(s => s.id)))}
-            className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 transition-colors"
-          >{scenSelectedIds.size === filteredScenarios.length ? 'Deselect All' : 'Select All'}</button>
-          <div className="flex-1" />
-          {scenSelectedIds.size > 0 && (
-            <button onClick={() => setConfirmScenBulkDelete(true)} className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors">
-              Delete {scenSelectedIds.size}
+      ) : (
+        <div className="flex-1 flex flex-col">
+          {activeId !== null && (
+            <button onClick={() => setActiveId(null)}
+              className="md:hidden self-start text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors p-3 -ml-1 mt-1 min-w-[44px] min-h-[44px] flex items-center">
+              ← {t.scenario}
             </button>
           )}
-          <button onClick={() => { setScenSelectMode(false); setScenSelectedIds(new Set()); setConfirmScenBulkDelete(false) }} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">Cancel</button>
+          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm px-6 text-center">
+            {isLoading ? 'Loading…' : 'Select or create a scenario to get started.'}
+          </div>
         </div>
       )}
+      </div>
 
-      {confirmScenBulkDelete && (
+      {confirmDeleteFolder !== null && (
         <ConfirmDialog
-          message={`Delete ${scenSelectedIds.size} scenario${scenSelectedIds.size !== 1 ? 's' : ''}?`}
-          onConfirm={deleteScenSelected}
-          onCancel={() => setConfirmScenBulkDelete(false)}
+          message={`Delete folder "${confirmDeleteFolder}" and all scenarios inside?`}
+          confirmLabel="Delete"
+          onConfirm={async () => { await deleteScenarioFolder(confirmDeleteFolder); setConfirmDeleteFolder(null) }}
+          onCancel={() => setConfirmDeleteFolder(null)}
         />
       )}
-      </div>
     </div>
   )
 }
@@ -4666,7 +3848,11 @@ function pcWrapLines(text: string, maxChars: number): string[] {
   return lines
 }
 
-const PALACE_EMOJI_CHOICES = ['🚪', '🛏️', '🍳', '🛋️', '🚿', '🌳', '🍽️', '📚', '🪟', '🔑', '🕯️', '🖼️', '🪑', '🧺', '🧴', '🎒']
+const PALACE_EMOJI_CHOICES = [
+  '🚪', '🪟', '🛏️', '🛋️', '🪑', '🍳', '🍽️', '🚿', '🧺', '🧴', '🕯️', '🖼️',
+  '📚', '💡', '🔑', '⏰', '📱', '💻', '🎒', '👜', '🧢', '👕', '👟', '🌳',
+  '🌿', '🌸', '☀️', '⭐', '🔥', '💧', '🐾', '🎵', '❤️', '⚡', '🎯', '✅',
+]
 
 // Maps a linked-content type to its Language sub-tab path, so a checkpoint's
 // link can be opened at `/learn/language/<path>?highlight=<id>`.
@@ -4798,12 +3984,12 @@ function CheckpointEditor({ checkpoint, onSave, onClose }: {
                     onSave({ ...checkpoint, label: label.trim() || 'Checkpoint', content, media })
                     navigate(`/learn/language/${pcContentRoute(content.type)}?highlight=${content.id}`)
                   }}
-                  className="text-gray-400 hover:text-xero-green flex-shrink-0 p-2 -m-2" title="Go to linked item"
+                  className="text-gray-400 hover:text-xero-green flex-shrink-0 p-2 relative z-10" title="Go to linked item"
                 >
                   <IconExternalLink className="w-3.5 h-3.5" strokeWidth={2} />
                 </button>
               )}
-              <button onClick={() => setContent(null)} className="text-gray-400 hover:text-red-500 flex-shrink-0 p-2 -m-2">
+              <button onClick={() => setContent(null)} className="text-gray-400 hover:text-red-500 flex-shrink-0 p-2 -ml-1 -mr-2">
                 <IconClose className="w-3.5 h-3.5" strokeWidth={2} />
               </button>
             </div>
@@ -5492,123 +4678,6 @@ function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
 
 // ─── MemoryPalaceView (folder tree + canvas) ─────────────────────────────────────
 
-interface PalaceTreeCtxType {
-  selectedId: number | null
-  onSelect: (id: number) => void
-  expanded: Set<string>
-  onToggle: (path: string) => void
-  renaming: { path: string; val: string } | null
-  setRenaming: (v: { path: string; val: string } | null) => void
-  addingFolderIn: string | null
-  setAddingFolderIn: (v: string | null) => void
-  folderInputVal: string
-  setFolderInputVal: (v: string) => void
-  onCommitFolderAdd: () => void
-  onCommitRename: () => void
-  onNewPalace: (folder: string | null) => void
-  onDropPalace: (id: number, folder: string | null) => void
-  onMoveFolder: (dragPath: string, targetPath: string | null) => void
-  onCtx: (e: React.MouseEvent, type: 'folder' | 'palace', folderPath?: string, palaceId?: number) => void
-}
-const PalaceTreeCtx = createContext<PalaceTreeCtxType | null>(null)
-
-function PalaceFolderTreeRow({ node, depth }: { node: FolderNode<MemoryPalaceMeta>; depth: number }) {
-  const ctx = useContext(PalaceTreeCtx)!
-  const isOpen = ctx.expanded.has(node.path)
-  const isRenaming = ctx.renaming?.path === node.path
-  const [dragOver, setDragOver] = useState(false)
-  return (
-    <>
-      <div
-        {...(!isTouch && {
-          draggable: true,
-          onDragStart: (e: React.DragEvent) => { e.stopPropagation(); e.dataTransfer.setData('folderPath', node.path); e.dataTransfer.effectAllowed = 'move' },
-        })}
-        style={{ paddingLeft: depth * 14 + 4 }}
-        className={`group flex items-center gap-1 py-2 pr-1 rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
-        onClick={() => ctx.onToggle(node.path)}
-        onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'folder', node.path) }}
-        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-        onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false) }}
-        onDrop={e => {
-          e.preventDefault(); e.stopPropagation(); setDragOver(false)
-          const palaceId = e.dataTransfer.getData('palaceId')
-          if (palaceId) { ctx.onDropPalace(Number(palaceId), node.path); return }
-          const folderPath = e.dataTransfer.getData('folderPath')
-          if (folderPath && folderPath !== node.path && !node.path.startsWith(folderPath + '/')) ctx.onMoveFolder(folderPath, node.path)
-        }}
-      >
-        <IconChevronRight className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-100 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.5} />
-        <IconFolder className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500 flex-shrink-0" strokeWidth={1.75} />
-        {isRenaming ? (
-          <input
-            autoFocus draggable={false}
-            value={ctx.renaming!.val}
-            onChange={e => ctx.setRenaming({ path: node.path, val: e.target.value })}
-            onKeyDown={e => { e.stopPropagation(); if (e.key === 'Escape') ctx.setRenaming(null) }}
-            onBlur={ctx.onCommitRename}
-            onClick={e => e.stopPropagation()}
-            className="flex-1 min-w-0 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
-          />
-        ) : (
-          <span className="text-xs flex-1 truncate text-gray-700 dark:text-slate-300">{node.name}</span>
-        )}
-        {!isRenaming && (
-          <div className={`flex items-center gap-0.5 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
-            <button title="New palace" onClick={e => { e.stopPropagation(); ctx.onNewPalace(node.path) }} className="p-2 -m-1 rounded text-gray-400 hover:text-xero-green">
-              <IconAdd className="w-3 h-3" strokeWidth={2.5} />
-            </button>
-            <button title="More" onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'folder', node.path) }} className="p-2 -m-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold">•••</button>
-          </div>
-        )}
-      </div>
-      {isOpen && (
-        <>
-          {ctx.addingFolderIn === node.path && (
-            <div style={{ paddingLeft: (depth + 1) * 14 + 4 }} className="flex items-center gap-1 py-0.5 pr-1">
-              <span className="w-3 flex-shrink-0" />
-              <IconFolder className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" strokeWidth={1.75} />
-              <input
-                autoFocus value={ctx.folderInputVal}
-                onChange={e => ctx.setFolderInputVal(e.target.value)}
-                onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') ctx.onCommitFolderAdd(); if (e.key === 'Escape') ctx.setAddingFolderIn(null) }}
-                onBlur={ctx.onCommitFolderAdd}
-                placeholder="Folder name…"
-                className="flex-1 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
-              />
-            </div>
-          )}
-          {node.children.map(c => <PalaceFolderTreeRow key={c.path} node={c} depth={depth + 1} />)}
-          {node.items.map(p => <PalaceTreeRow key={p.id} palace={p} depth={depth + 1} />)}
-        </>
-      )}
-    </>
-  )
-}
-
-function PalaceTreeRow({ palace, depth }: { palace: MemoryPalaceMeta; depth: number }) {
-  const ctx = useContext(PalaceTreeCtx)!
-  const active = ctx.selectedId === palace.id
-  return (
-    <div
-      {...(!isTouch && {
-        draggable: true,
-        onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('palaceId', String(palace.id)); e.dataTransfer.effectAllowed = 'move' },
-      })}
-      style={{ paddingLeft: depth * 14 + 4 }}
-      className={`group flex items-center gap-1.5 py-2 pr-1 rounded-lg cursor-pointer ${active ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
-      onClick={() => ctx.onSelect(palace.id)}
-      onContextMenu={e => { e.preventDefault(); ctx.onCtx(e, 'palace', undefined, palace.id) }}
-    >
-      <span className="w-3 flex-shrink-0" />
-      <IconPalace className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
-      <span className={`text-xs flex-1 truncate ${active ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{palace.title || 'Untitled'}</span>
-      <button onClick={e => { e.stopPropagation(); ctx.onCtx(e, 'palace', undefined, palace.id) }}
-        className={`p-2 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] font-bold leading-none ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>•••</button>
-    </div>
-  )
-}
-
 function MemoryPalaceView() {
   const { palaces, isLoading, createPalace, movePalaceToFolder, renamePalaceFolder, deletePalaceFolder, deletePalace } = useMemoryPalaceList()
   const [palaceParams, setPalaceParams] = useSearchParams()
@@ -5617,124 +4686,41 @@ function MemoryPalaceView() {
     setPalaceParams(p => { id !== null ? p.set('palace', String(id)) : p.delete('palace'); return p })
   }
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [renaming, setRenaming] = useState<{ path: string; val: string } | null>(null)
-  const [addingFolderIn, setAddingFolderIn] = useState<string | null>(null)
-  const [folderInputVal, setFolderInputVal] = useState('')
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; type: 'folder' | 'palace'; folderPath?: string; palaceId?: number } | null>(null)
-  const [folderPickerFor, setFolderPickerFor] = useState<number | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
-  const ctxMenuRef = useRef<HTMLDivElement>(null)
 
   const tree = buildFolderTree(palaces)
-  const allFolderPaths = collectFolderPaths(tree)
 
-  useEffect(() => {
-    if (!ctxMenu) return
-    function dismiss(ev: MouseEvent) { if (!ctxMenuRef.current?.contains(ev.target as Node)) { setCtxMenu(null); setFolderPickerFor(null) } }
-    document.addEventListener('mousedown', dismiss)
-    return () => document.removeEventListener('mousedown', dismiss)
-  }, [ctxMenu])
-
-  async function handleNewPalace(folder: string | null = null) {
+  async function handleNewPalace(folder: string | null) {
     const p = await createPalace('New Memory Palace', folder)
     setSelectedId(p.id)
-    if (folder) {
-      const ancestors = folder.split('/').map((_, i, a) => a.slice(0, i + 1).join('/'))
-      setExpanded(s => new Set([...s, ...ancestors]))
-    }
     setMobileOpen(false)
-  }
-
-  async function commitFolderAdd() {
-    if (addingFolderIn === null) return
-    if (!folderInputVal.trim()) { setAddingFolderIn(null); return }
-    const name = folderInputVal.trim()
-    const newPath = addingFolderIn ? `${addingFolderIn}/${name}` : name
-    setAddingFolderIn(null)
-    setFolderInputVal('')
-    await handleNewPalace(newPath)
-  }
-
-  async function commitRename() {
-    const r = renaming
-    setRenaming(null)
-    if (!r) return
-    const newName = r.val.trim()
-    if (!newName || newName === r.path.split('/').pop()) return
-    const parts = r.path.split('/')
-    parts[parts.length - 1] = newName
-    const newPath = parts.join('/')
-    await renamePalaceFolder(r.path, newPath)
-    setExpanded(s => { const n = new Set(s); n.delete(r.path); n.add(newPath); return n })
-  }
-
-  async function handleMoveFolder(dragPath: string, targetPath: string | null) {
-    if (targetPath !== null && (targetPath === dragPath || targetPath.startsWith(dragPath + '/'))) return
-    const name = dragPath.split('/').pop()!
-    const newPath = targetPath ? `${targetPath}/${name}` : name
-    if (newPath === dragPath) return
-    await renamePalaceFolder(dragPath, newPath)
-    setExpanded(s => { const n = new Set(s); n.delete(dragPath); n.add(newPath); return n })
-  }
-
-  function openCtx(e: React.MouseEvent, type: 'folder' | 'palace', folderPath?: string, palaceId?: number) {
-    const x = Math.min(e.clientX, window.innerWidth - 175)
-    const y = Math.min(e.clientY, window.innerHeight - 160)
-    setCtxMenu({ x, y, type, folderPath, palaceId })
-  }
-
-  const treeCtx: PalaceTreeCtxType = {
-    selectedId, onSelect: id => { setSelectedId(id); setMobileOpen(false) },
-    expanded, onToggle: path => setExpanded(s => { const n = new Set(s); n.has(path) ? n.delete(path) : n.add(path); return n }),
-    renaming, setRenaming,
-    addingFolderIn, setAddingFolderIn: v => { setAddingFolderIn(v); setFolderInputVal('') }, folderInputVal, setFolderInputVal,
-    onCommitFolderAdd: commitFolderAdd, onCommitRename: commitRename,
-    onNewPalace: handleNewPalace,
-    onDropPalace: (id, folder) => { movePalaceToFolder(id, folder) },
-    onMoveFolder: handleMoveFolder,
-    onCtx: openCtx,
   }
 
   const selectedTitle = palaces.find(p => p.id === selectedId)?.title ?? 'Memory Palace'
 
   function TreePane() {
     return (
-      <PalaceTreeCtx.Provider value={treeCtx}>
-        <div className="flex-1 overflow-y-auto p-2">
-          <button onClick={() => handleNewPalace(null)} className="w-full text-left text-xs text-gray-400 hover:text-xero-green transition-colors px-2 py-2 flex items-center gap-1.5">
-            <IconAdd className="w-3.5 h-3.5" strokeWidth={2.5} /> New palace
-          </button>
-          {isLoading && <p className="text-xs text-gray-400 px-2 py-2">Loading…</p>}
-          {addingFolderIn === '' && (
-            <div className="flex items-center gap-1 py-0.5 pr-1 pl-2">
-              <IconFolder className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" strokeWidth={1.75} />
-              <input
-                autoFocus value={folderInputVal}
-                onChange={e => setFolderInputVal(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') commitFolderAdd(); if (e.key === 'Escape') setAddingFolderIn(null) }}
-                onBlur={commitFolderAdd}
-                placeholder="Folder name…"
-                className="flex-1 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-1 py-0.5 outline-none"
-              />
-            </div>
-          )}
-          {tree.children.map(c => <PalaceFolderTreeRow key={c.path} node={c} depth={0} />)}
-          {tree.items.map(p => <PalaceTreeRow key={p.id} palace={p} depth={0} />)}
-          <button onClick={() => setAddingFolderIn('')} className="w-full text-left text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors px-2 py-1.5 mt-1 flex items-center gap-1.5">
-            <IconFolder className="w-3 h-3" strokeWidth={2} /> New folder
-          </button>
-          {!isLoading && palaces.length === 0 && <p className="text-xs text-gray-400 px-2 py-2">No memory palaces yet.</p>}
-        </div>
-      </PalaceTreeCtx.Provider>
+      <ItemFolderTree<MemoryPalaceMeta>
+        tree={tree}
+        selectedId={selectedId}
+        itemLabel={p => p.title || 'Untitled'}
+        itemIcon={<IconPalace className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
+        newItemLabel="New palace"
+        onSelectItem={p => { setSelectedId(p.id); setMobileOpen(false) }}
+        onNewItem={handleNewPalace}
+        onDeleteItem={p => setConfirmDeleteId(p.id)}
+        onRenameFolder={renamePalaceFolder}
+        onDeleteFolder={path => setConfirmDeleteFolder(path)}
+        onMoveItemToFolder={(id, folder) => movePalaceToFolder(id, folder)}
+      />
     )
   }
 
   return (
     <div className="flex h-full overflow-hidden relative">
       <div className="hidden md:flex w-52 flex-shrink-0 flex-col border-r border-xero-border dark:border-slate-700 bg-white dark:bg-slate-900">
-        <TreePane />
+        {isLoading ? <p className="text-xs text-gray-400 px-2 py-2">Loading…</p> : <TreePane />}
       </div>
 
       {mobileOpen && (
@@ -5762,41 +4748,6 @@ function MemoryPalaceView() {
           </div>
         )}
       </div>
-
-      {ctxMenu && (
-        <div ref={ctxMenuRef} className="fixed z-40 bg-white dark:bg-slate-800 border border-xero-border dark:border-slate-700 rounded-xl shadow-2xl py-1 min-w-[160px]"
-          style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={e => e.stopPropagation()}>
-          {ctxMenu.type === 'folder' ? (
-            <>
-              <button onClick={() => { setAddingFolderIn(ctxMenu.folderPath!); setExpanded(s => new Set([...s, ctxMenu.folderPath!])); setCtxMenu(null) }}
-                className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">New subfolder</button>
-              <button onClick={() => { setRenaming({ path: ctxMenu.folderPath!, val: ctxMenu.folderPath!.split('/').pop()! }); setCtxMenu(null) }}
-                className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">Rename</button>
-              <button onClick={() => { setConfirmDeleteFolder(ctxMenu.folderPath!); setCtxMenu(null) }}
-                className="w-full text-left text-xs px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">Delete folder</button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => setFolderPickerFor(folderPickerFor === ctxMenu.palaceId ? null : ctxMenu.palaceId!)}
-                className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center justify-between">
-                Move to folder <IconChevronRight className={`w-3 h-3 flex-shrink-0 transition-transform ${folderPickerFor === ctxMenu.palaceId ? 'rotate-90' : ''}`} strokeWidth={2.5} />
-              </button>
-              {folderPickerFor === ctxMenu.palaceId && (
-                <div className="bg-gray-50 dark:bg-slate-900/50 max-h-40 overflow-y-auto border-y border-gray-100 dark:border-slate-700">
-                  <button onClick={() => { movePalaceToFolder(ctxMenu.palaceId!, null); setFolderPickerFor(null); setCtxMenu(null) }}
-                    className="w-full text-left text-xs pl-6 pr-3 py-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700">No folder</button>
-                  {allFolderPaths.map(f => (
-                    <button key={f} onClick={() => { movePalaceToFolder(ctxMenu.palaceId!, f); setFolderPickerFor(null); setCtxMenu(null) }}
-                      className="w-full text-left text-xs pl-6 pr-3 py-2 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 truncate">{f}</button>
-                  ))}
-                </div>
-              )}
-              <button onClick={() => { setConfirmDeleteId(ctxMenu.palaceId!); setCtxMenu(null) }}
-                className="w-full text-left text-xs px-3 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
-            </>
-          )}
-        </div>
-      )}
 
       {confirmDeleteId !== null && (
         <ConfirmDialog

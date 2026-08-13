@@ -325,13 +325,15 @@ export function useMemoryPalace(id: number) {
 export function useVocabulary() {
   const { data, mutate, isLoading } = useSWR<VocabCard[]>('/api/notebook/vocabulary', fetcher)
 
-  async function addWord(payload: { word: string; translation: string; language: string; translation_language?: string; example?: string }) {
-    await fetch('/api/notebook/vocabulary', {
+  async function addWord(payload: { word: string; translation: string; language: string; translation_language?: string; example?: string }): Promise<VocabCard> {
+    const res = await fetch('/api/notebook/vocabulary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
+    const card = await res.json() as VocabCard
     await mutate()
+    return card
   }
 
   async function deleteWord(id: number) {
