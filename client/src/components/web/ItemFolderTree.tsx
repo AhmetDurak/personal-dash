@@ -63,7 +63,7 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
           onDragStart: (e: React.DragEvent) => { e.stopPropagation(); e.dataTransfer.setData('folderPath', node.path); e.dataTransfer.effectAllowed = 'move' },
         })}
         style={{ paddingLeft: depth * 14 + 4 }}
-        className={`group flex items-center gap-1 py-2 pr-1 min-h-[44px] rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+        className={`group flex items-center gap-1 py-1.5 pr-1 ${isTouch ? 'min-h-[44px]' : ''} rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
         onClick={() => ctx.onToggle(node.path)}
         onContextMenu={e => { e.preventDefault(); ctx.openCtx(e, 'folder', node.path) }}
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
@@ -93,10 +93,10 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
         )}
         {!isRenaming && (
           <div className={`flex items-center gap-2 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
-            <button title={ctx.newItemLabel} onClick={e => { e.stopPropagation(); ctx.onNewItem(node.path) }} className="p-3 min-w-[44px] min-h-[44px] rounded flex items-center justify-center text-gray-400 hover:text-xero-green">
+            <button title={ctx.newItemLabel} onClick={e => { e.stopPropagation(); ctx.onNewItem(node.path) }} className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-xero-green`}>
               <IconAdd className="w-3 h-3" strokeWidth={2.5} />
             </button>
-            <button title="More" onClick={e => { e.stopPropagation(); ctx.openCtx(e, 'folder', node.path) }} className="p-3 min-w-[44px] min-h-[44px] rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold">•••</button>
+            <button title="More" onClick={e => { e.stopPropagation(); ctx.openCtx(e, 'folder', node.path) }} className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold`}>•••</button>
           </div>
         )}
       </div>
@@ -134,7 +134,7 @@ function ItemTreeRow<T extends AnyItem>({ item, depth }: { item: T; depth: numbe
         onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('treeItemId', String(item.id)); e.dataTransfer.effectAllowed = 'move' },
       })}
       style={{ paddingLeft: depth * 14 + 4 }}
-      className={`group flex items-center gap-1.5 py-2 pr-1 min-h-[44px] rounded-lg cursor-pointer ${active ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+      className={`group flex items-center gap-1.5 py-1.5 pr-1 ${isTouch ? 'min-h-[44px]' : ''} rounded-lg cursor-pointer ${active ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
       onClick={() => ctx.onSelectItem(item)}
       onContextMenu={e => { e.preventDefault(); ctx.openCtx(e, 'item', undefined, item.id) }}
     >
@@ -142,7 +142,7 @@ function ItemTreeRow<T extends AnyItem>({ item, depth }: { item: T; depth: numbe
       {ctx.itemIcon}
       <span className={`text-xs flex-1 truncate ${active ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{ctx.itemLabel(item)}</span>
       <button onClick={e => { e.stopPropagation(); ctx.openCtx(e, 'item', undefined, item.id) }}
-        className={`p-3 min-w-[44px] min-h-[44px] rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] font-bold leading-none ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>•••</button>
+        className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5 opacity-30 group-hover:opacity-100'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] font-bold leading-none`}>•••</button>
     </div>
   )
 }
