@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useContext, createContext, type ReactNode 
 import { IconChevronRight, IconFolder, IconAdd } from '../../lib/icons'
 import { collectFolderPaths, type FolderNode } from '../../lib/folderTree'
 
-const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+export const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
 // A generic, reusable nested folder tree — one row per folder (expand/collapse,
 // rename, new subfolder, delete) with items as leaf rows underneath. Shared by
@@ -28,6 +28,9 @@ interface TreeCtxType<T extends AnyItem> {
   onDeleteFolder: (path: string) => void
   onMoveItemToFolder: (id: T['id'], folder: string | null) => void
   onMoveFolder: (dragPath: string, targetPath: string | null) => void
+  showItems: boolean
+  selectedFolder?: string | null
+  onSelectFolder?: (path: string) => void
   allFolderPaths: string[]
   expanded: Set<string>
   onToggle: (path: string) => void
@@ -53,6 +56,7 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
   const ctx = useTreeCtx<T>()
   const isOpen = ctx.expanded.has(node.path)
   const isRenaming = ctx.renaming?.path === node.path
+  const isActiveFolder = ctx.selectedFolder === node.path
   const [dragOver, setDragOver] = useState(false)
 
   return (
@@ -63,8 +67,8 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
           onDragStart: (e: React.DragEvent) => { e.stopPropagation(); e.dataTransfer.setData('folderPath', node.path); e.dataTransfer.effectAllowed = 'move' },
         })}
         style={{ paddingLeft: depth * 14 + 4 }}
-        className={`group flex items-center gap-1 py-1.5 pr-1 ${isTouch ? 'min-h-[44px]' : ''} rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
-        onClick={() => ctx.onToggle(node.path)}
+        className={`group flex items-center gap-1 py-1.5 pr-1 ${isTouch ? 'min-h-[44px]' : ''} rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : isActiveFolder ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+        onClick={() => { ctx.onToggle(node.path); ctx.onSelectFolder?.(node.path) }}
         onContextMenu={e => { e.preventDefault(); ctx.openCtx(e, 'folder', node.path) }}
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false) }}
@@ -89,7 +93,7 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
             className="flex-1 min-w-0 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-2 py-1.5 outline-none"
           />
         ) : (
-          <span className="text-xs flex-1 truncate text-gray-700 dark:text-slate-300">{node.name}</span>
+          <span className={`text-xs flex-1 truncate ${isActiveFolder ? 'text-xero-green font-medium' : 'text-gray-700 dark:text-slate-300'}`}>{node.name}</span>
         )}
         {!isRenaming && (
           <div className={`flex items-center gap-2 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
@@ -117,7 +121,7 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
             </div>
           )}
           {node.children.map(c => <FolderTreeRow<T> key={c.path} node={c} depth={depth + 1} />)}
-          {node.items.map(item => <ItemTreeRow<T> key={item.id} item={item} depth={depth + 1} />)}
+          {ctx.showItems && node.items.map(item => <ItemTreeRow<T> key={item.id} item={item} depth={depth + 1} />)}
         </>
       )}
     </>
@@ -160,11 +164,21 @@ export interface ItemFolderTreeProps<T extends AnyItem> {
   onRenameFolder: (oldPath: string, newPath: string) => void
   onDeleteFolder: (path: string) => void
   onMoveItemToFolder: (id: T['id'], folder: string | null) => void
+  /** When false, items aren't rendered as tree leaves — use for large flat collections
+   *  (e.g. hundreds of vocabulary words) where a row per item would flood the sidebar.
+   *  Pair with selectedFolder/onSelectFolder to drive a separate item-list view showing
+   *  the active folder's contents. Defaults to true (items shown inline, as in Notes). */
+  showItems?: boolean
+  /** Highlights the given folder path as active. Only meaningful with showItems=false. */
+  selectedFolder?: string | null
+  /** Called when a folder row is clicked, alongside the default expand/collapse. */
+  onSelectFolder?: (path: string) => void
 }
 
 export function ItemFolderTree<T extends AnyItem>({
   tree, selectedId, itemLabel, itemIcon, newItemLabel,
   onSelectItem, onNewItem, onDeleteItem, onRenameFolder, onDeleteFolder, onMoveItemToFolder,
+  showItems = true, selectedFolder, onSelectFolder,
 }: ItemFolderTreeProps<T>) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [renaming, setRenaming] = useState<{ path: string; val: string } | null>(null)
@@ -232,6 +246,7 @@ export function ItemFolderTree<T extends AnyItem>({
   const ctxValue: TreeCtxType<T> = {
     selectedId, onSelectItem, itemLabel, itemIcon, newItemLabel,
     onNewItem, onDeleteItem, onRenameFolder, onDeleteFolder, onMoveItemToFolder, onMoveFolder: handleMoveFolder,
+    showItems, selectedFolder, onSelectFolder,
     allFolderPaths,
     expanded, onToggle: path => setExpanded(s => { const n = new Set(s); n.has(path) ? n.delete(path) : n.add(path); return n }),
     renaming, setRenaming, commitRename,
@@ -263,11 +278,11 @@ export function ItemFolderTree<T extends AnyItem>({
           </div>
         )}
         {tree.children.map(c => <FolderTreeRow<T> key={c.path} node={c} depth={0} />)}
-        {tree.items.map(item => <ItemTreeRow<T> key={item.id} item={item} depth={0} />)}
+        {showItems && tree.items.map(item => <ItemTreeRow<T> key={item.id} item={item} depth={0} />)}
         <button onClick={() => startAddingFolder('')} className="w-full text-left text-xs text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors px-2 py-2 mt-1 flex items-center gap-1.5">
           <IconFolder className="w-3 h-3" strokeWidth={2} /> New folder
         </button>
-        {tree.children.length === 0 && tree.items.length === 0 && (
+        {tree.children.length === 0 && (!showItems || tree.items.length === 0) && (
           <p className="text-xs text-gray-400 px-2 py-2">Nothing here yet.</p>
         )}
 

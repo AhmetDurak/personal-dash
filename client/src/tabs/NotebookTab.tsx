@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 're
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage, IconPalace, IconImage, IconExternalLink,
   IconBook, IconMessage, IconLayers, IconMenu, IconChevronRight, IconChevronLeft, IconUpload } from '../lib/icons'
-import { buildFolderTree, collectFolderPaths } from '../lib/folderTree'
+import { buildFolderTree, collectFolderPaths, getItemsInFolder } from '../lib/folderTree'
 import { useSortFilter } from '../hooks/useSortFilter'
 import { SortFilterBar } from '../components/web/SortFilterBar'
 import { marked } from 'marked'
@@ -19,7 +19,7 @@ import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, Wor
   PalaceCheckpoint, PalaceConnection, PalaceContentType, PalaceSide, MemoryPalaceMeta } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChainsView } from '../components/web/ChainsView'
-import { ItemFolderTree } from '../components/web/ItemFolderTree'
+import { ItemFolderTree, isTouch } from '../components/web/ItemFolderTree'
 import { useLanguage } from '../hooks/useLanguage'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { AreaChart, Area, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContainer } from 'recharts'
@@ -1739,6 +1739,8 @@ function VocabView() {
   const csvInputRef = useRef<HTMLInputElement>(null)
   const csvTooltipRef = useRef<HTMLDivElement>(null)
   const [vocabSearch, setVocabSearch] = useState('')
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
   const vocabTree = buildFolderTree(vocab)
 
   useEffect(() => {
@@ -1771,7 +1773,9 @@ function VocabView() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const dueCards = vocab.filter(v => new Date(v.due_at) <= today)
   const q = vocabSearch.trim().toLowerCase()
-  const searchResults = q ? vocab.filter(v => [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))) : []
+  const scopedWords = getItemsInFolder(vocabTree, selectedFolder)
+  const listItems = q ? scopedWords.filter(v => [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))) : scopedWords
+  const scopeLabel = selectedFolder === null ? 'All Words' : selectedFolder === '' ? 'Unsorted' : selectedFolder
   const reviewCard: VocabCard | null = dueCards[reviewIdx] ?? null
 
   async function handleRate(quality: number) {
@@ -1965,37 +1969,98 @@ function VocabView() {
     setShowAdd(true)
   }
 
+  function TreePane() {
+    return (
+      <div className="flex-1 overflow-y-auto flex flex-col">
+        <div className="p-2 space-y-0.5 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          <button onClick={() => { setSelectedFolder(null); setMobileTreeOpen(false) }}
+            className={`w-full text-left text-xs px-2 py-2 rounded-lg transition-colors flex items-center ${isTouch ? 'min-h-[44px]' : ''} ${selectedFolder === null ? 'bg-xero-green/10 dark:bg-xero-green/20 text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}>
+            All Words
+          </button>
+          <button onClick={() => { setSelectedFolder(''); setMobileTreeOpen(false) }}
+            className={`w-full text-left text-xs px-2 py-2 rounded-lg transition-colors flex items-center ${isTouch ? 'min-h-[44px]' : ''} ${selectedFolder === '' ? 'bg-xero-green/10 dark:bg-xero-green/20 text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}>
+            Unsorted
+          </button>
+        </div>
+        <ItemFolderTree<VocabCard>
+          tree={vocabTree}
+          selectedId={null}
+          showItems={false}
+          selectedFolder={selectedFolder}
+          onSelectFolder={path => { setSelectedFolder(path); setMobileTreeOpen(false) }}
+          itemLabel={c => c.word}
+          newItemLabel={`+ ${t.addWord}`}
+          onSelectItem={() => {}}
+          onNewItem={handleNewItemRequest}
+          onRenameFolder={renameVocabFolder}
+          onDeleteFolder={path => setConfirmDeleteFolder(path)}
+          onMoveItemToFolder={(id, folder) => moveVocabToFolder(id, folder)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Sidebar: toolbar + folder tree */}
-      <div className={`${editCard !== null ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-gray-100 dark:border-slate-700 flex-col bg-gray-50 dark:bg-slate-900 flex-shrink-0`}>
-        <div className="flex items-center gap-2 flex-wrap px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+      {/* Folder tree column — desktop permanent, mobile overlay */}
+      <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+        <TreePane />
+      </div>
+      {mobileTreeOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />
+          <div className="relative w-64 h-full bg-gray-50 dark:bg-slate-900 flex flex-col shadow-2xl">
+            <TreePane />
+          </div>
+        </div>
+      )}
+
+      {/* Item list column */}
+      <div className={`${editCard !== null ? 'hidden md:flex' : 'flex'} w-full md:w-72 border-r border-gray-100 dark:border-slate-700 flex-col bg-white dark:bg-slate-900/50 flex-shrink-0`}>
+        <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          <button onClick={() => setMobileTreeOpen(true)}
+            className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
+            <IconMenu className="w-4 h-4" strokeWidth={2} />
+          </button>
+          <span className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate flex-1">{scopeLabel}</span>
           {dueCards.length > 0 && (
             <button
               onClick={() => setReviewMode(true)}
-              className="text-xs bg-xero-green text-white px-2.5 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+              className="text-xs bg-xero-green text-white px-2.5 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors flex-shrink-0"
             >
               {t.reviewNow} ({dueCards.length})
             </button>
           )}
-          <div className="relative ml-auto" ref={csvTooltipRef}>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => csvInputRef.current?.click()}
-                onMouseEnter={() => setCsvTooltipOpen(true)}
-                onMouseLeave={() => setCsvTooltipOpen(false)}
-                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-              >
-                {t.importCsv}
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 pt-2 flex-shrink-0">
+          <div className="relative flex-1 min-w-0">
+            <input
+              value={vocabSearch}
+              onChange={e => setVocabSearch(e.target.value)}
+              placeholder="Search…"
+              className="w-full text-xs border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-1 focus:ring-xero-green bg-white dark:bg-slate-800 dark:text-slate-100 placeholder-gray-400"
+            />
+            {vocabSearch && (
+              <button onClick={() => setVocabSearch('')} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 p-2">
+                <IconClose className="w-3 h-3" strokeWidth={2} />
               </button>
-              <button
-                onClick={() => setCsvTooltipOpen(v => !v)}
-                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
-                aria-label="CSV format info"
-              >
-                ?
-              </button>
-            </div>
+            )}
+          </div>
+          <button onClick={() => handleNewItemRequest(selectedFolder)} title={t.addWord}
+            className={`text-gray-400 hover:text-xero-green transition-colors p-2 -m-0.5 flex-shrink-0 flex items-center justify-center ${isTouch ? 'min-w-[44px] min-h-[44px]' : ''}`}>
+            <IconAdd className="w-4 h-4" strokeWidth={2.5} />
+          </button>
+          <div className="relative flex-shrink-0" ref={csvTooltipRef}>
+            <button
+              onClick={() => { if (isTouch && !csvTooltipOpen) { setCsvTooltipOpen(true); return } csvInputRef.current?.click() }}
+              onMouseEnter={() => setCsvTooltipOpen(true)}
+              onMouseLeave={() => setCsvTooltipOpen(false)}
+              className={`text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors p-2 -m-0.5 flex items-center justify-center ${isTouch ? 'min-w-[44px] min-h-[44px]' : ''}`}
+              title={t.importCsv}
+            >
+              <IconUpload className="w-4 h-4" strokeWidth={2} />
+            </button>
             {csvTooltipOpen && (
               <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
                 <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
@@ -2014,56 +2079,27 @@ function VocabView() {
           <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvImport} />
         </div>
 
-        <div className="relative px-2 pt-2">
-          <input
-            value={vocabSearch}
-            onChange={e => setVocabSearch(e.target.value)}
-            placeholder="Search…"
-            className="w-full text-xs border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-1 focus:ring-xero-green bg-white dark:bg-slate-800 dark:text-slate-100 placeholder-gray-400"
-          />
-          {vocabSearch && (
-            <button onClick={() => setVocabSearch('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
-              <IconClose className="w-3 h-3" strokeWidth={2} />
-            </button>
-          )}
-        </div>
-
         {importMsg && <p className="text-xs text-xero-green font-medium px-3 pt-1.5">{importMsg}</p>}
 
-        {isLoading ? (
-          <p className="text-xs text-gray-400 p-4">Loading…</p>
-        ) : vocabSearch.trim() ? (
-          <div className="flex-1 overflow-y-auto py-1 px-1">
-            {searchResults.length === 0 ? (
-              <p className="text-xs text-gray-400 px-3 py-2">No words found</p>
-            ) : (
-              searchResults.map(v => (
-                <div
-                  key={v.id}
-                  onClick={() => openEdit(v)}
-                  className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${editCard?.id === v.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
-                >
-                  <IconBook className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
-                  <span className={`text-xs flex-1 truncate ${editCard?.id === v.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{v.word}</span>
-                </div>
-              ))
-            )}
-          </div>
-        ) : (
-          <ItemFolderTree<VocabCard>
-            tree={vocabTree}
-            selectedId={editCard?.id ?? null}
-            itemLabel={c => c.word}
-            itemIcon={<IconBook className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
-            newItemLabel={`+ ${t.addWord}`}
-            onSelectItem={openEdit}
-            onNewItem={handleNewItemRequest}
-            onDeleteItem={c => setConfirmDeleteVocabId(c.id)}
-            onRenameFolder={renameVocabFolder}
-            onDeleteFolder={path => setConfirmDeleteFolder(path)}
-            onMoveItemToFolder={(id, folder) => moveVocabToFolder(id, folder)}
-          />
-        )}
+        <div className="flex-1 overflow-y-auto py-1 px-1 mt-1">
+          {isLoading ? (
+            <p className="text-xs text-gray-400 p-4">Loading…</p>
+          ) : listItems.length === 0 ? (
+            <p className="text-xs text-gray-400 px-3 py-3">{vocabSearch.trim() ? 'No words found' : 'No words here yet.'}</p>
+          ) : (
+            listItems.map(v => (
+              <div
+                key={v.id}
+                onClick={() => openEdit(v)}
+                className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${isTouch ? 'min-h-[44px]' : ''} ${editCard?.id === v.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+              >
+                <IconBook className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+                <span className={`text-xs flex-1 truncate ${editCard?.id === v.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{v.word}</span>
+                <span className="text-[10px] text-gray-400 dark:text-slate-500 truncate max-w-[35%]">{v.translation}</span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Detail / edit pane */}
@@ -3168,10 +3204,17 @@ function SentenceView() {
   }
 
   const [singleReviewItem, setSingleReviewItem] = useState<LanguageSentence | null>(null)
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
+  const [sentSearch, setSentSearch] = useState('')
 
   const sentTree = buildFolderTree(sentences)
   const dueItems = sentences.filter(s => isDueSR(s.due_at))
   const activeSentence = sentences.find(s => s.id === editingId) ?? null
+  const scopedSentences = getItemsInFolder(sentTree, selectedFolder)
+  const sq = sentSearch.trim().toLowerCase()
+  const listSentences = sq ? scopedSentences.filter(s => [s.source_text, s.translation ?? ''].some(v => v.toLowerCase().includes(sq))) : scopedSentences
+  const sentScopeLabel = selectedFolder === null ? 'All Sentences' : selectedFolder === '' ? 'Unsorted' : selectedFolder
 
   async function handleNew(folder: string | null = null) {
     const s = await createSentence()
@@ -3341,36 +3384,102 @@ function SentenceView() {
     )
   }
 
+  function TreePane() {
+    return (
+      <div className="flex-1 overflow-y-auto flex flex-col">
+        <div className="p-2 space-y-0.5 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          <button onClick={() => { setSelectedFolder(null); setMobileTreeOpen(false) }}
+            className={`w-full text-left text-xs px-2 py-2 rounded-lg transition-colors flex items-center ${isTouch ? 'min-h-[44px]' : ''} ${selectedFolder === null ? 'bg-xero-green/10 dark:bg-xero-green/20 text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}>
+            All Sentences
+          </button>
+          <button onClick={() => { setSelectedFolder(''); setMobileTreeOpen(false) }}
+            className={`w-full text-left text-xs px-2 py-2 rounded-lg transition-colors flex items-center ${isTouch ? 'min-h-[44px]' : ''} ${selectedFolder === '' ? 'bg-xero-green/10 dark:bg-xero-green/20 text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}>
+            Unsorted
+          </button>
+        </div>
+        <ItemFolderTree<LanguageSentence>
+          tree={sentTree}
+          selectedId={null}
+          showItems={false}
+          selectedFolder={selectedFolder}
+          onSelectFolder={path => { setSelectedFolder(path); setMobileTreeOpen(false) }}
+          itemLabel={s => s.source_text || t.untitled}
+          newItemLabel={`+ ${t.addSentence}`}
+          onSelectItem={() => {}}
+          onNewItem={handleNew}
+          onRenameFolder={renameSentenceFolder}
+          onDeleteFolder={path => setConfirmDeleteFolder(path)}
+          onMoveItemToFolder={(id, folder) => moveSentenceToFolder(id, folder)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full overflow-hidden">
       <datalist id="palace-suggestions">
         {PALACE_SUGGESTIONS.map(p => <option key={p} value={p} />)}
       </datalist>
 
-      {/* Sidebar: toolbar + folder tree */}
-      <div className={`${editingId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-gray-100 dark:border-slate-700 flex-col bg-gray-50 dark:bg-slate-900 flex-shrink-0`}>
-        <div className="flex items-center gap-2 flex-wrap px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+      {/* Folder tree column — desktop permanent, mobile overlay */}
+      <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+        <TreePane />
+      </div>
+      {mobileTreeOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />
+          <div className="relative w-64 h-full bg-gray-50 dark:bg-slate-900 flex flex-col shadow-2xl">
+            <TreePane />
+          </div>
+        </div>
+      )}
+
+      {/* Item list column */}
+      <div className={`${editingId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-72 border-r border-gray-100 dark:border-slate-700 flex-col bg-white dark:bg-slate-900/50 flex-shrink-0`}>
+        <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          <button onClick={() => setMobileTreeOpen(true)}
+            className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
+            <IconMenu className="w-4 h-4" strokeWidth={2} />
+          </button>
+          <span className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate flex-1">{sentScopeLabel}</span>
           {dueItems.length > 0 && (
             <button
               onClick={() => setReviewMode(true)}
-              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1"
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1 flex-shrink-0"
             >
               🏛️ {dueItems.length} due
             </button>
           )}
-          <div className="relative ml-auto" ref={sentCsvTooltipRef}>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => sentCsvRef.current?.click()}
-                onMouseEnter={() => setSentCsvTooltipOpen(true)}
-                onMouseLeave={() => setSentCsvTooltipOpen(false)}
-                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-              >Import CSV</button>
-              <button
-                onClick={() => setSentCsvTooltipOpen(v => !v)}
-                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
-              >?</button>
-            </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 pt-2 flex-shrink-0">
+          <div className="relative flex-1 min-w-0">
+            <input
+              value={sentSearch}
+              onChange={e => setSentSearch(e.target.value)}
+              placeholder="Search…"
+              className="w-full text-xs border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-1 focus:ring-xero-green bg-white dark:bg-slate-800 dark:text-slate-100 placeholder-gray-400"
+            />
+            {sentSearch && (
+              <button onClick={() => setSentSearch('')} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 p-2">
+                <IconClose className="w-3 h-3" strokeWidth={2} />
+              </button>
+            )}
+          </div>
+          <button onClick={() => handleNew(selectedFolder)} title={t.addSentence}
+            className={`text-gray-400 hover:text-xero-green transition-colors p-2 -m-0.5 flex-shrink-0 flex items-center justify-center ${isTouch ? 'min-w-[44px] min-h-[44px]' : ''}`}>
+            <IconAdd className="w-4 h-4" strokeWidth={2.5} />
+          </button>
+          <div className="relative flex-shrink-0" ref={sentCsvTooltipRef}>
+            <button
+              onClick={() => { if (isTouch && !sentCsvTooltipOpen) { setSentCsvTooltipOpen(true); return } sentCsvRef.current?.click() }}
+              onMouseEnter={() => setSentCsvTooltipOpen(true)}
+              onMouseLeave={() => setSentCsvTooltipOpen(false)}
+              className={`text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors p-2 -m-0.5 flex items-center justify-center ${isTouch ? 'min-w-[44px] min-h-[44px]' : ''}`}
+              title="Import CSV"
+            >
+              <IconUpload className="w-4 h-4" strokeWidth={2} />
+            </button>
             {sentCsvTooltipOpen && (
               <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
                 <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
@@ -3381,30 +3490,34 @@ function SentenceView() {
                     <p className="text-[10px] text-gray-300"><span className="text-white font-medium">translation</span> — optional</p>
                     <p className="text-[10px] text-gray-300"><span className="text-white font-medium">source_lang / target_lang</span> — <code className="text-green-300">de</code> / <code className="text-green-300">en</code> / <code className="text-green-300">tr</code> / <code className="text-green-300">ja</code></p>
                   </div>
+                  <div className="absolute bottom-full right-4 border-4 border-transparent border-b-gray-900" />
                 </div>
               </div>
             )}
           </div>
           <input ref={sentCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleSentCsvImport} />
         </div>
+
         {sentImportMsg && <p className="text-xs text-xero-green font-medium px-3 pt-1.5">{sentImportMsg}</p>}
-        {isLoading ? (
-          <p className="text-xs text-gray-400 p-4">Loading…</p>
-        ) : (
-          <ItemFolderTree<LanguageSentence>
-            tree={sentTree}
-            selectedId={editingId}
-            itemLabel={s => s.source_text || t.untitled}
-            itemIcon={<IconMessage className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
-            newItemLabel={`+ ${t.addSentence}`}
-            onSelectItem={openEdit}
-            onNewItem={handleNew}
-            onDeleteItem={s => setConfirmDeleteId(s.id)}
-            onRenameFolder={renameSentenceFolder}
-            onDeleteFolder={path => setConfirmDeleteFolder(path)}
-            onMoveItemToFolder={(id, folder) => moveSentenceToFolder(id, folder)}
-          />
-        )}
+
+        <div className="flex-1 overflow-y-auto py-1 px-1 mt-1">
+          {isLoading ? (
+            <p className="text-xs text-gray-400 p-4">Loading…</p>
+          ) : listSentences.length === 0 ? (
+            <p className="text-xs text-gray-400 px-3 py-3">{sentSearch.trim() ? 'No sentences found' : 'No sentences here yet.'}</p>
+          ) : (
+            listSentences.map(s => (
+              <div
+                key={s.id}
+                onClick={() => openEdit(s)}
+                className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${isTouch ? 'min-h-[44px]' : ''} ${editingId === s.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+              >
+                <IconMessage className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+                <span className={`text-xs flex-1 truncate ${editingId === s.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{s.source_text || t.untitled}</span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Detail / edit pane */}
@@ -3511,10 +3624,17 @@ function ScenarioView() {
   }
 
   const [singleReviewItem, setSingleReviewItem] = useState<LanguageScenario | null>(null)
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
+  const [scenSearch, setScenSearch] = useState('')
 
   const scenTree = buildFolderTree(scenarios)
   const active   = scenarios.find(s => s.id === activeId) ?? null
   const dueItems = scenarios.filter(s => isDueSR(s.due_at))
+  const scopedScenarios = getItemsInFolder(scenTree, selectedFolder)
+  const scq = scenSearch.trim().toLowerCase()
+  const listScenarios = scq ? scopedScenarios.filter(s => [s.title, s.content ?? ''].some(v => v.toLowerCase().includes(scq))) : scopedScenarios
+  const scenScopeLabel = selectedFolder === null ? 'All Scenarios' : selectedFolder === '' ? 'Unsorted' : selectedFolder
 
   async function handleNew(folder: string | null = null) {
     const s = await createScenario()
@@ -3603,36 +3723,102 @@ function ScenarioView() {
     )
   }
 
+  function TreePane() {
+    return (
+      <div className="flex-1 overflow-y-auto flex flex-col">
+        <div className="p-2 space-y-0.5 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          <button onClick={() => { setSelectedFolder(null); setMobileTreeOpen(false) }}
+            className={`w-full text-left text-xs px-2 py-2 rounded-lg transition-colors flex items-center ${isTouch ? 'min-h-[44px]' : ''} ${selectedFolder === null ? 'bg-xero-green/10 dark:bg-xero-green/20 text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}>
+            All Scenarios
+          </button>
+          <button onClick={() => { setSelectedFolder(''); setMobileTreeOpen(false) }}
+            className={`w-full text-left text-xs px-2 py-2 rounded-lg transition-colors flex items-center ${isTouch ? 'min-h-[44px]' : ''} ${selectedFolder === '' ? 'bg-xero-green/10 dark:bg-xero-green/20 text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'}`}>
+            Unsorted
+          </button>
+        </div>
+        <ItemFolderTree<LanguageScenario>
+          tree={scenTree}
+          selectedId={null}
+          showItems={false}
+          selectedFolder={selectedFolder}
+          onSelectFolder={path => { setSelectedFolder(path); setMobileTreeOpen(false) }}
+          itemLabel={s => s.title || t.untitled}
+          newItemLabel={`+ ${t.addScenario}`}
+          onSelectItem={() => {}}
+          onNewItem={handleNew}
+          onRenameFolder={renameScenarioFolder}
+          onDeleteFolder={path => setConfirmDeleteFolder(path)}
+          onMoveItemToFolder={(id, folder) => moveScenarioToFolder(id, folder)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full overflow-hidden">
       <datalist id="palace-suggestions">
         {PALACE_SUGGESTIONS.map(p => <option key={p} value={p} />)}
       </datalist>
 
-      {/* Sidebar: toolbar + folder tree */}
-      <div className={`${activeId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-gray-100 dark:border-slate-700 flex-col bg-gray-50 dark:bg-slate-900 flex-shrink-0`}>
-        <div className="flex items-center gap-2 flex-wrap px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+      {/* Folder tree column — desktop permanent, mobile overlay */}
+      <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+        <TreePane />
+      </div>
+      {mobileTreeOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />
+          <div className="relative w-64 h-full bg-gray-50 dark:bg-slate-900 flex flex-col shadow-2xl">
+            <TreePane />
+          </div>
+        </div>
+      )}
+
+      {/* Item list column */}
+      <div className={`${activeId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-72 border-r border-gray-100 dark:border-slate-700 flex-col bg-white dark:bg-slate-900/50 flex-shrink-0`}>
+        <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+          <button onClick={() => setMobileTreeOpen(true)}
+            className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
+            <IconMenu className="w-4 h-4" strokeWidth={2} />
+          </button>
+          <span className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate flex-1">{scenScopeLabel}</span>
           {dueItems.length > 0 && (
             <button
               onClick={() => setReviewMode(true)}
-              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1"
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1 flex-shrink-0"
             >
               🏛️ {dueItems.length} due
             </button>
           )}
-          <div className="relative ml-auto" ref={scenCsvTooltipRef}>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => scenCsvRef.current?.click()}
-                onMouseEnter={() => setScenCsvTooltipOpen(true)}
-                onMouseLeave={() => setScenCsvTooltipOpen(false)}
-                className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-              >Import CSV</button>
-              <button
-                onClick={() => setScenCsvTooltipOpen(v => !v)}
-                className="w-5 h-5 rounded-full text-[10px] font-bold bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
-              >?</button>
-            </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 pt-2 flex-shrink-0">
+          <div className="relative flex-1 min-w-0">
+            <input
+              value={scenSearch}
+              onChange={e => setScenSearch(e.target.value)}
+              placeholder="Search…"
+              className="w-full text-xs border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-1 focus:ring-xero-green bg-white dark:bg-slate-800 dark:text-slate-100 placeholder-gray-400"
+            />
+            {scenSearch && (
+              <button onClick={() => setScenSearch('')} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 p-2">
+                <IconClose className="w-3 h-3" strokeWidth={2} />
+              </button>
+            )}
+          </div>
+          <button onClick={() => handleNew(selectedFolder)} title={t.addScenario}
+            className={`text-gray-400 hover:text-xero-green transition-colors p-2 -m-0.5 flex-shrink-0 flex items-center justify-center ${isTouch ? 'min-w-[44px] min-h-[44px]' : ''}`}>
+            <IconAdd className="w-4 h-4" strokeWidth={2.5} />
+          </button>
+          <div className="relative flex-shrink-0" ref={scenCsvTooltipRef}>
+            <button
+              onClick={() => { if (isTouch && !scenCsvTooltipOpen) { setScenCsvTooltipOpen(true); return } scenCsvRef.current?.click() }}
+              onMouseEnter={() => setScenCsvTooltipOpen(true)}
+              onMouseLeave={() => setScenCsvTooltipOpen(false)}
+              className={`text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors p-2 -m-0.5 flex items-center justify-center ${isTouch ? 'min-w-[44px] min-h-[44px]' : ''}`}
+              title="Import CSV"
+            >
+              <IconUpload className="w-4 h-4" strokeWidth={2} />
+            </button>
             {scenCsvTooltipOpen && (
               <div className="absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)] pointer-events-none">
                 <div className="bg-gray-900 text-white rounded-xl shadow-2xl p-3 text-left">
@@ -3643,30 +3829,34 @@ function ScenarioView() {
                     <p className="text-[10px] text-gray-300"><span className="text-white font-medium">content</span> — optional (use quotes if it contains commas)</p>
                     <p className="text-[10px] text-gray-300"><span className="text-white font-medium">source_lang / target_lang</span> — <code className="text-green-300">de</code> / <code className="text-green-300">en</code> / <code className="text-green-300">tr</code> / <code className="text-green-300">ja</code></p>
                   </div>
+                  <div className="absolute bottom-full right-4 border-4 border-transparent border-b-gray-900" />
                 </div>
               </div>
             )}
           </div>
           <input ref={scenCsvRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleScenCsvImport} />
         </div>
+
         {scenImportMsg && <p className="text-xs text-xero-green font-medium px-3 pt-1.5">{scenImportMsg}</p>}
-        {isLoading ? (
-          <p className="text-xs text-gray-400 p-4">Loading…</p>
-        ) : (
-          <ItemFolderTree<LanguageScenario>
-            tree={scenTree}
-            selectedId={activeId}
-            itemLabel={s => s.title || t.untitled}
-            itemIcon={<IconLayers className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
-            newItemLabel={`+ ${t.addScenario}`}
-            onSelectItem={openScenario}
-            onNewItem={handleNew}
-            onDeleteItem={s => setConfirmDeleteId(s.id)}
-            onRenameFolder={renameScenarioFolder}
-            onDeleteFolder={path => setConfirmDeleteFolder(path)}
-            onMoveItemToFolder={(id, folder) => moveScenarioToFolder(id, folder)}
-          />
-        )}
+
+        <div className="flex-1 overflow-y-auto py-1 px-1 mt-1">
+          {isLoading ? (
+            <p className="text-xs text-gray-400 p-4">Loading…</p>
+          ) : listScenarios.length === 0 ? (
+            <p className="text-xs text-gray-400 px-3 py-3">{scenSearch.trim() ? 'No scenarios found' : 'No scenarios here yet.'}</p>
+          ) : (
+            listScenarios.map(s => (
+              <div
+                key={s.id}
+                onClick={() => openScenario(s)}
+                className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${isTouch ? 'min-h-[44px]' : ''} ${activeId === s.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
+              >
+                <IconLayers className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+                <span className={`text-xs flex-1 truncate ${activeId === s.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{s.title || t.untitled}</span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Detail / edit pane */}
