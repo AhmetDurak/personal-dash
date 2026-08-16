@@ -6,6 +6,7 @@ import type { PlanTask } from '../hooks/useDailyPlan'
 import { useLanguage } from '../hooks/useLanguage'
 import { useAllReminders } from '../hooks/useNotebook'
 import { ChallengesView } from '../components/web/ChallengesView'
+import { KanbanView } from '../components/web/KanbanView'
 import { IconClose, IconChevronLeft, IconChevronRight, IconBell, IconCheck, IconEdit } from '../lib/icons'
 import { useRoutineReminders } from '../hooks/useRoutineReminders'
 import { Linkified } from '../lib/linkify'
@@ -756,7 +757,7 @@ function RightPanel({
   )
 }
 
-type TodayMode = 'plan' | 'challenges'
+type TodayMode = 'plan' | 'challenges' | 'kanban'
 type PlanScope = 'day' | 'week' | 'month' | 'year'
 type Panel     = 'plan' | 'journal'
 
@@ -869,10 +870,10 @@ export function Planner() {
           )}
           <div className="min-w-0">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wide leading-none mb-0.5">
-              {mode === 'challenges' ? 'Routine' : t.planner}
+              {mode === 'challenges' ? 'Routine' : mode === 'kanban' ? 'Kanban' : t.planner}
             </p>
             <h1 className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">
-              {mode === 'challenges' ? '🔁 My Routines' : headerSub}
+              {mode === 'challenges' ? '🔁 My Routines' : mode === 'kanban' ? '🗂️ Stories & Tickets' : headerSub}
             </h1>
           </div>
         </div>
@@ -893,6 +894,12 @@ export function Planner() {
                 mode === 'challenges' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700'
               }`}
             >🔁 Routine</button>
+            <button
+              onClick={() => up({ mode: 'kanban' })}
+              className={`text-xs px-2.5 py-1.5 md:py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                mode === 'kanban' ? 'bg-white dark:bg-slate-600 text-gray-900 dark:text-slate-100 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
+              }`}
+            >🗂️ Kanban</button>
           </div>
 
           {/* Day navigator */}
@@ -978,6 +985,8 @@ export function Planner() {
       <div className="flex-1 overflow-hidden">
         {mode === 'challenges' ? (
           <ChallengesView scope="general" />
+        ) : mode === 'kanban' ? (
+          <KanbanView />
         ) : scope === 'year' && !showYearSelectedDay ? (
           renderYearCalendar()
         ) : scope === 'year' && showYearSelectedDay ? (

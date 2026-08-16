@@ -518,6 +518,32 @@ CREATE TABLE IF NOT EXISTS memory_palaces (
   updated_at  TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_memory_palaces_user ON memory_palaces(user_id);
+
+-- Kanban (Planner section) — a story/main task holds a plan (description) and
+-- is broken into tickets tracked across fixed To Do / In Progress / Done columns.
+CREATE TABLE IF NOT EXISTS kanban_stories (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  title       TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  folder      TEXT DEFAULT NULL,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_kanban_stories_user ON kanban_stories(user_id);
+
+CREATE TABLE IF NOT EXISTS kanban_tickets (
+  id          SERIAL PRIMARY KEY,
+  story_id    INTEGER NOT NULL REFERENCES kanban_stories(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  title       TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'todo',
+  position    INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_kanban_tickets_story ON kanban_tickets(story_id);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]
