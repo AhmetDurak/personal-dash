@@ -68,7 +68,7 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
         })}
         style={{ paddingLeft: depth * 14 + 4 }}
         className={`group flex items-center gap-1 py-1.5 pr-1 ${isTouch ? 'min-h-[44px]' : ''} rounded-lg cursor-pointer select-none transition-colors ${dragOver ? 'bg-xero-green/10 dark:bg-xero-green/20 ring-1 ring-xero-green/30 dark:ring-xero-green/50' : isActiveFolder ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
-        onClick={() => { ctx.onToggle(node.path); ctx.onSelectFolder?.(node.path) }}
+        onClick={() => { if (!isOpen) ctx.onToggle(node.path); ctx.onSelectFolder?.(node.path) }}
         onContextMenu={e => { e.preventDefault(); ctx.openCtx(e, 'folder', node.path) }}
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false) }}
@@ -80,7 +80,11 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
           if (folderPath && folderPath !== node.path && !node.path.startsWith(folderPath + '/')) ctx.onMoveFolder(folderPath, node.path)
         }}
       >
-        <IconChevronRight className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-100 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.5} />
+        <IconChevronRight
+          className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform duration-100 ${isOpen ? 'rotate-90' : ''}`}
+          strokeWidth={2.5}
+          onClick={e => { e.stopPropagation(); ctx.onToggle(node.path) }}
+        />
         <IconFolder className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500 flex-shrink-0" strokeWidth={1.75} />
         {isRenaming ? (
           <input
