@@ -4070,6 +4070,7 @@ function CheckpointEditor({ checkpoint, onSave, onClose }: {
   const [query, setQuery] = useState('')
   const [mediaKind, setMediaKind] = useState<'image' | 'gif'>(media?.type === 'gif' ? 'gif' : 'image')
   const [mediaUrl, setMediaUrl] = useState(media && media.type !== 'emoji' ? media.value : '')
+  const mediaDragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null)
 
   function contentLabel(c: { type: PalaceContentType; id: number } | null): string {
     if (!c) return ''
@@ -4144,7 +4145,12 @@ function CheckpointEditor({ checkpoint, onSave, onClose }: {
                   onChange={e => {
                     const v = e.target.value
                     setMediaUrl(v)
-                    if (v.trim()) setMedia({ type: mediaKind, value: v.trim() })
+                    if (v.trim()) {
+                      setMedia(m => ({
+                        type: mediaKind, value: v.trim(),
+                        ...(m && m.type !== 'emoji' ? { offsetX: m.offsetX, offsetY: m.offsetY, scale: m.scale } : {}),
+                      }))
+                    }
                     else if (media?.type !== 'emoji') setMedia(null)
                   }}
                   placeholder="Paste image or gif URL…"
@@ -4158,6 +4164,48 @@ function CheckpointEditor({ checkpoint, onSave, onClose }: {
               </button>
             )}
           </div>
+
+          {media && media.type !== 'emoji' && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-slate-500">Position &amp; zoom — drag to pan</span>
+                <button
+                  type="button"
+                  onClick={() => setMedia(m => (m && m.type !== 'emoji' ? { ...m, offsetX: undefined, offsetY: undefined, scale: undefined } : m))}
+                  className="text-[10px] text-gray-400 hover:text-xero-green p-2.5 -m-2.5"
+                >
+                  Reset
+                </button>
+              </div>
+              <div
+                className="relative w-32 h-32 mx-auto rounded-2xl overflow-hidden border border-xero-border dark:border-slate-600 cursor-move touch-none select-none"
+                onPointerDown={e => {
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  mediaDragRef.current = { startX: e.clientX, startY: e.clientY, baseX: media.offsetX ?? 0, baseY: media.offsetY ?? 0 }
+                }}
+                onPointerMove={e => {
+                  if (!mediaDragRef.current) return
+                  const dx = e.clientX - mediaDragRef.current.startX
+                  const dy = e.clientY - mediaDragRef.current.startY
+                  setMedia(m => (m && m.type !== 'emoji' ? { ...m, offsetX: mediaDragRef.current!.baseX + dx, offsetY: mediaDragRef.current!.baseY + dy } : m))
+                }}
+                onPointerUp={() => { mediaDragRef.current = null }}
+                onPointerCancel={() => { mediaDragRef.current = null }}
+              >
+                <img
+                  src={media.value} alt="" draggable={false}
+                  className="w-32 h-32 object-cover pointer-events-none"
+                  style={{ transform: `translate(${media.offsetX ?? 0}px, ${media.offsetY ?? 0}px) scale(${media.scale ?? 1})` }}
+                />
+              </div>
+              <input
+                type="range" min={1} max={3} step={0.05}
+                value={media.scale ?? 1}
+                onChange={e => setMedia(m => (m && m.type !== 'emoji' ? { ...m, scale: parseFloat(e.target.value) } : m))}
+                className={`mt-2 w-32 mx-auto block ${isTouch ? 'h-10' : ''}`}
+              />
+            </div>
+          )}
         </div>
 
         <div>
@@ -4680,9 +4728,18 @@ function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
                   <clipPath id={`pclip-${c.id}`}><rect x={x} y={y} width={PW} height={PH} rx={16} /></clipPath>
                   <rect x={x} y={y} width={PW} height={PH} rx={16} fill={isFlipped ? (dark ? '#162032' : '#F1F5F9') : (dark ? '#1E293B' : 'white')} stroke={color} strokeWidth={1.5} />
 
-                  {!isFlipped && hasMedia && c.media!.type !== 'emoji' && (
-                    <image href={c.media!.value} x={x} y={y} width={PW} height={PH} preserveAspectRatio="xMidYMid slice" clipPath={`url(#pclip-${c.id})`} style={{ pointerEvents: 'none' }} />
-                  )}
+                  {!isFlipped && hasMedia && c.media!.type !== 'emoji' && (() => {
+                    const cx = x + PW / 2, cy = y + PH / 2
+                    const offX = c.media!.offsetX ?? 0, offY = c.media!.offsetY ?? 0, mScale = c.media!.scale ?? 1
+                    return (
+                      <image
+                        href={c.media!.value} x={x} y={y} width={PW} height={PH}
+                        preserveAspectRatio="xMidYMid slice" clipPath={`url(#pclip-${c.id})`}
+                        transform={`translate(${cx + offX} ${cy + offY}) scale(${mScale}) translate(${-cx} ${-cy})`}
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    )
+                  })()}
                   {!isFlipped && hasMedia && c.media!.type === 'emoji' && (
                     <text x={x + PW / 2} y={y + PH / 2 - 6} textAnchor="middle" dominantBaseline="central" fontSize={44} style={{ pointerEvents: 'none', userSelect: 'none' }}>{c.media!.value}</text>
                   )}

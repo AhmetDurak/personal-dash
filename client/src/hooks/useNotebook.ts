@@ -127,7 +127,7 @@ export interface PalaceCheckpoint {
   x?: number
   y?: number
   content?: { type: PalaceContentType; id: number } | null
-  media?: { type: PalaceMediaType; value: string } | null
+  media?: { type: PalaceMediaType; value: string; offsetX?: number; offsetY?: number; scale?: number } | null
 }
 
 export interface PalaceConnection {
