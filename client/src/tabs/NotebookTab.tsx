@@ -3232,16 +3232,18 @@ function SentenceView() {
 
   // Deep-link support: Memory Palace's "Go to linked item" navigates here with
   // ?highlight=<id> — open that sentence's edit panel directly, regardless of folder.
-  const [highlightParams, setHighlightParams] = useSearchParams()
+  // Sets `sentence` and clears `highlight` in a single setSentParams call — doing
+  // these as two separate useSearchParams updates races and drops one of them.
   useEffect(() => {
-    const hi = highlightParams.get('highlight')
+    const hi = sentParams.get('highlight')
     if (!hi) return
     const s = sentences.find(s => s.id === Number(hi))
     if (s) {
-      openEdit(s)
-      setHighlightParams(p => { p.delete('highlight'); return p }, { replace: true })
+      setDraft({ ...s })
+      setTranslateResult(null)
+      setSentParams(p => { p.set('sentence', String(s.id)); p.delete('highlight'); return p }, { replace: true })
     }
-  }, [highlightParams, sentences]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sentParams, sentences]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function scheduleSave(id: number, patch: Partial<LanguageSentence>) {
     if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -3652,16 +3654,18 @@ function ScenarioView() {
 
   // Deep-link support: Memory Palace's "Go to linked item" navigates here with
   // ?highlight=<id> — open that scenario directly, regardless of folder.
-  const [highlightParams, setHighlightParams] = useSearchParams()
+  // Sets `scenario` and clears `highlight` in a single setScenParams call — doing
+  // these as two separate useSearchParams updates races and drops one of them.
   useEffect(() => {
-    const hi = highlightParams.get('highlight')
+    const hi = scenParams.get('highlight')
     if (!hi) return
     const s = scenarios.find(s => s.id === Number(hi))
     if (s) {
-      openScenario(s)
-      setHighlightParams(p => { p.delete('highlight'); return p }, { replace: true })
+      setDraft({ ...s })
+      setIsEditingContent(false)
+      setScenParams(p => { p.set('scenario', String(s.id)); p.delete('highlight'); return p }, { replace: true })
     }
-  }, [highlightParams, scenarios]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scenParams, scenarios]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function scheduleTitle(id: number, title: string) {
     if (titleTimer.current) clearTimeout(titleTimer.current)
