@@ -1528,7 +1528,7 @@ function MindmapView() {
     <div className="flex h-full overflow-hidden relative">
       {/* Desktop sidebar */}
       <div className="hidden md:flex w-44 flex-shrink-0 flex-col bg-xero-navy border-r border-xero-navy-light">
-        <MapList onSelect={() => {}} />
+        {MapList({ onSelect: () => {} })}
       </div>
 
       {/* Mobile overlay */}
@@ -1536,7 +1536,7 @@ function MindmapView() {
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <div className="relative w-52 h-full bg-xero-navy flex flex-col shadow-2xl">
-            <MapList onSelect={() => setMobileOpen(false)} />
+            {MapList({ onSelect: () => setMobileOpen(false) })}
           </div>
         </div>
       )}
@@ -2004,13 +2004,13 @@ function VocabView() {
     <div className="flex h-full overflow-hidden">
       {/* Folder tree column — desktop permanent, mobile overlay */}
       <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-        <TreePane />
+        {TreePane()}
       </div>
       {mobileTreeOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />
           <div className="relative w-64 h-full bg-gray-50 dark:bg-slate-900 flex flex-col shadow-2xl">
-            <TreePane />
+            {TreePane()}
           </div>
         </div>
       )}
@@ -3423,13 +3423,13 @@ function SentenceView() {
 
       {/* Folder tree column — desktop permanent, mobile overlay */}
       <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-        <TreePane />
+        {TreePane()}
       </div>
       {mobileTreeOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />
           <div className="relative w-64 h-full bg-gray-50 dark:bg-slate-900 flex flex-col shadow-2xl">
-            <TreePane />
+            {TreePane()}
           </div>
         </div>
       )}
@@ -3762,13 +3762,13 @@ function ScenarioView() {
 
       {/* Folder tree column — desktop permanent, mobile overlay */}
       <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-        <TreePane />
+        {TreePane()}
       </div>
       {mobileTreeOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />
           <div className="relative w-64 h-full bg-gray-50 dark:bg-slate-900 flex flex-col shadow-2xl">
-            <TreePane />
+            {TreePane()}
           </div>
         </div>
       )}
@@ -4967,14 +4967,14 @@ function MemoryPalaceView() {
   return (
     <div className="flex h-full overflow-hidden relative">
       <div className="hidden md:flex w-52 flex-shrink-0 flex-col border-r border-xero-border dark:border-slate-700 bg-white dark:bg-slate-900">
-        {isLoading ? <p className="text-xs text-gray-400 px-2 py-2">Loading…</p> : <TreePane />}
+        {isLoading ? <p className="text-xs text-gray-400 px-2 py-2">Loading…</p> : TreePane()}
       </div>
 
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <div className="relative w-64 h-full bg-white dark:bg-slate-900 flex flex-col shadow-2xl">
-            <TreePane />
+            {TreePane()}
           </div>
         </div>
       )}
