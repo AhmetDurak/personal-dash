@@ -686,8 +686,8 @@ useEffect(() => { nodesRef.current = nodes }, [nodes])
         const newScale = Math.max(0.15, Math.min(5, pinchInitScale * (newDist / pinchInitDist)))
         const ratio = newScale / pinchInitScale
         const newPan = {
-          x: pinchInitPan.x + pinchMidX * (1 - ratio),
-          y: pinchInitPan.y + pinchMidY * (1 - ratio),
+          x: pinchInitPan.x * ratio + pinchMidX * (1 - ratio),
+          y: pinchInitPan.y * ratio + pinchMidY * (1 - ratio),
         }
         scaleRef.current = newScale
         setScale(newScale)
@@ -4397,8 +4397,8 @@ function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
         const newScale = Math.max(0.15, Math.min(5, pinchInitScale * (newDist / pinchInitDist)))
         const ratio = newScale / pinchInitScale
         const newPan = {
-          x: pinchInitPan.x + pinchMidX * (1 - ratio),
-          y: pinchInitPan.y + pinchMidY * (1 - ratio),
+          x: pinchInitPan.x * ratio + pinchMidX * (1 - ratio),
+          y: pinchInitPan.y * ratio + pinchMidY * (1 - ratio),
         }
         scaleRef.current = newScale
         setScale(newScale)
