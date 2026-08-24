@@ -55,6 +55,7 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
 
   function refresh() {
     mutate(`/api/transactions/${month}`)
+    mutate(`/api/summary/${month}`)
     setSelectedIds(new Set())
   }
 
