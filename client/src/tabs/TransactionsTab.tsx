@@ -293,7 +293,7 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
                 <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
                 <span className="text-xs text-gray-500">Expenses</span>
               </div>
-              <span className="text-sm font-semibold text-gray-800">{formatEur(summary.totalExpenses)}</span>
+              <span className="text-sm font-semibold text-amber-500">{formatEur(summary.totalExpenses)}</span>
             </div>
             <div className="flex-1 flex items-center justify-between px-5 py-3 gap-3">
               <span className="text-xs text-gray-500">Net</span>
