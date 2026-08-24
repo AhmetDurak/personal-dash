@@ -11,7 +11,7 @@ const TITLES: Record<string, string> = {
   learn:        'Finance Academy',
 }
 
-const NO_MONTH = new Set(['transactions', 'etf', 'learn'])
+const NO_MONTH = new Set(['etf', 'learn'])
 
 interface Props {
   month: string

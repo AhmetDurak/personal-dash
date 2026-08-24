@@ -5,7 +5,6 @@ import { useSummary } from '../hooks/useSummary'
 import { TransactionList } from '../components/web/TransactionList'
 import { AddEntryModal } from '../components/web/AddEntryModal'
 import { formatEur } from '../utils/format'
-import { MonthSelector } from '../components/web/MonthSelector'
 import { PdfImportModal } from '../components/web/PdfImportModal'
 import { CsvImportModal } from '../components/web/CsvImportModal'
 import { HelpTooltip } from '../components/web/HelpTooltip'
@@ -23,7 +22,7 @@ type SortDir = 'asc' | 'desc'
 interface Props { month: string; onMonthChange: (m: string) => void }
 
 
-export function TransactionsTab({ month, onMonthChange }: Props) {
+export function TransactionsTab({ month }: Props) {
   const [addModal, setAddModal]       = useState(false)
   const [editTx, setEditTx]           = useState<Transaction | null>(null)
   const [sortField, setSortField]     = useState<SortField>('date')
@@ -206,9 +205,8 @@ export function TransactionsTab({ month, onMonthChange }: Props) {
       {/* Top bar */}
       <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleImportPdf} />
       <input ref={csvInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImportCsv} />
-      {/* Row 1: month + primary action */}
-      <div className="flex items-center justify-between gap-2">
-        <MonthSelector month={month} onChange={onMonthChange} />
+      {/* Row 1: primary action */}
+      <div className="flex items-center justify-end gap-2">
         <button
           onClick={() => setAddModal(true)}
           className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg hover:bg-xero-green-dark font-medium transition-colors flex-shrink-0"
