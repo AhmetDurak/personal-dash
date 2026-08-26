@@ -26,14 +26,20 @@ interface Props {
 }
 
 function NavItems({ onClose, collapsed }: { onClose?: () => void; collapsed?: boolean }) {
+  const [hovered, setHovered] = useState<{ label: string; top: number } | null>(null)
+
   return (
     <nav className="flex-1 py-3 overflow-y-auto">
       {NAV.map(item => (
         <NavLink
           key={item.path}
           to={item.path}
-          onClick={onClose}
-          title={collapsed ? item.label : undefined}
+          onClick={() => { setHovered(null); onClose?.() }}
+          onMouseEnter={collapsed ? e => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            setHovered({ label: item.label, top: rect.top + rect.height / 2 })
+          } : undefined}
+          onMouseLeave={collapsed ? () => setHovered(null) : undefined}
           className={({ isActive }) =>
             `w-full flex items-center gap-3 text-sm transition-all text-left border-l-2 group ${
               collapsed ? 'justify-center px-0 py-3.5' : 'px-5 py-2.5'
@@ -55,6 +61,14 @@ function NavItems({ onClose, collapsed }: { onClose?: () => void; collapsed?: bo
           )}
         </NavLink>
       ))}
+      {collapsed && hovered && (
+        <div
+          className="fixed z-50 ml-3 -translate-y-1/2 px-2.5 py-1.5 rounded-md bg-gray-900 text-white text-xs font-medium whitespace-nowrap shadow-lg pointer-events-none"
+          style={{ top: hovered.top, left: '3.5rem' }}
+        >
+          {hovered.label}
+        </div>
+      )}
     </nav>
   )
 }
