@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useState } from 'react'
 import { EXPENSE_CATS, INCOME_CATS, CATEGORY_TREE } from '../../types'
-import { formatEur, formatDate } from '../../utils/format'
+import { formatEur, formatDate, currentMonth } from '../../utils/format'
 import type { Category, TxType, Transaction } from '../../types'
 
 const REPEAT_OPTIONS = [
@@ -15,6 +15,12 @@ const REPEAT_OPTIONS = [
 interface Form { type: TxType; name: string; amount: string; date: string; category: Category; subcategory: string; repeat: number; repeatCount: number }
 interface Props { month: string; onClose: () => void; onSaved: () => void; transaction?: Transaction }
 interface ConfirmState { name: string; category: Category }
+
+function defaultDate(month: string): string {
+  if (month !== currentMonth()) return `${month}-01`
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 function validate(f: Form): string | null {
   if (!f.name.trim()) return 'Name required'
@@ -35,7 +41,7 @@ export function AddEntryModal({ month, onClose, onSaved, transaction }: Props) {
     subcategory: transaction.subcategory ?? '',
     repeat: 0,
     repeatCount: 12,
-  } : { type: 'expense', name: '', amount: '', date: `${month}-01`, category: 'Sonstige' as Category, subcategory: '', repeat: 0, repeatCount: 12 })
+  } : { type: 'expense', name: '', amount: '', date: defaultDate(month), category: 'Sonstige' as Category, subcategory: '', repeat: 0, repeatCount: 12 })
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
