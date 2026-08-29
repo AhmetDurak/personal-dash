@@ -21,6 +21,7 @@ const CashFlowTab = lazy(() => import('./tabs/CashFlowTab').then(m => ({ default
 const TransactionsTab = lazy(() => import('./tabs/TransactionsTab').then(m => ({ default: m.TransactionsTab })))
 const ETFTab = lazy(() => import('./tabs/ETFTab').then(m => ({ default: m.ETFTab })))
 const NewsTab = lazy(() => import('./tabs/NewsTab').then(m => ({ default: m.NewsTab })))
+const UpdatesTab = lazy(() => import('./tabs/UpdatesTab').then(m => ({ default: m.UpdatesTab })))
 const LearnTab = lazy(() => import('./tabs/LearnTab').then(m => ({ default: m.LearnTab })))
 const Planner = lazy(() => import('./tabs/Planner').then(m => ({ default: m.Planner })))
 const HomeTab = lazy(() => import('./tabs/HomeTab').then(m => ({ default: m.HomeTab })))
@@ -42,6 +43,21 @@ function NewsPage() {
       <div className="flex-1 overflow-y-auto">
         <Suspense fallback={<RouteFallback />}>
           <NewsTab />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+function UpdatesPage() {
+  return (
+    <div className="h-full flex flex-col bg-xero-bg">
+      <header className="flex items-center px-8 py-4 bg-white border-b border-xero-border flex-shrink-0">
+        <h1 className="text-xl font-semibold text-gray-900">Updates</h1>
+      </header>
+      <div className="flex-1 overflow-y-auto">
+        <Suspense fallback={<RouteFallback />}>
+          <UpdatesTab />
         </Suspense>
       </div>
     </div>
@@ -131,6 +147,7 @@ export function App() {
               <Route path="/life/*"      element={<LifeTab />} />
               <Route path="/learn/*"     element={<LearnSectionTab />} />
               <Route path="/news"        element={<NewsPage />} />
+              <Route path="/updates"     element={<UpdatesPage />} />
               <Route path="/finance/*"   element={<FinanceDashboard />} />
               <Route path="/admin"       element={<AdminTab userEmail={user.email} />} />
               {/* Legacy redirects */}

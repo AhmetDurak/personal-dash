@@ -137,6 +137,7 @@ html, body {
 .dark .text-emerald-600   { color: #34d399; }
 .dark .text-red-700       { color: #fca5a5; }
 .dark .text-red-500       { color: #f87171; }
+.dark .text-blue-700      { color: #93c5fd; }
 .dark .border-amber-100   { border-color: rgba(245, 158, 11, 0.2); }
 
 /* DashboardHeader specifically */

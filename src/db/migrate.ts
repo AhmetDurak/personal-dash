@@ -544,6 +544,21 @@ CREATE TABLE IF NOT EXISTS kanban_tickets (
   updated_at  TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_kanban_tickets_story ON kanban_tickets(story_id);
+
+-- Published updates: scheduled Claude tasks (news write-ups, improvement summaries,
+-- etc.) publish here via the same session/bearer auth as the rest of /api, and the
+-- Updates tab reads them back.
+CREATE TABLE IF NOT EXISTS publications (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  title      TEXT NOT NULL,
+  body       TEXT NOT NULL DEFAULT '',
+  type       TEXT NOT NULL DEFAULT 'news',
+  link       TEXT,
+  read       BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_publications_user ON publications(user_id, created_at DESC);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]

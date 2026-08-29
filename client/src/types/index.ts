@@ -237,6 +237,18 @@ export interface NewsFeed {
   metals: MetalPrice[]
 }
 
+// ─── Published updates (scheduled Claude tasks → dashboard) ────────────────────
+
+export interface Publication {
+  id: number
+  title: string
+  body: string
+  type: string
+  link: string | null
+  read: boolean
+  createdAt: string
+}
+
 // ─── PDF import types ──────────────────────────────────────────────────────────
 
 export interface ParsedTx {

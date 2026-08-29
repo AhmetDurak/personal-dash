@@ -11,6 +11,7 @@ export const TRANSLATIONS = {
     meal: 'Meal',
     sport: 'Sport',
     news: 'News',
+    updates: 'Updates',
     // notebook sections
     notes: 'Notes',
     mindmap: 'Mindmap',
@@ -205,6 +206,7 @@ export const TRANSLATIONS = {
     meal: 'Mahlzeit',
     sport: 'Sport',
     news: 'News',
+    updates: 'Updates',
     notes: 'Notizen',
     mindmap: 'Mindmap',
     chains: 'Ketten',
@@ -387,6 +389,7 @@ export const TRANSLATIONS = {
     meal: 'Yemek',
     sport: 'Spor',
     news: 'Haberler',
+    updates: 'Güncellemeler',
     notes: 'Notlar',
     mindmap: 'Zihin Haritası',
     chains: 'Zincirler',

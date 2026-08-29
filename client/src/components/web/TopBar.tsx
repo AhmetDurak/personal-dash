@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useDarkMode } from '../../hooks/useDarkMode'
 import { useAuth } from '../../hooks/useAuth'
+import { usePublications } from '../../hooks/usePublications'
 import { useLanguage } from '../../hooks/useLanguage'
 import type { Lang } from '../../hooks/useLanguage'
 import { NotificationsPanel } from './NotificationsPanel'
@@ -38,6 +39,7 @@ export function TopBar() {
   const { user, logout } = useAuth()
   const { lang, t, setLang } = useLanguage()
   const backendStatus = useBackendStatus()
+  const { unreadCount: unreadUpdates } = usePublications()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -63,6 +65,7 @@ export function TopBar() {
     { to: () => localStorage.getItem('learn:lastPath') ?? '/learn/notes',              label: t.learn,      isActive: (p: string) => p.startsWith('/learn') },
     { to: () => '/reminders',                                                           label: t.reminders,  isActive: (p: string) => p.startsWith('/reminders') },
     { to: () => '/news',                                                                label: t.news,       isActive: (p: string) => p.startsWith('/news') },
+    { to: () => '/updates',                                                             label: t.updates,    isActive: (p: string) => p.startsWith('/updates') },
     ...(user?.email === 'durakahmet049@gmail.com'
       ? [{ to: () => '/admin', label: 'Admin', isActive: (p: string) => p.startsWith('/admin') }]
       : []),
@@ -87,7 +90,7 @@ export function TopBar() {
       </Link>
 
       {/* App switcher */}
-      <div className="flex-1 flex overflow-x-auto min-w-0" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex-1 flex overflow-x-auto min-w-0 py-0.5" style={{ scrollbarWidth: 'none' }}>
         {APPS.map(app => {
           const active = app.isActive(pathname)
           const href   = app.to()
@@ -95,11 +98,16 @@ export function TopBar() {
             <Link
               key={href}
               to={href}
-              className={`flex-shrink-0 px-2.5 md:px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`relative flex-shrink-0 px-2.5 md:px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
                 active ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
               }`}
             >
               {app.label}
+              {href === '/updates' && unreadUpdates > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-1 rounded-full bg-xero-green text-white text-[9px] font-bold flex items-center justify-center">
+                  {unreadUpdates > 9 ? '9+' : unreadUpdates}
+                </span>
+              )}
             </Link>
           )
         })}

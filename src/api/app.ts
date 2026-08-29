@@ -18,6 +18,7 @@ import { importPdfRouter } from './routes/importPdf'
 import { importCsvRouter } from './routes/importCsv'
 import { etfRouter } from './routes/etf'
 import { notificationsRouter } from './routes/notifications'
+import { publicationsRouter } from './routes/publications'
 import { notebookRouter } from './routes/notebook'
 import { budgetsRouter } from './routes/budgets'
 import { templatesRouter } from './routes/templates'
@@ -104,6 +105,7 @@ app.use('/api/import/pdf',    importPdfRouter())
 app.use('/api/import/csv',    importCsvRouter())
 app.use('/api/etf',           etfRouter())
 app.use('/api/notifications', notificationsRouter(pool))
+app.use('/api/publications',  publicationsRouter(pool))
 app.use('/api/notebook',      notebookRouter(pool))
 app.use('/api/budgets',       budgetsRouter(pool))
 app.use('/api/templates',     templatesRouter(pool))
