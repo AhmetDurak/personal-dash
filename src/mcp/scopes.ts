@@ -19,6 +19,10 @@ export const SCOPE_GROUPS = {
     label: 'Chains',
     description: 'Read, create, check off, and delete your habit chains.',
   },
+  'updates:readwrite': {
+    label: 'Updates',
+    description: 'Publish items (news, improvements, etc.) to your Updates feed, and read/manage what\'s there.',
+  },
 } as const
 
 export type ScopeKey = keyof typeof SCOPE_GROUPS
