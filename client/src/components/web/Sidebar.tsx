@@ -6,16 +6,18 @@ import {
   IconDashboard   as LayoutDashboard,
   IconIncome      as TrendingUp,
   IconGraduation  as GraduationCap,
+  IconSavings     as PiggyBank,
   IconChevronLeft,
   IconChevronRight,
 } from '../../lib/icons'
 
 const NAV = [
-  { path: '/finance/transactions', label: 'Transactions',    Icon: ArrowUpDown },
-  { path: '/finance/cashflow',     label: 'Cash Flow',       Icon: ArrowLeftRight },
-  { path: '/finance/overview',     label: 'Profit & Loss',   Icon: LayoutDashboard },
-  { path: '/finance/etf',          label: 'ETF Monitor',     Icon: TrendingUp },
-  { path: '/finance/learn',        label: 'Finance Academy', Icon: GraduationCap },
+  { path: '/finance/transactions',  label: 'Transactions',    Icon: ArrowUpDown },
+  { path: '/finance/cashflow',      label: 'Cash Flow',       Icon: ArrowLeftRight },
+  { path: '/finance/overview',      label: 'Profit & Loss',   Icon: LayoutDashboard },
+  { path: '/finance/etf',           label: 'ETF Monitor',     Icon: TrendingUp },
+  { path: '/finance/savings-plan',  label: 'Savings Plan',    Icon: PiggyBank },
+  { path: '/finance/learn',         label: 'Finance Academy', Icon: GraduationCap },
 ]
 
 const COLLAPSE_KEY = 'sidebar:collapsed:/finance'

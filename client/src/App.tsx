@@ -20,6 +20,7 @@ const OverviewTab = lazy(() => import('./tabs/OverviewTab').then(m => ({ default
 const CashFlowTab = lazy(() => import('./tabs/CashFlowTab').then(m => ({ default: m.CashFlowTab })))
 const TransactionsTab = lazy(() => import('./tabs/TransactionsTab').then(m => ({ default: m.TransactionsTab })))
 const ETFTab = lazy(() => import('./tabs/ETFTab').then(m => ({ default: m.ETFTab })))
+const SavingsPlanTab = lazy(() => import('./tabs/SavingsPlanTab').then(m => ({ default: m.SavingsPlanTab })))
 const NewsTab = lazy(() => import('./tabs/NewsTab').then(m => ({ default: m.NewsTab })))
 const UpdatesTab = lazy(() => import('./tabs/UpdatesTab').then(m => ({ default: m.UpdatesTab })))
 const LearnTab = lazy(() => import('./tabs/LearnTab').then(m => ({ default: m.LearnTab })))
@@ -89,6 +90,7 @@ function FinanceDashboard() {
               <Route path="cashflow"     element={<CashFlowTab month={month} span={span} onSpanChange={setSpan} />} />
               <Route path="overview"     element={<OverviewTab month={month} span={span} onSpanChange={setSpan} />} />
               <Route path="etf"          element={<ETFTab />} />
+              <Route path="savings-plan" element={<SavingsPlanTab />} />
               <Route path="learn"        element={<LearnTab />} />
               <Route path="simplified"   element={<Navigate to="/finance/transactions" replace />} />
               <Route path="*"            element={<Navigate to="/finance/transactions" replace />} />
