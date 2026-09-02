@@ -26,13 +26,13 @@ describe('SummaryStage source-hiding', () => {
 describe('ReadingStage does show the source (sanity check for the contrast above)', () => {
   it('renders the source content during the reading stage', () => {
     const session = makeSession({ status: 'reading' })
-    render(<ReadingStage session={session} onReady={vi.fn()} />)
-    expect(screen.getByText(SECRET_SOURCE_TEXT)).toBeInTheDocument()
+    render(<ReadingStage session={session} onSave={vi.fn()} onReady={vi.fn()} />)
+    expect(screen.getByDisplayValue(SECRET_SOURCE_TEXT)).toBeInTheDocument()
   })
 
   it('does not render the summary form fields during the reading stage', () => {
     const session = makeSession({ status: 'reading' })
-    render(<ReadingStage session={session} onReady={vi.fn()} />)
+    render(<ReadingStage session={session} onSave={vi.fn()} onReady={vi.fn()} />)
     expect(screen.queryByText(/main idea/i)).not.toBeInTheDocument()
   })
 })

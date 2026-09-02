@@ -77,6 +77,30 @@ export function readingRouter(pool: Pool): Router {
     res.json(toCamel(rows[0]))
   })
 
+  // Only while status='reading' — editing the source after recall has started
+  // would defeat the "summarize from memory" exercise.
+  router.patch('/:id/source', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const b = req.body as Partial<{ title: string; category: string | null; sourceContent: string }>
+    const { rows: existingRows } = await pool.query(
+      `SELECT * FROM reading_sessions WHERE id=$1 AND user_id=$2 AND status='reading'`,
+      [req.params.id, uid]
+    )
+    const existing = existingRows[0]
+    if (!existing) { res.json(null); return }
+
+    const title = b.title !== undefined ? b.title.trim() || existing.title : existing.title
+    const category = b.category !== undefined ? (b.category?.trim() || null) : existing.category
+    const sourceContent = b.sourceContent !== undefined ? b.sourceContent : existing.source_content
+
+    const { rows } = await pool.query(
+      `UPDATE reading_sessions SET title=$1, category=$2, source_content=$3, updated_at=now()
+       WHERE id=$4 AND user_id=$5 RETURNING *`,
+      [title, category, sourceContent, req.params.id, uid]
+    )
+    res.json(rows[0] ? toCamel(rows[0]) : null)
+  })
+
   router.patch('/:id/recall', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { rows } = await pool.query(

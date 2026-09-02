@@ -26,20 +26,20 @@ describe('ReadingView stage-order enforcement (SessionWizard)', () => {
   it('renders the reading stage (with source) when status is "reading", not the summary form', () => {
     mockUseReadingSession.mockReturnValue({
       session: makeSession({ status: 'reading' }),
-      goToRecall: vi.fn(), saveSummaryDraft: vi.fn(), advanceStage: vi.fn(),
+      goToRecall: vi.fn(), saveSourceDraft: vi.fn(), saveSummaryDraft: vi.fn(), advanceStage: vi.fn(),
       submitEvaluation: vi.fn(), saveImprovedDraft: vi.fn(), submitReflection: vi.fn(),
     })
 
     renderAt('/1')
 
-    expect(screen.getByText(SECRET_SOURCE_TEXT)).toBeInTheDocument()
+    expect(screen.getByDisplayValue(SECRET_SOURCE_TEXT)).toBeInTheDocument()
     expect(screen.queryByText(/main idea/i)).not.toBeInTheDocument()
   })
 
   it('renders SessionResult, not a stage form, when status is "completed"', () => {
     mockUseReadingSession.mockReturnValue({
       session: makeSession({ status: 'completed', totalScore: 21, summaryWordCount: 120 }),
-      goToRecall: vi.fn(), saveSummaryDraft: vi.fn(), advanceStage: vi.fn(),
+      goToRecall: vi.fn(), saveSourceDraft: vi.fn(), saveSummaryDraft: vi.fn(), advanceStage: vi.fn(),
       submitEvaluation: vi.fn(), saveImprovedDraft: vi.fn(), submitReflection: vi.fn(),
     })
 
@@ -54,7 +54,7 @@ describe('ReadingView stage-order enforcement (SessionWizard)', () => {
   it('renders the evaluation scorecard, not the reading source, when status is "evaluate"', () => {
     mockUseReadingSession.mockReturnValue({
       session: makeSession({ status: 'evaluate' }),
-      goToRecall: vi.fn(), saveSummaryDraft: vi.fn(), advanceStage: vi.fn(),
+      goToRecall: vi.fn(), saveSourceDraft: vi.fn(), saveSummaryDraft: vi.fn(), advanceStage: vi.fn(),
       submitEvaluation: vi.fn(), saveImprovedDraft: vi.fn(), submitReflection: vi.fn(),
     })
 

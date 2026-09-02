@@ -17,7 +17,7 @@ function SessionWizard() {
   const { id } = useParams<{ id: string }>()
   const sessionId = id ? Number(id) : null
   const {
-    session, goToRecall, saveSummaryDraft, advanceStage,
+    session, goToRecall, saveSourceDraft, saveSummaryDraft, advanceStage,
     submitEvaluation, saveImprovedDraft, submitReflection,
   } = useReadingSession(sessionId)
 
@@ -36,7 +36,7 @@ function SessionWizard() {
         <StageProgress status={session.status} />
       </div>
 
-      {session.status === 'reading' && <ReadingStage session={session} onReady={goToRecall} />}
+      {session.status === 'reading' && <ReadingStage session={session} onSave={saveSourceDraft} onReady={goToRecall} />}
       {session.status === 'recall' && (
         <SummaryStage session={session} onSave={saveSummaryDraft} onContinue={() => advanceStage('evaluate')} />
       )}

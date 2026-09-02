@@ -84,11 +84,21 @@ export function useReadingSession(id: number | null) {
   const session = id !== null ? (data ?? []).find(s => s.id === id) ?? null : null
   const summaryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const improvedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sourceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   async function goToRecall() {
     if (!id) return
     await postJson(`/api/reading/${id}/recall`, 'PATCH')
     await mutate()
+  }
+
+  function saveSourceDraft(patch: Partial<{ title: string; category: string | null; sourceContent: string }>) {
+    if (!id) return
+    if (sourceTimer.current) clearTimeout(sourceTimer.current)
+    sourceTimer.current = setTimeout(async () => {
+      await postJson(`/api/reading/${id}/source`, 'PATCH', patch)
+      await mutate()
+    }, DEBOUNCE_MS)
   }
 
   function saveSummaryDraft(patch: Partial<{
@@ -130,7 +140,7 @@ export function useReadingSession(id: number | null) {
   }
 
   return {
-    session, goToRecall, saveSummaryDraft, advanceStage,
+    session, goToRecall, saveSourceDraft, saveSummaryDraft, advanceStage,
     submitEvaluation, saveImprovedDraft, submitReflection,
   }
 }
