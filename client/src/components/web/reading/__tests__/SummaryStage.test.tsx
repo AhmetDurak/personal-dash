@@ -27,13 +27,35 @@ describe('ReadingStage does show the source (sanity check for the contrast above
   it('renders the source content during the reading stage', () => {
     const session = makeSession({ status: 'reading' })
     render(<ReadingStage session={session} onSave={vi.fn()} onReady={vi.fn()} />)
-    expect(screen.getByDisplayValue(SECRET_SOURCE_TEXT)).toBeInTheDocument()
+    expect(screen.getByText(SECRET_SOURCE_TEXT)).toBeInTheDocument()
   })
 
   it('does not render the summary form fields during the reading stage', () => {
     const session = makeSession({ status: 'reading' })
     render(<ReadingStage session={session} onSave={vi.fn()} onReady={vi.fn()} />)
     expect(screen.queryByText(/main idea/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('ReadingStage edit toggle', () => {
+  it('shows read-only content by default, with no editable fields', () => {
+    const session = makeSession({ status: 'reading' })
+    render(<ReadingStage session={session} onSave={vi.fn()} onReady={vi.fn()} />)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('switches to editable fields after clicking Edit, and back after clicking Done', async () => {
+    const user = userEvent.setup()
+    const session = makeSession({ status: 'reading' })
+    render(<ReadingStage session={session} onSave={vi.fn()} onReady={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.getAllByRole('textbox').length).toBeGreaterThan(0)
+    expect(screen.getByDisplayValue(SECRET_SOURCE_TEXT)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Done editing' }))
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByText(SECRET_SOURCE_TEXT)).toBeInTheDocument()
   })
 })
 

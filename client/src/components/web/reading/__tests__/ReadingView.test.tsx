@@ -32,7 +32,7 @@ describe('ReadingView stage-order enforcement (SessionWizard)', () => {
 
     renderAt('/1')
 
-    expect(screen.getByDisplayValue(SECRET_SOURCE_TEXT)).toBeInTheDocument()
+    expect(screen.getByText(SECRET_SOURCE_TEXT)).toBeInTheDocument()
     expect(screen.queryByText(/main idea/i)).not.toBeInTheDocument()
   })
 
