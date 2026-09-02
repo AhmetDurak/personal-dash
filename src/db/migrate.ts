@@ -559,6 +559,52 @@ CREATE TABLE IF NOT EXISTS publications (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_publications_user ON publications(user_id, created_at DESC);
+
+-- Daily Reading -> Summary -> Evaluation (Learn section): a guided session where
+-- the user reads material, then recalls/summarizes it from memory (source hidden),
+-- self-evaluates against 5 criteria, rewrites an improved summary, and reflects.
+-- The row IS the in-progress draft from creation onward (see status), continuously
+-- autosaved -- there is no separate drafts table or localStorage layer.
+CREATE TABLE IF NOT EXISTS reading_sessions (
+  id                  SERIAL PRIMARY KEY,
+  user_id             INTEGER NOT NULL REFERENCES users(id),
+  status              TEXT NOT NULL DEFAULT 'reading',
+    -- 'reading' | 'recall' | 'evaluate' | 'improve' | 'reflect' | 'completed'
+  title               TEXT NOT NULL,
+  category            TEXT DEFAULT NULL,
+  source_content      TEXT NOT NULL,
+  reading_started_at  TIMESTAMPTZ DEFAULT now(),
+  reading_time_sec    INTEGER DEFAULT NULL,
+
+  summary_main_idea   TEXT NOT NULL DEFAULT '',
+  summary_point_1     TEXT NOT NULL DEFAULT '',
+  summary_point_2     TEXT NOT NULL DEFAULT '',
+  summary_point_3     TEXT NOT NULL DEFAULT '',
+  summary_importance  TEXT NOT NULL DEFAULT '',
+  summary_example     TEXT NOT NULL DEFAULT '',
+  summary_word_count  INTEGER DEFAULT NULL,
+
+  evaluation_scores   JSONB DEFAULT NULL,
+    -- { understanding: {score:0-5, note}, mainIdea: {...}, unnecessaryDetailsRemoved: {...},
+    --   clarity: {...}, explainability: {...} }
+  total_score         INTEGER DEFAULT NULL,
+  biggest_weakness    TEXT DEFAULT NULL,
+    -- 'too_much_detail'|'missing_main_idea'|'missing_important_info'|'poor_structure'|
+    -- 'too_vague'|'too_complicated'|'unclear_language'|'other'
+  weakness_note       TEXT DEFAULT NULL,
+
+  improved_summary    TEXT DEFAULT NULL,
+
+  reflection_learned  TEXT DEFAULT NULL,
+  can_explain_2min    BOOLEAN DEFAULT NULL,
+  takeaway            TEXT DEFAULT NULL,
+
+  created_at          TIMESTAMPTZ DEFAULT now(),
+  updated_at          TIMESTAMPTZ DEFAULT now(),
+  completed_at        TIMESTAMPTZ DEFAULT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reading_sessions_user ON reading_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_reading_sessions_user_status ON reading_sessions(user_id, status);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]

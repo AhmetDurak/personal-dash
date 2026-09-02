@@ -93,6 +93,7 @@ export { Activity      as IconActivity     } from 'lucide-react'
 
 // ── Content ───────────────────────────────────────────────────────────────────
 export { BookOpen    as IconBook        } from 'lucide-react'
+export { BookOpenCheck as IconReading   } from 'lucide-react'
 export { StickyNote  as IconNote        } from 'lucide-react'
 export { Tag         as IconTag         } from 'lucide-react'
 export { Link        as IconLink        } from 'lucide-react'

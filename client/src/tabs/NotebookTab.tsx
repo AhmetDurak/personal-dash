@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage, IconPalace, IconImage, IconExternalLink,
-  IconBook, IconMessage, IconLayers, IconMenu, IconChevronRight, IconChevronLeft, IconUpload } from '../lib/icons'
+  IconBook, IconMessage, IconLayers, IconMenu, IconChevronRight, IconChevronLeft, IconUpload, IconReading } from '../lib/icons'
 import { buildFolderTree, collectFolderPaths, getItemsInFolder } from '../lib/folderTree'
 import { useSortFilter } from '../hooks/useSortFilter'
 import { SortFilterBar } from '../components/web/SortFilterBar'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { hljs } from '../lib/highlight'
+import { ReadingView } from '../components/web/reading/ReadingView'
 import { renderMermaid } from '../lib/mermaid'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios,
@@ -5077,6 +5078,7 @@ export function LearnSectionTab() {
     { path: '/learn/mindmap',  label: t.mindmap,         icon: <IconMindmap  className="w-4 h-4" strokeWidth={1.75} /> },
     { path: '/learn/language', label: t.languageSection, icon: <IconLanguage className="w-4 h-4" strokeWidth={1.75} /> },
     { path: '/learn/chains',   label: t.chains,          icon: <IconLink     className="w-4 h-4" strokeWidth={1.75} /> },
+    { path: '/learn/reading',  label: t.reading,         icon: <IconReading  className="w-4 h-4" strokeWidth={1.75} /> },
   ]
 
   return (
@@ -5093,6 +5095,7 @@ export function LearnSectionTab() {
           <Route path="mindmap" element={<MindmapView />} />
           <Route path="language/*" element={<LanguageTab />} />
           <Route path="chains/*" element={<ChainsView />} />
+          <Route path="reading/*" element={<ReadingView />} />
         </>
       )}
     </SectionShell>
