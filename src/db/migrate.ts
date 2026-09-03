@@ -605,6 +605,29 @@ CREATE TABLE IF NOT EXISTS reading_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_reading_sessions_user ON reading_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_reading_sessions_user_status ON reading_sessions(user_id, status);
+
+-- Cross-entity "Connections" (Obsidian-style linking). Entity-type-agnostic by
+-- design: v1's UI/MCP tools only ever use entity_type='note', but the schema can
+-- reference any future content type (vocab, sentence, mindmap, kanban, ...)
+-- without a migration. Ids are TEXT (not INTEGER) so both DB-backed integer ids
+-- (cast to string) and, later, Obsidian vault file-path ids can be represented.
+-- Undirected: the app layer canonicalizes (a,b) vs (b,a) before insert so a pair
+-- is never stored twice in reverse order.
+CREATE TABLE IF NOT EXISTS links (
+  id            SERIAL PRIMARY KEY,
+  user_id       INTEGER REFERENCES users(id) NOT NULL,
+  a_type        TEXT NOT NULL,
+  a_id          TEXT NOT NULL,
+  b_type        TEXT NOT NULL,
+  b_id          TEXT NOT NULL,
+  note          TEXT,
+  created_by    TEXT NOT NULL DEFAULT 'user',
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_links_user ON links(user_id);
+CREATE INDEX IF NOT EXISTS idx_links_a ON links(user_id, a_type, a_id);
+CREATE INDEX IF NOT EXISTS idx_links_b ON links(user_id, b_type, b_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_links_pair ON links(user_id, a_type, a_id, b_type, b_id);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]

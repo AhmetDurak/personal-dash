@@ -23,6 +23,10 @@ export const SCOPE_GROUPS = {
     label: 'Updates',
     description: 'Publish items (news, improvements, etc.) to your Updates feed, and read/manage what\'s there.',
   },
+  'links:readwrite': {
+    label: 'Connections',
+    description: 'Read, create, and delete connections between your notes and other items.',
+  },
 } as const
 
 export type ScopeKey = keyof typeof SCOPE_GROUPS

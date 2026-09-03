@@ -9,6 +9,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { hljs } from '../lib/highlight'
 import { ReadingView } from '../components/web/reading/ReadingView'
+import { ConnectionsPanel } from '../components/notebook/ConnectionsPanel'
 import { renderMermaid } from '../lib/mermaid'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios,
@@ -488,6 +489,7 @@ function NotesView() {
                 )}
               </div>
             </div>
+            <ConnectionsPanel noteId={selectedId} onSelect={id => setSelectedId(String(id))} />
             {preview ? (
               <div
                 ref={previewRef}

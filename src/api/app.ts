@@ -32,6 +32,7 @@ import { translateRouter } from './routes/translate'
 import { analyticsRouter } from './routes/analytics'
 import { chainsRouter } from './routes/chains'
 import { readingRouter } from './routes/reading'
+import { linksRouter } from './routes/links'
 import { kanbanRouter } from './routes/kanban'
 import { mcpWellKnownRouter } from './routes/mcpWellKnown'
 import { mcpOAuthRouter } from './routes/mcpOAuth'
@@ -119,6 +120,7 @@ app.use('/api/translate',     translateRouter())
 app.use('/api/analytics',    analyticsRouter(pool))
 app.use('/api/chains',       chainsRouter(pool))
 app.use('/api/reading',      readingRouter(pool))
+app.use('/api/links',        linksRouter(pool))
 app.use('/api/kanban',       kanbanRouter(pool))
 app.use('/api/mcp',          mcpConsentApiRouter(pool))
 

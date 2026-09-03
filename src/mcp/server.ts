@@ -8,6 +8,7 @@ import { registerMindmapTools } from './tools/mindmap'
 import { registerLanguageTools } from './tools/language'
 import { registerChainsTools } from './tools/chains'
 import { registerUpdatesTools } from './tools/updates'
+import { registerLinksTools } from './tools/links'
 import type { ScopeKey } from './scopes'
 
 // Builds a fresh, request-scoped McpServer registering only the tools whose
@@ -15,7 +16,7 @@ import type { ScopeKey } from './scopes'
 export function createMcpServer(req: Request, pool: Pool): McpServer {
   const server = new McpServer(
     { name: 'financedash', version: '1.0.0' },
-    { instructions: 'Personal finance dashboard. Finance and investment tools are strictly read-only — there is no way to create, edit, or delete ledger data through this connector. Other tool groups (Notes, Mindmap, Language, Chains, Updates) support full read/write, scoped to what the user granted at connection time.' }
+    { instructions: 'Personal finance dashboard. Finance and investment tools are strictly read-only — there is no way to create, edit, or delete ledger data through this connector. Other tool groups (Notes, Mindmap, Language, Chains, Updates, Connections) support full read/write, scoped to what the user granted at connection time.' }
   )
 
   const scopes = new Set<ScopeKey>(req.mcpScope ?? [])
@@ -43,6 +44,10 @@ export function createMcpServer(req: Request, pool: Pool): McpServer {
 
   if (scopes.has('updates:readwrite')) {
     registerUpdatesTools(server, req, pool)
+  }
+
+  if (scopes.has('links:readwrite')) {
+    registerLinksTools(server, req, pool)
   }
 
   return server
