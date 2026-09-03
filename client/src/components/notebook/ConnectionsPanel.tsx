@@ -27,11 +27,16 @@ export function ConnectionsPanel({ noteId, onSelect }: Props) {
     setQuery('')
   }, [noteId])
 
+  // Measure position on the first keystroke (not as soon as `adding` becomes
+  // true) — autoFocus opens the mobile keyboard asynchronously, which scrolls
+  // the input into view. Waiting for the user to actually type means the
+  // keyboard has already settled by the time we measure.
+  const dropdownOpen = adding && query.length > 0
   useEffect(() => {
-    if (!adding || !inputRef.current) { setDropdownRect(null); return }
+    if (!dropdownOpen || !inputRef.current) { setDropdownRect(null); return }
     const rect = inputRef.current.getBoundingClientRect()
     setDropdownRect({ top: rect.bottom + 4, left: rect.left, width: rect.width })
-  }, [adding])
+  }, [dropdownOpen])
 
   if (noteId === null) return null
   const noteIdStr = String(noteId)
@@ -115,7 +120,7 @@ export function ConnectionsPanel({ noteId, onSelect }: Props) {
         </div>
       )}
 
-      {adding && query && dropdownRect && createPortal(
+      {dropdownOpen && dropdownRect && createPortal(
         <div
           className="fixed z-50 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg max-h-40 overflow-y-auto"
           style={{ top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width }}
