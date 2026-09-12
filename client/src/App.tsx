@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { useReminderNotifications } from './hooks/useReminderNotifications'
 import { useAnalytics } from './hooks/useAnalytics'
@@ -33,6 +33,13 @@ const RemindersView = lazy(() => import('./tabs/NotebookTab').then(m => ({ defau
 
 function RouteFallback() {
   return <div className="h-full w-full bg-xero-bg dark:bg-slate-900 animate-pulse" />
+}
+
+// Reading moved from its own top-level section into the Language tab — preserve
+// deep links (e.g. /learn/reading/42) instead of dropping the sub-path.
+function RedirectLearnReading() {
+  const { '*': rest } = useParams()
+  return <Navigate to={`/learn/language/reading${rest ? '/' + rest : ''}`} replace />
 }
 
 function NewsPage() {
@@ -162,6 +169,7 @@ export function App() {
               <Route path="/workspace/mindmap"   element={<Navigate to="/learn/mindmap" replace />} />
               <Route path="/workspace/vocab"     element={<Navigate to="/learn/language" replace />} />
               <Route path="/learn/vocab"         element={<Navigate to="/learn/language" replace />} />
+              <Route path="/learn/reading/*"     element={<RedirectLearnReading />} />
               <Route path="/workspace/*"         element={<Navigate to="/learn/notes" replace />} />
               <Route path="*"            element={<Navigate to="/home" replace />} />
             </Routes>

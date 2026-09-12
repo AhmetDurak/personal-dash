@@ -35,6 +35,7 @@ export interface ReadingSession {
   reflectionLearned: string | null
   canExplain2min: boolean | null
   takeaway: string | null
+  folder: string | null
   createdAt: string
   updatedAt: string
   completedAt: string | null
@@ -65,8 +66,8 @@ async function postJson(url: string, method: string, body?: unknown) {
 export function useReadingSessions() {
   const { data, mutate, isLoading } = useSWR<ReadingSession[]>('/api/reading', fetcher)
 
-  async function createSession(title: string, sourceContent: string, category: string | null) {
-    const session = await postJson('/api/reading', 'POST', { title, sourceContent, category }) as ReadingSession
+  async function createSession(title: string, sourceContent: string, category: string | null, folder: string | null = null) {
+    const session = await postJson('/api/reading', 'POST', { title, sourceContent, category, folder }) as ReadingSession
     await mutate()
     return session
   }
@@ -76,7 +77,22 @@ export function useReadingSessions() {
     await mutate()
   }
 
-  return { sessions: data ?? [], isLoading, createSession, removeSession }
+  async function moveSessionToFolder(id: number, folder: string | null) {
+    await postJson(`/api/reading/${id}/folder`, 'PATCH', { folder })
+    await mutate()
+  }
+
+  async function renameSessionFolder(oldPath: string, newPath: string) {
+    await postJson('/api/reading/folder-rename', 'PATCH', { oldPath, newPath })
+    await mutate()
+  }
+
+  async function deleteSessionFolder(path: string) {
+    await postJson(`/api/reading/folder?path=${encodeURIComponent(path)}`, 'DELETE')
+    await mutate()
+  }
+
+  return { sessions: data ?? [], isLoading, createSession, removeSession, moveSessionToFolder, renameSessionFolder, deleteSessionFolder }
 }
 
 export function useReadingSession(id: number | null) {

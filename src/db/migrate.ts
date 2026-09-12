@@ -606,6 +606,10 @@ CREATE TABLE IF NOT EXISTS reading_sessions (
 CREATE INDEX IF NOT EXISTS idx_reading_sessions_user ON reading_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_reading_sessions_user_status ON reading_sessions(user_id, status);
 
+-- Folder for reading sessions, so Reading can be folder-organized like the
+-- other Learn > Language item types instead of a flat unsorted list.
+ALTER TABLE reading_sessions ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
+
 -- Cross-entity "Connections" (Obsidian-style linking). Entity-type-agnostic by
 -- design: v1's UI/MCP tools only ever use entity_type='note', but the schema can
 -- reference any future content type (vocab, sentence, mindmap, kanban, ...)

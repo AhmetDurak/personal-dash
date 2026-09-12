@@ -26,6 +26,7 @@ export function makeSession(overrides: Partial<ReadingSession> = {}): ReadingSes
     reflectionLearned: null,
     canExplain2min: null,
     takeaway: null,
+    folder: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     completedAt: null,

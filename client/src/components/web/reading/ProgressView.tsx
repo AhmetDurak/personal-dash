@@ -16,7 +16,7 @@ export function ProgressView() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">
-      <Link to="/learn/reading" className="inline-flex items-center gap-1 py-2 px-1 text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
+      <Link to="/learn/language/reading" className="inline-flex items-center gap-1 py-2 px-1 text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
         <IconChevronLeft className="w-3 h-3" strokeWidth={2.5} /> {t.readingBackToSessions}
       </Link>
       <h1 className="text-lg font-semibold text-gray-900 dark:text-slate-100">{t.readingProgressLink}</h1>

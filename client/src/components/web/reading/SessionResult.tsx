@@ -51,10 +51,10 @@ export function SessionResult({ session }: { session: ReadingSession }) {
       )}
 
       <div className="flex gap-2 pt-2">
-        <Link to="/learn/reading" className="flex-1 text-center py-2.5 text-sm font-medium rounded-xl border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+        <Link to="/learn/language/reading" className="flex-1 text-center py-2.5 text-sm font-medium rounded-xl border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
           {t.readingBackToSessions}
         </Link>
-        <Link to="/learn/reading/new" className="flex-1 text-center py-2.5 text-sm font-semibold rounded-xl bg-xero-green text-white hover:bg-xero-green-dark transition-colors">
+        <Link to="/learn/language/reading/new" className="flex-1 text-center py-2.5 text-sm font-semibold rounded-xl bg-xero-green text-white hover:bg-xero-green-dark transition-colors">
           {t.readingNewSession}
         </Link>
       </div>

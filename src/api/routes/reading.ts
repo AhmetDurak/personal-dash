@@ -33,6 +33,7 @@ function toCamel(row: Record<string, unknown>) {
     reflectionLearned: row.reflection_learned,
     canExplain2min: row.can_explain_2min,
     takeaway: row.takeaway,
+    folder: row.folder,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -66,13 +67,13 @@ export function readingRouter(pool: Pool): Router {
 
   router.post('/', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
-    const { title, category, sourceContent } = req.body as { title: string; category?: string | null; sourceContent: string }
+    const { title, category, sourceContent, folder } = req.body as { title: string; category?: string | null; sourceContent: string; folder?: string | null }
     if (!title?.trim()) { res.status(400).json({ error: 'title required' }); return }
     if (!sourceContent?.trim()) { res.status(400).json({ error: 'sourceContent required' }); return }
     const { rows } = await pool.query(
-      `INSERT INTO reading_sessions (title, category, source_content, user_id)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [title.trim(), category?.trim() || null, sourceContent, uid]
+      `INSERT INTO reading_sessions (title, category, source_content, user_id, folder)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [title.trim(), category?.trim() || null, sourceContent, uid, folder || null]
     )
     res.json(toCamel(rows[0]))
   })
@@ -206,6 +207,39 @@ export function readingRouter(pool: Pool): Router {
   router.delete('/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     await pool.query('DELETE FROM reading_sessions WHERE id=$1 AND user_id=$2', [req.params.id, uid])
+    res.json({ ok: true })
+  })
+
+  router.patch('/folder-rename', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { oldPath, newPath } = req.body as { oldPath: string; newPath: string }
+    if (!oldPath?.trim() || !newPath?.trim()) { res.status(400).json({ error: 'oldPath and newPath required' }); return }
+    await pool.query(
+      `UPDATE reading_sessions SET folder = CASE WHEN folder = $1 THEN $2 ELSE $2 || SUBSTRING(folder FROM LENGTH($1) + 1) END
+       WHERE user_id = $3 AND (folder = $1 OR folder LIKE $4)`,
+      [oldPath, newPath, uid, oldPath + '/%']
+    )
+    res.json({ ok: true })
+  })
+
+  router.patch('/:id/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { folder } = req.body as { folder: string | null }
+    const { rows } = await pool.query(
+      'UPDATE reading_sessions SET folder=$1, updated_at=now() WHERE id=$2 AND user_id=$3 RETURNING *',
+      [folder ?? null, req.params.id, uid]
+    )
+    res.json(rows[0] ? toCamel(rows[0]) : null)
+  })
+
+  router.delete('/folder', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { path } = req.query as { path: string }
+    if (!path?.trim()) { res.status(400).json({ error: 'path required' }); return }
+    await pool.query(
+      `DELETE FROM reading_sessions WHERE user_id = $1 AND (folder = $2 OR folder LIKE $3)`,
+      [uid, path, path + '/%']
+    )
     res.json({ ok: true })
   })
 

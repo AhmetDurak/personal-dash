@@ -28,7 +28,7 @@ function SessionWizard() {
   return (
     <div className="py-4">
       <div className="max-w-2xl mx-auto px-4 mb-2">
-        <Link to="/learn/reading" className="inline-block py-2 px-1 text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
+        <Link to="/learn/language/reading" className="inline-block py-2 px-1 text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
           {t.readingSaveExit}
         </Link>
       </div>

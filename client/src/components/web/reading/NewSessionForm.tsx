@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useReadingSessions } from '../../../hooks/useReading'
 import { useLanguage } from '../../../hooks/useLanguage'
 import { AutoGrowTextarea } from '../AutoGrowTextarea'
@@ -10,6 +10,8 @@ export function NewSessionForm() {
   const { t } = useLanguage()
   const { createSession } = useReadingSessions()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const folder = searchParams.get('folder')
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('')
   const [content, setContent] = useState('')
@@ -20,9 +22,9 @@ export function NewSessionForm() {
   async function handleStart() {
     if (!canStart || saving) return
     setSaving(true)
-    const session = await createSession(title.trim(), content, category.trim() || null)
+    const session = await createSession(title.trim(), content, category.trim() || null, folder)
     setSaving(false)
-    if (session?.id) navigate(`/learn/reading/${session.id}`)
+    if (session?.id) navigate(`/learn/language/reading/${session.id}`)
   }
 
   return (
