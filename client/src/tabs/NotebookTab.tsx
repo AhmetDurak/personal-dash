@@ -5066,57 +5066,35 @@ function LanguageTab() {
   ]
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Desktop: vertical icon rail — same visual idiom as the outer Learn section rail */}
-      <aside className="hidden md:flex w-36 flex-shrink-0 flex-col bg-xero-navy overflow-y-auto">
-        {LANG_VIEWS.map(v => (
-          <NavLink
-            key={v.path}
-            to={`/learn/language/${v.path}`}
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 px-4 py-3 text-sm font-medium border-l-[3px] transition-colors ${
-                isActive
-                  ? 'border-xero-green text-xero-green bg-xero-navy-light'
-                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-xero-navy-light'
-              }`
-            }
-          >
-            {v.icon}{v.label}
-          </NavLink>
-        ))}
-      </aside>
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile: horizontal pill bar (narrow screens keep this — a vertical rail would eat too much height) */}
-        <header className={`md:hidden flex items-center gap-1 px-4 py-2.5 border-b flex-shrink-0 overflow-hidden ${dark ? 'bg-slate-900 border-slate-700' : 'bg-white border-xero-border'}`}>
-          <div className="flex overflow-x-auto gap-1 flex-1" style={{ scrollbarWidth: 'none' }}>
-            {LANG_VIEWS.map(v => (
-              <NavLink
-                key={v.path}
-                to={`/learn/language/${v.path}`}
-                className={({ isActive }) =>
-                  `text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900'
-                      : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
-                  }`
-                }
-              >
-                {v.icon}{v.label}
-              </NavLink>
-            ))}
-          </div>
-        </header>
-        <div className="flex-1 overflow-hidden">
-          <Routes>
-            <Route path="vocab"      element={<VocabView />} />
-            <Route path="sentence"   element={<SentenceView />} />
-            <Route path="scenario"   element={<ScenarioView />} />
-            <Route path="palace"     element={<MemoryPalaceView />} />
-            <Route path="reading/*"  element={<ReadingView />} />
-            <Route index element={<Navigate to="scenario" replace />} />
-          </Routes>
+    <div className="flex flex-col h-full overflow-hidden">
+      <header className={`flex items-center gap-1 px-4 py-2.5 border-b flex-shrink-0 overflow-hidden ${dark ? 'bg-slate-900 border-slate-700' : 'bg-white border-xero-border'}`}>
+        <div className="flex overflow-x-auto gap-1 flex-1" style={{ scrollbarWidth: 'none' }}>
+          {LANG_VIEWS.map(v => (
+            <NavLink
+              key={v.path}
+              to={`/learn/language/${v.path}`}
+              className={({ isActive }) =>
+                `text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
+                  isActive
+                    ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900'
+                    : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+                }`
+              }
+            >
+              {v.icon}{v.label}
+            </NavLink>
+          ))}
         </div>
+      </header>
+      <div className="flex-1 overflow-hidden">
+        <Routes>
+          <Route path="vocab"      element={<VocabView />} />
+          <Route path="sentence"   element={<SentenceView />} />
+          <Route path="scenario"   element={<ScenarioView />} />
+          <Route path="palace"     element={<MemoryPalaceView />} />
+          <Route path="reading/*"  element={<ReadingView />} />
+          <Route index element={<Navigate to="scenario" replace />} />
+        </Routes>
       </div>
     </div>
   )
