@@ -101,9 +101,6 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
         )}
         {!isRenaming && (
           <div className={`flex items-center gap-2 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
-            <button title={ctx.newItemLabel} onClick={e => { e.stopPropagation(); ctx.onNewItem(node.path) }} className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-xero-green`}>
-              <IconAdd className="w-3 h-3" strokeWidth={2.5} />
-            </button>
             <button title="More" onClick={e => { e.stopPropagation(); ctx.openCtx(e, 'folder', node.path) }} className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold`}>•••</button>
           </div>
         )}
@@ -295,6 +292,8 @@ export function ItemFolderTree<T extends AnyItem>({
             style={{ left: ctxMenu.x, top: Math.max(8, ctxMenu.y) }} onClick={e => e.stopPropagation()}>
             {ctxMenu.type === 'folder' ? (
               <>
+                <button onClick={() => { onNewItem(ctxMenu.folderPath!); setCtxMenu(null) }}
+                  className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">{newItemLabel.replace(/^\+\s*/, '')}</button>
                 <button onClick={() => { startAddingFolder(ctxMenu.folderPath!); setCtxMenu(null) }}
                   className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">New subfolder</button>
                 <button onClick={() => { setRenaming({ path: ctxMenu.folderPath!, val: ctxMenu.folderPath!.split('/').pop()! }); setCtxMenu(null) }}
