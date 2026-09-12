@@ -97,7 +97,7 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
             className="flex-1 min-w-0 text-xs bg-white dark:bg-slate-700 border border-xero-green rounded px-2 py-1.5 outline-none"
           />
         ) : (
-          <span className={`text-xs flex-1 truncate ${isActiveFolder ? 'text-xero-green font-medium' : 'text-gray-700 dark:text-slate-300'}`}>{node.name}</span>
+          <span title={node.name} className={`text-xs flex-1 truncate ${isActiveFolder ? 'text-xero-green font-medium' : 'text-gray-700 dark:text-slate-300'}`}>{node.name}</span>
         )}
         {!isRenaming && (
           <div className={`flex items-center gap-2 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
@@ -148,7 +148,7 @@ function ItemTreeRow<T extends AnyItem>({ item, depth }: { item: T; depth: numbe
     >
       <span className="w-3 flex-shrink-0" />
       {ctx.itemIcon}
-      <span className={`text-xs flex-1 truncate ${active ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{ctx.itemLabel(item)}</span>
+      <span title={ctx.itemLabel(item)} className={`text-xs flex-1 truncate ${active ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{ctx.itemLabel(item)}</span>
       <button onClick={e => { e.stopPropagation(); ctx.openCtx(e, 'item', undefined, item.id) }}
         className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5 opacity-30 group-hover:opacity-100'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] font-bold leading-none`}>•••</button>
     </div>

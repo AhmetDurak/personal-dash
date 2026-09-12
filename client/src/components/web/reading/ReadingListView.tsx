@@ -4,6 +4,7 @@ import { useReadingSessions, useReadingStats, type ReadingSession } from '../../
 import { useLanguage } from '../../../hooks/useLanguage'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ItemFolderTree, isTouch } from '../ItemFolderTree'
+import { ResizableSidebar } from '../ResizableSidebar'
 import { buildFolderTree, getItemsInFolder } from '../../../lib/folderTree'
 import { IconAdd, IconDelete, IconReading, IconMenu } from '../../../lib/icons'
 import { formatDate } from '../../../utils/format'
@@ -90,9 +91,9 @@ export function ReadingListView() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Folder tree column — desktop permanent, mobile overlay */}
-      <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+      <ResizableSidebar storageKey="notebook:tree-width" defaultWidth={176} className="border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
         {TreePane()}
-      </div>
+      </ResizableSidebar>
       {mobileTreeOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />

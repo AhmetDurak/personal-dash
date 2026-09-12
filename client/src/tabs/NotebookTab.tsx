@@ -22,6 +22,7 @@ import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, Wor
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChainsView } from '../components/web/ChainsView'
 import { ItemFolderTree, isTouch } from '../components/web/ItemFolderTree'
+import { ResizableSidebar } from '../components/web/ResizableSidebar'
 import { AutoGrowTextarea } from '../components/web/AutoGrowTextarea'
 import { useLanguage } from '../hooks/useLanguage'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -1531,9 +1532,9 @@ function MindmapView() {
   return (
     <div className="flex h-full overflow-hidden relative">
       {/* Desktop sidebar */}
-      <div className="hidden md:flex w-44 flex-shrink-0 flex-col bg-xero-navy border-r border-xero-navy-light">
+      <ResizableSidebar storageKey="notebook:tree-width" defaultWidth={176} className="bg-xero-navy border-r border-xero-navy-light">
         {MapList({ onSelect: () => {} })}
-      </div>
+      </ResizableSidebar>
 
       {/* Mobile overlay */}
       {mobileOpen && (
@@ -2007,9 +2008,9 @@ function VocabView() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Folder tree column — desktop permanent, mobile overlay */}
-      <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+      <ResizableSidebar storageKey="notebook:tree-width" defaultWidth={176} className="border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
         {TreePane()}
-      </div>
+      </ResizableSidebar>
       {mobileTreeOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />
@@ -3428,9 +3429,9 @@ function SentenceView() {
       </datalist>
 
       {/* Folder tree column — desktop permanent, mobile overlay */}
-      <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+      <ResizableSidebar storageKey="notebook:tree-width" defaultWidth={176} className="border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
         {TreePane()}
-      </div>
+      </ResizableSidebar>
       {mobileTreeOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />
@@ -3773,9 +3774,9 @@ function ScenarioView() {
       </datalist>
 
       {/* Folder tree column — desktop permanent, mobile overlay */}
-      <div className="hidden md:flex w-44 flex-shrink-0 flex-col border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+      <ResizableSidebar storageKey="notebook:tree-width" defaultWidth={176} className="border-r border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
         {TreePane()}
-      </div>
+      </ResizableSidebar>
       {mobileTreeOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileTreeOpen(false)} />
@@ -5002,9 +5003,9 @@ function MemoryPalaceView() {
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      <div className="hidden md:flex w-52 flex-shrink-0 flex-col border-r border-xero-border dark:border-slate-700 bg-white dark:bg-slate-900">
+      <ResizableSidebar storageKey="notebook:tree-width" defaultWidth={208} className="border-r border-xero-border dark:border-slate-700 bg-white dark:bg-slate-900">
         {isLoading ? <p className="text-xs text-gray-400 px-2 py-2">Loading…</p> : TreePane()}
-      </div>
+      </ResizableSidebar>
 
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
