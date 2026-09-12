@@ -7,6 +7,14 @@ function getSessionId(): string {
   return id
 }
 
+// Persists across browser sessions (unlike session_id above), so the same
+// device/browser is counted once across many visits instead of once per visit.
+function getVisitorId(): string {
+  let id = localStorage.getItem('_avid')
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem('_avid', id) }
+  return id
+}
+
 function detectDevice(): string {
   const ua = navigator.userAgent
   if (/tablet|ipad|playbook|silk/i.test(ua)) return 'tablet'
@@ -37,6 +45,7 @@ function detectOS(): string {
 function sendEvent(page: string, durationMs: number) {
   const payload = JSON.stringify({
     session_id:  getSessionId(),
+    visitor_id:  getVisitorId(),
     page,
     duration_ms: durationMs,
     device:      detectDevice(),

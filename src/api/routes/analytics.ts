@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { Pool } from 'pg'
 
 const ADMIN_EMAIL = 'durakahmet049@gmail.com'
+const DEMO_EMAIL = 'demo@personaldashboard.app'
 
 function requireAdmin(req: Request, res: Response): boolean {
   const user = req.user as Express.User
@@ -14,15 +15,16 @@ export function analyticsRouter(pool: Pool): Router {
 
   // POST /api/analytics/event — called via sendBeacon from frontend
   router.post('/event', async (req: Request, res: Response) => {
-    const { session_id, page, duration_ms, device, browser, os } = req.body as {
-      session_id?: string; page?: string; duration_ms?: number
+    const { session_id, visitor_id, page, duration_ms, device, browser, os } = req.body as {
+      session_id?: string; visitor_id?: string; page?: string; duration_ms?: number
       device?: string; browser?: string; os?: string
     }
     if (!session_id || !page) return res.status(400).end()
+    const uid = (req.user as Express.User)?.id ?? null
     await pool.query(
-      `INSERT INTO analytics_events (session_id, page, duration_ms, device, browser, os)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [session_id.slice(0, 64), page.slice(0, 200), duration_ms ?? null, device ?? null, browser ?? null, os ?? null]
+      `INSERT INTO analytics_events (session_id, visitor_id, user_id, page, duration_ms, device, browser, os)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [session_id.slice(0, 64), visitor_id?.slice(0, 64) ?? null, uid, page.slice(0, 200), duration_ms ?? null, device ?? null, browser ?? null, os ?? null]
     )
     res.status(204).end()
   })
@@ -36,11 +38,15 @@ export function analyticsRouter(pool: Pool): Router {
       pool.query(`
         SELECT
           COUNT(*)                                                          AS total_views,
-          COUNT(DISTINCT session_id)                                        AS unique_visitors,
-          COALESCE(AVG(duration_ms) FILTER (WHERE duration_ms IS NOT NULL), 0) AS avg_duration_ms
-        FROM analytics_events
-        WHERE timestamp > now() - ($1 || ' days')::INTERVAL
-      `, [days]),
+          COUNT(DISTINCT ae.session_id)                                     AS unique_visitors,
+          COUNT(DISTINCT ae.visitor_id)                                     AS distinct_devices,
+          COUNT(DISTINCT ae.user_id) FILTER (WHERE u.email IS DISTINCT FROM $2) AS signed_in_users,
+          COUNT(DISTINCT ae.visitor_id) FILTER (WHERE u.email = $2)          AS demo_devices,
+          COALESCE(AVG(ae.duration_ms) FILTER (WHERE ae.duration_ms IS NOT NULL), 0) AS avg_duration_ms
+        FROM analytics_events ae
+        LEFT JOIN users u ON u.id = ae.user_id
+        WHERE ae.timestamp > now() - ($1 || ' days')::INTERVAL
+      `, [days, DEMO_EMAIL]),
 
       pool.query(`
         WITH counts AS (
@@ -108,11 +114,14 @@ export function analyticsRouter(pool: Pool): Router {
 
     res.json({
       overview: {
-        totalViews:    parseInt(overview.rows[0].total_views),
+        totalViews:     parseInt(overview.rows[0].total_views),
         uniqueVisitors: parseInt(overview.rows[0].unique_visitors),
-        avgDurationMs: Math.round(parseFloat(overview.rows[0].avg_duration_ms)),
-        bounceRate:    parseFloat(bounce.rows[0].bounce_rate ?? '0'),
-        activeNow:     parseInt(activeNow.rows[0].active),
+        distinctDevices: parseInt(overview.rows[0].distinct_devices),
+        signedInUsers:  parseInt(overview.rows[0].signed_in_users),
+        demoDevices:    parseInt(overview.rows[0].demo_devices),
+        avgDurationMs:  Math.round(parseFloat(overview.rows[0].avg_duration_ms)),
+        bounceRate:     parseFloat(bounce.rows[0].bounce_rate ?? '0'),
+        activeNow:      parseInt(activeNow.rows[0].active),
       },
       timeline: timeline.rows.map(r => ({
         date:     r.date,

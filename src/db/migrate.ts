@@ -433,6 +433,15 @@ CREATE INDEX IF NOT EXISTS idx_analytics_timestamp ON analytics_events(timestamp
 CREATE INDEX IF NOT EXISTS idx_analytics_page      ON analytics_events(page);
 CREATE INDEX IF NOT EXISTS idx_analytics_session   ON analytics_events(session_id);
 
+-- visitor_id: a persistent (localStorage) id, unlike session_id which resets every
+-- browser session -- lets "distinct devices over time" be told apart from "visits".
+-- user_id: which signed-in account the event belongs to, so demo traffic (which all
+-- shares one seeded account) can be told apart from real registered users.
+ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS visitor_id TEXT DEFAULT NULL;
+ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) DEFAULT NULL;
+CREATE INDEX IF NOT EXISTS idx_analytics_visitor ON analytics_events(visitor_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_user     ON analytics_events(user_id);
+
 -- MCP (Model Context Protocol) remote connector: OAuth 2.1 authorization server tables.
 CREATE TABLE IF NOT EXISTS mcp_oauth_clients (
   client_id                  TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,

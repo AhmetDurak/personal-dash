@@ -3633,7 +3633,7 @@ function ScenarioView() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
   const [scenSearch, setScenSearch] = useState('')
-  const [scenPreview, setScenPreview] = useState(false)
+  const [scenPreview, setScenPreview] = useState(true)
 
   const scenTree = buildFolderTree(scenarios)
   const active   = scenarios.find(s => s.id === activeId) ?? null
@@ -3649,14 +3649,14 @@ function ScenarioView() {
     setDraft({ ...s, folder: folder ?? s.folder })
     setActiveId(s.id)
     setIsEditingContent(true)
-    setScenPreview(false)
+    setScenPreview(true)
   }
 
   function openScenario(s: LanguageScenario) {
     setDraft({ ...s })
     setActiveId(s.id)
     setIsEditingContent(false)
-    setScenPreview(false)
+    setScenPreview(true)
   }
 
   // Deep-link support: Memory Palace's "Go to linked item" navigates here with
@@ -3670,6 +3670,7 @@ function ScenarioView() {
     if (s) {
       setDraft({ ...s })
       setIsEditingContent(false)
+      setScenPreview(true)
       setScenParams(p => { p.set('scenario', String(s.id)); p.delete('highlight'); return p }, { replace: true })
     }
   }, [scenParams, scenarios]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -3937,7 +3938,7 @@ function ScenarioView() {
               autoFocus
               value={draft.content ?? ''}
               onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, content: v })); scheduleContent(active.id, v) }}
-              onBlur={() => { if (contentTimer.current) clearTimeout(contentTimer.current); saveScenario(active.id, { content: draft.content ?? '' }); setIsEditingContent(false) }}
+              onBlur={() => { if (contentTimer.current) clearTimeout(contentTimer.current); saveScenario(active.id, { content: draft.content ?? '' }); setIsEditingContent(false); setScenPreview(true) }}
               placeholder="Write your scenario here…"
               minRows={8}
               className={`w-full resize-none focus:outline-none text-sm leading-relaxed bg-transparent ${dark ? 'text-slate-100 placeholder-slate-500' : 'text-gray-800'}`}

@@ -10,6 +10,7 @@ const ADMIN_EMAIL = 'durakahmet049@gmail.com'
 interface Stats {
   overview: {
     totalViews: number; uniqueVisitors: number
+    distinctDevices: number; signedInUsers: number; demoDevices: number
     avgDurationMs: number; bounceRate: number; activeNow: number
   }
   timeline: { date: string; views: number; visitors: number }[]
@@ -101,11 +102,13 @@ export function AdminTab({ userEmail }: { userEmail: string }) {
         {s && (
           <>
             {/* Overview cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard label="Page Views"      value={s.overview.totalViews.toLocaleString()} />
-              <StatCard label="Unique Visitors" value={s.overview.uniqueVisitors.toLocaleString()} />
-              <StatCard label="Avg Duration"    value={fmt(s.overview.avgDurationMs)} />
-              <StatCard label="Bounce Rate"     value={pct(s.overview.bounceRate)} sub="single-page sessions" />
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <StatCard label="Page Views"       value={s.overview.totalViews.toLocaleString()} />
+              <StatCard label="Unique Visitors"  value={s.overview.uniqueVisitors.toLocaleString()} sub="by browser session" />
+              <StatCard label="Distinct Devices" value={s.overview.distinctDevices.toLocaleString()} sub="not per-session" />
+              <StatCard label="Signed-in Users"  value={s.overview.signedInUsers.toLocaleString()} sub={`${s.overview.demoDevices.toLocaleString()} demo excluded`} />
+              <StatCard label="Avg Duration"     value={fmt(s.overview.avgDurationMs)} />
+              <StatCard label="Bounce Rate"      value={pct(s.overview.bounceRate)} sub="single-page sessions" />
             </div>
 
             {/* Timeline chart */}
