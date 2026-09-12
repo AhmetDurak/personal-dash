@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { ReadingSession } from '../../../hooks/useReading'
 import { useLanguage } from '../../../hooks/useLanguage'
+import { AutoGrowTextarea } from '../AutoGrowTextarea'
 
 function reconstructSummary(session: Pick<ReadingSession,
   'summaryMainIdea' | 'summaryPoint1' | 'summaryPoint2' | 'summaryPoint3' | 'summaryImportance' | 'summaryExample'>) {
@@ -48,10 +49,10 @@ export function ImproveStage({ session, onSave, onContinue }: {
         </div>
         <div className="rounded-2xl border bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 p-4">
           <p className="text-xs font-semibold text-xero-green mb-2">{t.readingImprovedSummaryLabel}</p>
-          <textarea
+          <AutoGrowTextarea
             value={improved}
             onChange={e => update(e.target.value)}
-            rows={8}
+            minRows={8}
             className="w-full text-sm border-0 p-0 bg-transparent text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-xero-green/30 rounded-md resize-none"
             placeholder={t.readingImprovedPlaceholder}
           />

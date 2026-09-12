@@ -232,6 +232,8 @@ export const TRANSLATIONS = {
     editSentence: 'Edit sentence',
     editScenario: 'Edit scenario',
     scenarioTitle: 'Title',
+    scenarioViewLinked: 'Linked',
+    scenarioViewPreview: 'Preview',
     // ETF
     etfOverview: 'Overview',
     etfChart: 'Chart',
@@ -509,6 +511,8 @@ export const TRANSLATIONS = {
     editSentence: 'Satz bearbeiten',
     editScenario: 'Szenario bearbeiten',
     scenarioTitle: 'Titel',
+    scenarioViewLinked: 'Verknüpft',
+    scenarioViewPreview: 'Vorschau',
     // ETF
     etfOverview: 'Übersicht',
     etfChart: 'Chart',
@@ -786,6 +790,8 @@ export const TRANSLATIONS = {
     editSentence: 'Cümleyi düzenle',
     editScenario: 'Senaryoyu düzenle',
     scenarioTitle: 'Başlık',
+    scenarioViewLinked: 'Bağlantılı',
+    scenarioViewPreview: 'Önizleme',
     // ETF
     etfOverview: 'Genel Bakış',
     etfChart: 'Grafik',

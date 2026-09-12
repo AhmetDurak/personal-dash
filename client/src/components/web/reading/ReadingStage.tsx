@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { ReadingSession } from '../../../hooks/useReading'
 import { useLanguage } from '../../../hooks/useLanguage'
 import { IconEdit, IconCheck } from '../../../lib/icons'
+import { AutoGrowTextarea } from '../AutoGrowTextarea'
 
 interface Props {
   session: Pick<ReadingSession, 'id' | 'title' | 'category' | 'sourceContent' | 'readingStartedAt'>
@@ -83,11 +84,11 @@ export function ReadingStage({ session, onSave, onReady }: Props) {
 
       <div className="rounded-2xl border bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 p-6">
         {editing ? (
-          <textarea
+          <AutoGrowTextarea
             value={content}
             onChange={e => { setContent(e.target.value); onSave({ sourceContent: e.target.value }) }}
-            rows={14}
-            className="w-full text-sm text-gray-700 dark:text-slate-300 leading-relaxed bg-transparent border-0 p-0 focus:outline-none focus:ring-2 focus:ring-xero-green/30 rounded-md resize-y"
+            minRows={14}
+            className="w-full text-sm text-gray-700 dark:text-slate-300 leading-relaxed bg-transparent border-0 p-0 focus:outline-none focus:ring-2 focus:ring-xero-green/30 rounded-md resize-none"
           />
         ) : (
           <p className="text-sm text-gray-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{session.sourceContent}</p>

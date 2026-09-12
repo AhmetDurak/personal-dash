@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { ReadingSession } from '../../../hooks/useReading'
 import { useLanguage } from '../../../hooks/useLanguage'
+import { AutoGrowTextarea } from '../AutoGrowTextarea'
 
 interface Fields {
   mainIdea: string; point1: string; point2: string; point3: string; importance: string; example: string
@@ -71,10 +72,10 @@ export function SummaryStage({ session, onSave, onContinue }: {
             <span className="text-xs font-semibold text-gray-600 dark:text-slate-400">{row.label}</span>
             {row.question && <span className="block text-[11px] text-gray-400 dark:text-slate-500 mb-1.5">{row.question}</span>}
             {!row.question && <span className="block mb-1.5" />}
-            <textarea
+            <AutoGrowTextarea
               value={fields[row.key]}
               onChange={e => update(row.key, e.target.value)}
-              rows={row.key === 'mainIdea' || row.key === 'importance' ? 4 : 2}
+              minRows={row.key === 'mainIdea' || row.key === 'importance' ? 4 : 2}
               className={inputCls}
             />
           </label>

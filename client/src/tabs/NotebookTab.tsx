@@ -22,6 +22,7 @@ import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, Wor
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChainsView } from '../components/web/ChainsView'
 import { ItemFolderTree, isTouch } from '../components/web/ItemFolderTree'
+import { AutoGrowTextarea } from '../components/web/AutoGrowTextarea'
 import { useLanguage } from '../hooks/useLanguage'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { AreaChart, Area, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContainer } from 'recharts'
@@ -3632,6 +3633,7 @@ function ScenarioView() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
   const [scenSearch, setScenSearch] = useState('')
+  const [scenPreview, setScenPreview] = useState(false)
 
   const scenTree = buildFolderTree(scenarios)
   const active   = scenarios.find(s => s.id === activeId) ?? null
@@ -3647,12 +3649,14 @@ function ScenarioView() {
     setDraft({ ...s, folder: folder ?? s.folder })
     setActiveId(s.id)
     setIsEditingContent(true)
+    setScenPreview(false)
   }
 
   function openScenario(s: LanguageScenario) {
     setDraft({ ...s })
     setActiveId(s.id)
     setIsEditingContent(false)
+    setScenPreview(false)
   }
 
   // Deep-link support: Memory Palace's "Go to linked item" navigates here with
@@ -3909,16 +3913,40 @@ function ScenarioView() {
           </button>
         </div>
 
+        {!isEditingContent && draft.content && (
+          <div className="flex justify-end">
+            <div className="inline-flex rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden text-xs">
+              <button
+                onClick={() => setScenPreview(false)}
+                className={`px-2.5 py-1 font-medium transition-colors ${!scenPreview ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900' : 'text-gray-400 hover:text-gray-600 dark:hover:text-slate-300'}`}
+              >
+                {t.scenarioViewLinked}
+              </button>
+              <button
+                onClick={() => setScenPreview(true)}
+                className={`px-2.5 py-1 font-medium transition-colors border-l border-gray-200 dark:border-slate-600 ${scenPreview ? 'bg-gray-900 dark:bg-slate-200 text-white dark:text-slate-900' : 'text-gray-400 hover:text-gray-600 dark:hover:text-slate-300'}`}
+              >
+                {t.scenarioViewPreview}
+              </button>
+            </div>
+          </div>
+        )}
         <div className={`rounded-xl border p-3 min-h-32 ${dark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-gray-100 text-gray-800'}`}>
           {isEditingContent ? (
-            <textarea
+            <AutoGrowTextarea
               autoFocus
               value={draft.content ?? ''}
               onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, content: v })); scheduleContent(active.id, v) }}
               onBlur={() => { if (contentTimer.current) clearTimeout(contentTimer.current); saveScenario(active.id, { content: draft.content ?? '' }); setIsEditingContent(false) }}
               placeholder="Write your scenario here…"
-              rows={8}
+              minRows={8}
               className={`w-full resize-none focus:outline-none text-sm leading-relaxed bg-transparent ${dark ? 'text-slate-100 placeholder-slate-500' : 'text-gray-800'}`}
+            />
+          ) : draft.content && scenPreview ? (
+            <div
+              onClick={() => setIsEditingContent(true)}
+              className="cursor-text note-prose text-sm"
+              dangerouslySetInnerHTML={{ __html: parseMarkdown(draft.content) }}
             />
           ) : (
             <div onClick={() => setIsEditingContent(true)} className="cursor-text">

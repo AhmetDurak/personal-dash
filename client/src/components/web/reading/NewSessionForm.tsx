@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useReadingSessions } from '../../../hooks/useReading'
 import { useLanguage } from '../../../hooks/useLanguage'
+import { AutoGrowTextarea } from '../AutoGrowTextarea'
 
 const inputCls = 'w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl px-3 py-2.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-xero-green/30 focus:border-xero-green resize-none'
 
@@ -40,7 +41,7 @@ export function NewSessionForm() {
 
       <label className="block">
         <span className="text-xs font-semibold text-gray-600 dark:text-slate-400 block mb-1.5">{t.readingContentLabel}</span>
-        <textarea value={content} onChange={e => setContent(e.target.value)} rows={12} className={inputCls} placeholder={t.readingContentPlaceholder} />
+        <AutoGrowTextarea value={content} onChange={e => setContent(e.target.value)} minRows={12} className={inputCls} placeholder={t.readingContentPlaceholder} />
       </label>
 
       <button
