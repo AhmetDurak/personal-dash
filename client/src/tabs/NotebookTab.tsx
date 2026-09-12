@@ -2021,7 +2021,7 @@ function VocabView() {
       )}
 
       {/* Item list column */}
-      <div className={`${editCard !== null ? 'hidden md:flex' : 'flex'} w-full md:w-72 border-r border-gray-100 dark:border-slate-700 flex-col bg-white dark:bg-slate-900/50 flex-shrink-0`}>
+      <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={editCard !== null ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <button onClick={() => setMobileTreeOpen(true)}
             className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
@@ -2105,7 +2105,7 @@ function VocabView() {
             ))
           )}
         </div>
-      </div>
+      </ResizableSidebar>
 
       {/* Detail / edit pane */}
       <div className={`${editCard === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
@@ -3442,7 +3442,7 @@ function SentenceView() {
       )}
 
       {/* Item list column */}
-      <div className={`${editingId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-72 border-r border-gray-100 dark:border-slate-700 flex-col bg-white dark:bg-slate-900/50 flex-shrink-0`}>
+      <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={editingId !== null ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <button onClick={() => setMobileTreeOpen(true)}
             className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
@@ -3525,7 +3525,7 @@ function SentenceView() {
             ))
           )}
         </div>
-      </div>
+      </ResizableSidebar>
 
       {/* Detail / edit pane */}
       <div className={`${editingId === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
@@ -3787,7 +3787,7 @@ function ScenarioView() {
       )}
 
       {/* Item list column */}
-      <div className={`${activeId !== null ? 'hidden md:flex' : 'flex'} w-full md:w-72 border-r border-gray-100 dark:border-slate-700 flex-col bg-white dark:bg-slate-900/50 flex-shrink-0`}>
+      <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={activeId !== null ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <button onClick={() => setMobileTreeOpen(true)}
             className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
@@ -3870,7 +3870,7 @@ function ScenarioView() {
             ))
           )}
         </div>
-      </div>
+      </ResizableSidebar>
 
       {/* Detail / edit pane */}
       <div className={`${activeId === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>

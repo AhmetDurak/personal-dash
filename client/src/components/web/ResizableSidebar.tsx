@@ -1,18 +1,23 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { isTouch } from './ItemFolderTree'
 
 const MIN_WIDTH = 140
 const MAX_WIDTH = 420
 
-// A fixed-width sidebar column (the folder-tree columns across Notes/Vocab/
-// Sentence/Scenario/Palace/Reading) that can be dragged wider/narrower from its
-// right edge, remembering the chosen width per storageKey. Desktop-only
-// (`hidden md:flex`) to match the fixed-width columns it replaces — mobile gets
-// its own overlay drawer for the tree, which doesn't need resizing.
-export function ResizableSidebar({ storageKey, defaultWidth, className = '', children }: {
+// A fixed-width sidebar column (the folder-tree and item-list columns across
+// Notes/Vocab/Sentence/Scenario/Palace/Reading) that can be dragged wider/
+// narrower from its right edge, remembering the chosen width per storageKey.
+// Resizing only ever applies at the md breakpoint and up (via a CSS variable
+// + `md:w-[var(--rs-width)]`, so it never fights a caller's own mobile layout
+// (e.g. a list column that's `w-full` on phone and fixed-width on desktop).
+// `mobileClassName` controls what the column does below md — default 'hidden'
+// matches the folder-tree columns, which get their own overlay drawer on
+// mobile instead.
+export function ResizableSidebar({ storageKey, defaultWidth, className = '', mobileClassName = 'hidden', children }: {
   storageKey: string
   defaultWidth: number
   className?: string
+  mobileClassName?: string
   children: ReactNode
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -48,7 +53,11 @@ export function ResizableSidebar({ storageKey, defaultWidth, className = '', chi
   }, [storageKey, width])
 
   return (
-    <div ref={containerRef} className={`hidden md:flex flex-shrink-0 flex-col relative ${className}`} style={{ width }}>
+    <div
+      ref={containerRef}
+      className={`${mobileClassName} md:flex md:w-[var(--rs-width)] flex-shrink-0 flex-col relative ${className}`}
+      style={{ '--rs-width': `${width}px` } as CSSProperties}
+    >
       {children}
       <div
         onMouseDown={e => {
@@ -59,7 +68,7 @@ export function ResizableSidebar({ storageKey, defaultWidth, className = '', chi
         }}
         onDoubleClick={() => setWidth(defaultWidth)}
         title="Drag to resize, double-click to reset"
-        className="absolute top-0 -right-1.5 w-3 h-full cursor-col-resize z-10 group flex items-center justify-center"
+        className="hidden md:flex absolute top-0 -right-1.5 w-3 h-full cursor-col-resize z-10 group items-center justify-center"
       >
         <div className="w-px h-full bg-transparent group-hover:bg-xero-green/50 group-active:bg-xero-green/70 transition-colors" />
       </div>
