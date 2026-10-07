@@ -19,6 +19,14 @@ export interface TranscriptPreview {
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
+export class TranscriptFetchError extends Error {
+  reason?: string
+  constructor(message: string, reason?: string) {
+    super(message)
+    this.reason = reason
+  }
+}
+
 async function postJson(url: string, method: string, body?: unknown) {
   const res = await fetch(url, {
     method,
@@ -26,7 +34,7 @@ async function postJson(url: string, method: string, body?: unknown) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data?.error || 'Request failed')
+  if (!res.ok) throw new TranscriptFetchError(data?.error || 'Request failed', data?.reason)
   return data
 }
 

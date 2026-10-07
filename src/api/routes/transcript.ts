@@ -1,6 +1,25 @@
 import { Router, Request, Response } from 'express'
 import { Pool } from 'pg'
-import { YoutubeTranscript } from 'youtube-transcript'
+import {
+  YoutubeTranscript,
+  YoutubeTranscriptDisabledError,
+  YoutubeTranscriptVideoUnavailableError,
+  YoutubeTranscriptNotAvailableError,
+  YoutubeTranscriptNotAvailableLanguageError,
+  YoutubeTranscriptTooManyRequestError,
+} from 'youtube-transcript'
+
+// Maps the library's typed errors (and our own URL-parsing error) to a stable
+// reason code the client can localize, instead of showing the raw library message.
+function errorReason(err: unknown): string {
+  if (err instanceof YoutubeTranscriptDisabledError) return 'disabled'
+  if (err instanceof YoutubeTranscriptVideoUnavailableError) return 'unavailable'
+  if (err instanceof YoutubeTranscriptNotAvailableError) return 'no_captions'
+  if (err instanceof YoutubeTranscriptNotAvailableLanguageError) return 'no_captions'
+  if (err instanceof YoutubeTranscriptTooManyRequestError) return 'rate_limited'
+  if (err instanceof Error && err.message.startsWith('Could not parse')) return 'invalid_url'
+  return 'unknown'
+}
 
 function toCamel(row: Record<string, unknown>) {
   return {
@@ -26,9 +45,26 @@ async function fetchVideoTitle(videoId: string): Promise<string> {
   }
 }
 
-async function fetchYoutubeTranscript(url: string): Promise<{ videoId: string; title: string; transcriptText: string }> {
+// The library tries a fast InnerTube API call first and silently falls back to
+// scraping the video's HTML page on any failure. That fallback occasionally
+// misreports "disabled"/"unavailable" when captions do exist (e.g. YouTube
+// serving a page without caption metadata for transient reasons) — confirmed by
+// retrying the same video immediately succeeding after a reported failure. One
+// retry absorbs that flakiness before we tell the user captions aren't available.
+async function fetchTranscriptWithRetry(url: string) {
+  try {
+    return await YoutubeTranscript.fetchTranscript(url)
+  } catch (err) {
+    if (err instanceof YoutubeTranscriptDisabledError || err instanceof YoutubeTranscriptVideoUnavailableError) {
+      return await YoutubeTranscript.fetchTranscript(url)
+    }
+    throw err
+  }
+}
+
+export async function fetchYoutubeTranscript(url: string): Promise<{ videoId: string; title: string; transcriptText: string }> {
   const videoId = extractVideoId(url)
-  const segments = await YoutubeTranscript.fetchTranscript(url)
+  const segments = await fetchTranscriptWithRetry(url)
   const title = await fetchVideoTitle(videoId)
   const transcriptText = segments.map(s => s.text).join(' ').replace(/\s+/g, ' ').trim()
   return { videoId, title, transcriptText }
@@ -56,7 +92,7 @@ export function transcriptRouter(pool: Pool): Router {
       const { videoId, title, transcriptText } = await fetchYoutubeTranscript(url.trim())
       res.json({ videoId, title, transcriptText })
     } catch (err) {
-      res.status(502).json({ error: err instanceof Error ? err.message : String(err) })
+      res.status(502).json({ error: err instanceof Error ? err.message : String(err), reason: errorReason(err) })
     }
   })
 
@@ -79,7 +115,7 @@ export function transcriptRouter(pool: Pool): Router {
       )
       res.json(toCamel(rows[0]))
     } catch (err) {
-      res.status(502).json({ error: err instanceof Error ? err.message : String(err) })
+      res.status(502).json({ error: err instanceof Error ? err.message : String(err), reason: errorReason(err) })
     }
   })
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useTranscripts, type Transcript, type TranscriptPreview } from '../../hooks/useTranscripts'
+import { useTranscripts, TranscriptFetchError, type Transcript, type TranscriptPreview } from '../../hooks/useTranscripts'
 import { useLanguage } from '../../hooks/useLanguage'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ItemFolderTree } from './ItemFolderTree'
@@ -7,12 +7,29 @@ import { ResizableSidebar } from './ResizableSidebar'
 import { buildFolderTree } from '../../lib/folderTree'
 import { IconTranscript, IconDelete, IconExternalLink } from '../../lib/icons'
 
+// Maps the backend's stable reason codes (see errorReason() in src/api/routes/transcript.ts)
+// to a localized message key, so the UI never has to show the raw library error text.
+const REASON_MESSAGE_KEYS = {
+  disabled: 'transcriptErrorDisabled',
+  unavailable: 'transcriptErrorUnavailable',
+  no_captions: 'transcriptErrorNoCaptions',
+  rate_limited: 'transcriptErrorRateLimited',
+  invalid_url: 'transcriptErrorInvalidUrl',
+} as const
+
 export function TranscriptView() {
   const { t } = useLanguage()
   const {
     transcripts, isLoading, fetchPreview, createTranscript, removeTranscript,
     moveTranscriptToFolder, renameTranscriptFolder, deleteTranscriptFolder,
   } = useTranscripts()
+
+  function localizeError(err: unknown): string {
+    if (err instanceof TranscriptFetchError && err.reason && err.reason in REASON_MESSAGE_KEYS) {
+      return t[REASON_MESSAGE_KEYS[err.reason as keyof typeof REASON_MESSAGE_KEYS]]
+    }
+    return t.transcriptError
+  }
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [isNew, setIsNew] = useState(false)
@@ -57,7 +74,7 @@ export function TranscriptView() {
       setPreview(await fetchPreview(url.trim()))
     } catch (err) {
       setPreview(null)
-      setError(err instanceof Error ? err.message : t.transcriptError)
+      setError(localizeError(err))
     } finally {
       setFetching(false)
     }
@@ -73,7 +90,7 @@ export function TranscriptView() {
       setPreview(null)
       setSelectedId(created.id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.transcriptError)
+      setError(localizeError(err))
     } finally {
       setSaving(false)
     }

@@ -27,6 +27,10 @@ export const SCOPE_GROUPS = {
     label: 'Connections',
     description: 'Read, create, and delete connections between your notes and other items.',
   },
+  'transcript:readwrite': {
+    label: 'Transcript',
+    description: 'Fetch YouTube video transcripts, and read, save, and delete them in your Transcript library.',
+  },
 } as const
 
 export type ScopeKey = keyof typeof SCOPE_GROUPS
