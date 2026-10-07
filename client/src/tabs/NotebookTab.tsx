@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage, IconPalace, IconImage, IconExternalLink,
-  IconBook, IconMessage, IconLayers, IconMenu, IconChevronRight, IconChevronLeft, IconUpload, IconReading } from '../lib/icons'
+  IconBook, IconMessage, IconLayers, IconMenu, IconChevronRight, IconChevronLeft, IconUpload, IconReading, IconTranscript } from '../lib/icons'
 import { buildFolderTree, collectFolderPaths, getItemsInFolder } from '../lib/folderTree'
 import { useSortFilter } from '../hooks/useSortFilter'
 import { SortFilterBar } from '../components/web/SortFilterBar'
@@ -21,6 +21,7 @@ import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, Wor
   PalaceCheckpoint, PalaceConnection, PalaceContentType, PalaceSide, MemoryPalaceMeta } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChainsView } from '../components/web/ChainsView'
+import { TranscriptView } from '../components/web/TranscriptView'
 import { ItemFolderTree, isTouch } from '../components/web/ItemFolderTree'
 import { ResizableSidebar } from '../components/web/ResizableSidebar'
 import { AutoGrowTextarea } from '../components/web/AutoGrowTextarea'
@@ -5112,6 +5113,7 @@ export function LearnSectionTab() {
     { path: '/learn/mindmap',  label: t.mindmap,         icon: <IconMindmap  className="w-4 h-4" strokeWidth={1.75} /> },
     { path: '/learn/language', label: t.languageSection, icon: <IconLanguage className="w-4 h-4" strokeWidth={1.75} /> },
     { path: '/learn/chains',   label: t.chains,          icon: <IconLink     className="w-4 h-4" strokeWidth={1.75} /> },
+    { path: '/learn/transcript', label: t.transcript,    icon: <IconTranscript className="w-4 h-4" strokeWidth={1.75} /> },
   ]
 
   return (
@@ -5128,6 +5130,7 @@ export function LearnSectionTab() {
           <Route path="mindmap" element={<MindmapView />} />
           <Route path="language/*" element={<LanguageTab />} />
           <Route path="chains/*" element={<ChainsView />} />
+          <Route path="transcript/*" element={<TranscriptView />} />
         </>
       )}
     </SectionShell>

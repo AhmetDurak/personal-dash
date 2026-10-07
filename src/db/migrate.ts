@@ -641,6 +641,22 @@ CREATE INDEX IF NOT EXISTS idx_links_user ON links(user_id);
 CREATE INDEX IF NOT EXISTS idx_links_a ON links(user_id, a_type, a_id);
 CREATE INDEX IF NOT EXISTS idx_links_b ON links(user_id, b_type, b_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_links_pair ON links(user_id, a_type, a_id, b_type, b_id);
+
+-- Learn > Transcript: fetched YouTube caption tracks, saved and folder-organized
+-- like reading_sessions.
+CREATE TABLE IF NOT EXISTS transcripts (
+  id                SERIAL PRIMARY KEY,
+  user_id           INTEGER NOT NULL REFERENCES users(id),
+  url               TEXT NOT NULL,
+  video_id          TEXT NOT NULL,
+  title             TEXT NOT NULL,
+  transcript_text   TEXT NOT NULL,
+  folder            TEXT DEFAULT NULL,
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  updated_at        TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_transcripts_user ON transcripts(user_id);
+CREATE INDEX IF NOT EXISTS idx_transcripts_user_folder ON transcripts(user_id, folder);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]
