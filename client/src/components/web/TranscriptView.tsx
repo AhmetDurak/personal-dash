@@ -202,7 +202,7 @@ export function TranscriptView() {
                   </a>
                   <button
                     onClick={() => setConfirmDeleteId(selected.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors p-2.5 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-2.5 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
                   >
                     <IconDelete className="w-3.5 h-3.5" strokeWidth={2} />
                   </button>
