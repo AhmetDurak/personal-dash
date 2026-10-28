@@ -1714,6 +1714,7 @@ function VocabView() {
   const [reviewMode, setReviewMode] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [reviewIdx, setReviewIdx] = useState(0)
+  const [singleReview, setSingleReview] = useState<VocabCard | null>(null)
   const [typeMode, setTypeMode]   = useState(false)
   const [answer, setAnswer]       = useState('')
   const [answerResult, setAnswerResult] = useState<{ correct: boolean; pct: number } | null>(null)
@@ -1782,7 +1783,9 @@ function VocabView() {
   const scopedWords = getItemsInFolder(vocabTree, selectedFolder)
   const listItems = q ? scopedWords.filter(v => [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))) : scopedWords
   const scopeLabel = selectedFolder === null ? 'All Words' : selectedFolder === '' ? 'Unsorted' : selectedFolder
-  const reviewCard: VocabCard | null = dueCards[reviewIdx] ?? null
+  // Reviewing one picked word uses a snapshot so it stays put after its due date moves.
+  const reviewCards = singleReview ? [singleReview] : dueCards
+  const reviewCard: VocabCard | null = reviewCards[reviewIdx] ?? null
 
   async function handleRate(quality: number) {
     if (!reviewCard) return
@@ -1876,21 +1879,21 @@ function VocabView() {
             ⌨️ Type
           </button>
           <button
-            onClick={() => { setReviewMode(false); setReviewIdx(0); setFlipped(false); setTypeMode(false); setAnswer(''); setAnswerResult(null) }}
+            onClick={() => { setReviewMode(false); setSingleReview(null); setReviewIdx(0); setFlipped(false); setTypeMode(false); setAnswer(''); setAnswerResult(null) }}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
             {t.exitReview}
           </button>
-          <span className="text-sm text-gray-400">{Math.min(reviewIdx, dueCards.length)}/{dueCards.length} reviewed</span>
+          <span className="text-sm text-gray-400">{Math.min(reviewIdx, reviewCards.length)}/{reviewCards.length} reviewed</span>
         </div>
 
-        {reviewIdx >= dueCards.length ? (
+        {reviewIdx >= reviewCards.length ? (
           <div className="text-center">
             <p className="text-5xl mb-4">🎉</p>
             <p className="text-xl font-semibold text-gray-800">{t.allCaughtUp}</p>
-            <p className="text-sm text-gray-400 mt-2">{t.reviewed(dueCards.length)}</p>
+            <p className="text-sm text-gray-400 mt-2">{t.reviewed(reviewCards.length)}</p>
             <button
-              onClick={() => { setReviewMode(false); setReviewIdx(0) }}
+              onClick={() => { setReviewMode(false); setSingleReview(null); setReviewIdx(0) }}
               className="mt-4 text-sm bg-xero-green text-white px-5 py-2 rounded-lg font-medium"
             >
               {t.done}
@@ -2283,6 +2286,17 @@ function VocabView() {
           </div>
           <div className="flex items-center gap-3 pt-1">
             <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">{t.save}</button>
+            <button
+              type="button"
+              onClick={() => {
+                const card = vocab.find(v => v.id === editCard.id)
+                if (!card) return
+                setSingleReview(card); setReviewIdx(0); setFlipped(false); setAnswer(''); setAnswerResult(null); setReviewMode(true)
+              }}
+              className="text-sm border border-xero-green text-xero-green px-4 py-2 rounded-lg font-medium hover:bg-xero-green/10 transition-colors flex-shrink-0"
+            >
+              {t.reviewWord}
+            </button>
             <button type="button" onClick={() => setConfirmDeleteVocabId(editCard.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors flex-shrink-0">{t.delete}</button>
           </div>
         </form>
