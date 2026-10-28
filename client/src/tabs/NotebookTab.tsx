@@ -24,6 +24,7 @@ import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChainsView } from '../components/web/ChainsView'
 import { TranscriptView } from '../components/web/TranscriptView'
 import { ItemFolderTree, isTouch } from '../components/web/ItemFolderTree'
+import { FolderMoveButton } from '../components/web/FolderMoveButton'
 import { ResizableSidebar } from '../components/web/ResizableSidebar'
 import { AutoGrowTextarea } from '../components/web/AutoGrowTextarea'
 import { useLanguage } from '../hooks/useLanguage'
@@ -2101,6 +2102,8 @@ function VocabView() {
               <div
                 key={v.id}
                 onClick={() => openEdit(v)}
+                draggable={!isTouch}
+                onDragStart={e => { e.dataTransfer.setData('treeItemId', String(v.id)); e.dataTransfer.effectAllowed = 'move' }}
                 className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${isTouch ? 'min-h-[44px]' : ''} ${editCard?.id === v.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
               >
                 <IconBook className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
@@ -2284,6 +2287,9 @@ function VocabView() {
             >
               {LANGS.map(l => <option key={l} value={l}>{LANG_LABELS[l]}</option>)}
             </select>
+          </div>
+          <div className="flex justify-end">
+            <FolderMoveButton folder={vocab.find(v => v.id === editCard.id)?.folder ?? null} folders={collectFolderPaths(vocabTree)} onMove={f => moveVocabToFolder(editCard.id, f)} />
           </div>
           <div className="flex items-center gap-3 pt-1">
             <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">{t.save}</button>
@@ -3536,6 +3542,8 @@ function SentenceView() {
               <div
                 key={s.id}
                 onClick={() => openEdit(s)}
+                draggable={!isTouch}
+                onDragStart={e => { e.dataTransfer.setData('treeItemId', String(s.id)); e.dataTransfer.effectAllowed = 'move' }}
                 className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${isTouch ? 'min-h-[44px]' : ''} ${editingId === s.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
               >
                 <IconMessage className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
@@ -3563,6 +3571,7 @@ function SentenceView() {
             {isDueSR(activeSentence.due_at) ? '⚡ Due for review' : `Next review: ${nextReviewLabel(activeSentence.due_at)}`}
           </span>
           <div className="flex items-center gap-3">
+            <FolderMoveButton folder={activeSentence.folder} folders={collectFolderPaths(sentTree)} onMove={f => moveSentenceToFolder(activeSentence.id, f)} />
             <button onClick={() => setSingleReviewItem(activeSentence)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
             <button onClick={() => setConfirmDeleteId(activeSentence.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
           </div>
@@ -3999,6 +4008,8 @@ function ScenarioView() {
               <div
                 key={s.id}
                 onClick={() => openScenario(s)}
+                draggable={!isTouch}
+                onDragStart={e => { e.dataTransfer.setData('treeItemId', String(s.id)); e.dataTransfer.effectAllowed = 'move' }}
                 className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${isTouch ? 'min-h-[44px]' : ''} ${activeId === s.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
               >
                 <IconLayers className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
@@ -4143,6 +4154,7 @@ function ScenarioView() {
             {isDueSR(active.due_at) ? '⚡ Due for review' : `Next review: ${nextReviewLabel(active.due_at)}`}
           </span>
           <div className="flex items-center gap-3">
+            <FolderMoveButton folder={active.folder} folders={collectFolderPaths(scenTree)} onMove={f => moveScenarioToFolder(active.id, f)} />
             <button onClick={() => setSingleReviewItem(active)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
             <button onClick={() => setConfirmDeleteId(active.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
           </div>
