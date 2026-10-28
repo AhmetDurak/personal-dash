@@ -4052,8 +4052,16 @@ function ScenarioView() {
           </button>
         </div>
 
-        {!isEditingContent && draft.content && (
-          <div className="flex justify-end">
+        {!isEditingContent && (
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setIsEditingContent(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-600 px-3 min-h-[44px] text-xs font-medium text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />
+              {t.edit}
+            </button>
+            {draft.content && (
             <div className="inline-flex rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden text-xs min-h-[44px]">
               <button
                 onClick={() => setScenPreview(false)}
@@ -4068,6 +4076,7 @@ function ScenarioView() {
                 {t.scenarioViewPreview}
               </button>
             </div>
+            )}
           </div>
         )}
         <div className={`rounded-xl border p-3 min-h-32 ${dark ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-gray-100 text-gray-800'}`}>
@@ -4083,12 +4092,11 @@ function ScenarioView() {
             />
           ) : draft.content && scenPreview ? (
             <div
-              onClick={() => setIsEditingContent(true)}
-              className="cursor-text note-prose text-sm"
+              className="note-prose text-sm"
               dangerouslySetInnerHTML={{ __html: parseMarkdown(draft.content) }}
             />
           ) : (
-            <div onClick={() => setIsEditingContent(true)} className="cursor-text">
+            <div>
               {draft.content ? (
                 <WordLinker
                   text={draft.content}
@@ -4099,7 +4107,7 @@ function ScenarioView() {
                   onRemoveLink={handleRemoveLink}
                 />
               ) : (
-                <p className="text-sm text-gray-400 dark:text-slate-500">Click to write…</p>
+                <p className="text-sm text-gray-400 dark:text-slate-500">Nothing written yet — tap Edit to start.</p>
               )}
             </div>
           )}
