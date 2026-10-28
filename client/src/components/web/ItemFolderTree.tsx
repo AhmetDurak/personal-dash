@@ -281,20 +281,22 @@ export function ItemFolderTree<T extends AnyItem>({
           <span className="w-3 flex-shrink-0" />
           <IconFolder className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500 flex-shrink-0" strokeWidth={1.75} />
           <span className="text-xs flex-1 truncate italic text-gray-500 dark:text-slate-400">Root</span>
-          {sort && (
-            <div className="relative flex-shrink-0 min-w-0">
-              <IconSort className="absolute left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" strokeWidth={2} />
-              <select
-                value={sort.key}
-                onChange={e => sort.onChange(e.target.value)}
-                title="Sort"
-                className={`max-w-[110px] text-[11px] bg-transparent border border-gray-200 dark:border-slate-600 rounded-md pl-5 pr-1 ${isTouch ? 'min-h-[44px]' : 'py-1'} outline-none focus:ring-1 focus:ring-xero-green text-gray-600 dark:text-slate-400 dark:bg-slate-800 cursor-pointer appearance-none truncate`}
-              >
-                {sort.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-          )}
           <div className={`flex items-center gap-2 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
+            {sort && (
+              <div title={`Sort: ${sort.options.find(o => o.value === sort.key)?.label ?? ''}`}
+                className={`relative ${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300`}>
+                <IconSort className="w-3.5 h-3.5 pointer-events-none" strokeWidth={2} />
+                {/* Invisible native select over the icon — keeps the OS picker on iOS */}
+                <select
+                  value={sort.key}
+                  onChange={e => sort.onChange(e.target.value)}
+                  aria-label="Sort"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                >
+                  {sort.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            )}
             <button title="More" onClick={e => openCtx(e, 'folder', '')} className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold`}>•••</button>
           </div>
         </div>
