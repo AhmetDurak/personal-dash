@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useContext, createContext, type ReactNode } from 'react'
-import { IconChevronRight, IconFolder, IconSort } from '../../lib/icons'
+import { IconCheck, IconChevronRight, IconFolder, IconSort } from '../../lib/icons'
 import { collectFolderPaths, type FolderNode } from '../../lib/folderTree'
 
 export const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
@@ -42,8 +42,8 @@ interface TreeCtxType<T extends AnyItem> {
   folderInputVal: string
   setFolderInputVal: (v: string) => void
   commitFolderAdd: () => void
-  ctxMenu: { x: number; y: number; type: 'folder' | 'item'; folderPath?: string; itemId?: T['id'] } | null
-  openCtx: (e: React.MouseEvent, type: 'folder' | 'item', folderPath?: string, itemId?: T['id']) => void
+  ctxMenu: { x: number; y: number; type: 'folder' | 'item' | 'sort'; folderPath?: string; itemId?: T['id'] } | null
+  openCtx: (e: React.MouseEvent, type: 'folder' | 'item' | 'sort', folderPath?: string, itemId?: T['id']) => void
   closeCtx: () => void
 }
 // Context value is generic per-tree-instance; each ItemFolderTree provides its own.
@@ -195,7 +195,7 @@ export function ItemFolderTree<T extends AnyItem>({
   const [renaming, setRenaming] = useState<{ path: string; val: string } | null>(null)
   const [addingFolderIn, setAddingFolderIn] = useState<string | null>(null)
   const [folderInputVal, setFolderInputVal] = useState('')
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; type: 'folder' | 'item'; folderPath?: string; itemId?: T['id'] } | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; type: 'folder' | 'item' | 'sort'; folderPath?: string; itemId?: T['id'] } | null>(null)
   const [folderPickerFor, setFolderPickerFor] = useState<T['id'] | null>(null)
   const [folderMovePickerOpen, setFolderMovePickerOpen] = useState(false)
   const [rootDragOver, setRootDragOver] = useState(false)
@@ -249,7 +249,7 @@ export function ItemFolderTree<T extends AnyItem>({
     setExpanded(s => { const n = new Set(s); n.delete(dragPath); n.add(newPath); return n })
   }
 
-  function openCtx(e: React.MouseEvent, type: 'folder' | 'item', folderPath?: string, itemId?: T['id']) {
+  function openCtx(e: React.MouseEvent, type: 'folder' | 'item' | 'sort', folderPath?: string, itemId?: T['id']) {
     const x = Math.min(e.clientX, window.innerWidth - 175)
     const y = Math.min(e.clientY, window.innerHeight - 260)
     setCtxMenu({ x, y, type, folderPath, itemId })
@@ -290,19 +290,10 @@ export function ItemFolderTree<T extends AnyItem>({
           <span className="text-xs flex-1 truncate italic text-gray-500 dark:text-slate-400">Root</span>
           <div className={`flex items-center gap-2 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
             {sort && (
-              <div title={`Sort: ${sort.options.find(o => o.value === sort.key)?.label ?? ''}`}
-                className={`relative ${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300`}>
-                <IconSort className="w-3.5 h-3.5 pointer-events-none" strokeWidth={2} />
-                {/* Invisible native select over the icon — keeps the OS picker on iOS */}
-                <select
-                  value={sort.key}
-                  onChange={e => sort.onChange(e.target.value)}
-                  aria-label="Sort"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                >
-                  {sort.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
+              <button title={`Sort: ${sort.options.find(o => o.value === sort.key)?.label ?? ''}`} onClick={e => openCtx(e, 'sort')}
+                className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300`}>
+                <IconSort className="w-3.5 h-3.5" strokeWidth={2} />
+              </button>
             )}
             <button title="More" onClick={e => openCtx(e, 'folder', '')} className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold`}>•••</button>
           </div>
@@ -329,7 +320,17 @@ export function ItemFolderTree<T extends AnyItem>({
         {ctxMenu && (
           <div ref={ctxMenuRef} className="fixed z-40 bg-white dark:bg-slate-800 border border-xero-border dark:border-slate-700 rounded-xl shadow-2xl py-1 min-w-[160px] max-h-[min(320px,calc(100vh-1rem))] overflow-y-auto"
             style={{ left: ctxMenu.x, top: Math.max(8, ctxMenu.y) }} onClick={e => e.stopPropagation()}>
-            {ctxMenu.type === 'folder' ? (
+            {ctxMenu.type === 'sort' ? (
+              <>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500 px-3 pt-1.5 pb-1">Sort by</p>
+                {sort?.options.map(o => (
+                  <button key={o.value} onClick={() => { sort.onChange(o.value); setCtxMenu(null) }}
+                    className={`w-full text-left text-xs px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center justify-between gap-3 ${o.value === sort.key ? 'text-xero-green font-medium' : 'text-gray-700 dark:text-slate-300'}`}>
+                    {o.label}{o.value === sort.key && <IconCheck className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2.5} />}
+                  </button>
+                ))}
+              </>
+            ) : ctxMenu.type === 'folder' ? (
               <>
                 <button onClick={() => { onNewItem(ctxMenu.folderPath || null); setCtxMenu(null) }}
                   className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">{newItemLabel.replace(/^\+\s*/, '')}</button>
