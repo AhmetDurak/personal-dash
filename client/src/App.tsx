@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react'
-import { Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { useReminderNotifications } from './hooks/useReminderNotifications'
 import { useAnalytics } from './hooks/useAnalytics'
@@ -7,6 +7,7 @@ import { LanguageContext, useLanguageState } from './hooks/useLanguage'
 import { TopBar } from './components/web/TopBar'
 import { Sidebar } from './components/web/Sidebar'
 import { AppTour } from './components/web/AppTour'
+import { RouteErrorBoundary } from './components/web/RouteErrorBoundary'
 import { DashboardHeader } from './components/web/DashboardHeader'
 import { currentMonth } from './utils/format'
 import type { Span } from './components/web/BalanceChart'
@@ -114,6 +115,7 @@ function AnalyticsTracker() { useAnalytics(); return null }
 export function App() {
   const { user, isLoading } = useAuth()
   const langCtx = useLanguageState()
+  const { pathname } = useLocation()
   useReminderNotifications()
 
   if (isLoading) return <div className="h-screen bg-gray-950" />
@@ -145,6 +147,7 @@ export function App() {
         <AnalyticsTracker />
         <AppTour />
         <div className="flex-1 overflow-hidden">
+          <RouteErrorBoundary resetKey={pathname}>
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/login"       element={<Navigate to="/home" replace />} />
@@ -174,6 +177,7 @@ export function App() {
               <Route path="*"            element={<Navigate to="/home" replace />} />
             </Routes>
           </Suspense>
+          </RouteErrorBoundary>
         </div>
       </div>
     </LanguageContext.Provider>
