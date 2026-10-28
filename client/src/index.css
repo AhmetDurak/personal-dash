@@ -22,7 +22,11 @@ html, body {
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* App shell is fixed-height; stop iOS rubber-band bounce exposing a blank page */
+  overscroll-behavior: none;
+  background-color: rgb(var(--clr-page-bg));
 }
+.dark, .dark body { background-color: #0F172A; }
 
 /* Tabular numbers everywhere financial values appear */
 .tabular-nums, input[type="number"] { font-variant-numeric: tabular-nums; }
