@@ -70,6 +70,7 @@ html, body {
 /* Hover states */
 .dark .hover\:bg-white:hover    { background-color: #1E293B; }
 .dark .hover\:bg-gray-50:hover  { background-color: #1E2A3E; }
+.dark .hover\:text-gray-900:hover { color: #F1F5F9; }
 .dark .hover\:bg-gray-100:hover { background-color: #253047; }
 .dark .hover\:bg-gray-200:hover { background-color: #334155; }
 .dark .hover\:bg-gray-300:hover { background-color: #3A4D66; }
@@ -278,6 +279,7 @@ html, body {
 [data-theme="nord"] .text-gray-300 { color: #B0B8C8; }
 [data-theme="nord"] .hover\:bg-white:hover     { background-color: #3B4252; }
 [data-theme="nord"] .hover\:bg-gray-50:hover  { background-color: #434C5E; }
+[data-theme="nord"] .hover\:text-gray-900:hover { color: #ECEFF4; }
 [data-theme="nord"] .hover\:bg-gray-100:hover { background-color: #4C566A; }
 [data-theme="nord"] .hover\:bg-gray-200:hover { background-color: #566074; }
 [data-theme="nord"] .hover\:bg-gray-300:hover { background-color: #637085; }
@@ -318,6 +320,7 @@ html, body {
 [data-theme="dracula"] .text-gray-300 { color: #B0ADCC; }
 [data-theme="dracula"] .hover\:bg-white:hover     { background-color: #44475A; }
 [data-theme="dracula"] .hover\:bg-gray-50:hover  { background-color: #383A4A; }
+[data-theme="dracula"] .hover\:text-gray-900:hover { color: #F8F8F2; }
 [data-theme="dracula"] .hover\:bg-gray-100:hover { background-color: #44475A; }
 [data-theme="dracula"] .hover\:bg-gray-200:hover { background-color: #565870; }
 [data-theme="dracula"] .hover\:bg-gray-300:hover { background-color: #636578; }
@@ -356,6 +359,7 @@ html, body {
 [data-theme="solarized"] .text-gray-400 { color: #839496; }
 [data-theme="solarized"] .text-gray-300 { color: #93A1A1; }
 [data-theme="solarized"] .hover\:bg-gray-50:hover  { background-color: #EEE8D5; }
+[data-theme="solarized"] .hover\:text-gray-900:hover { color: #073642; }
 [data-theme="solarized"] .hover\:bg-gray-100:hover { background-color: #E4DCCB; }
 [data-theme="solarized"] .hover\:bg-gray-200:hover { background-color: #D5CEBB; }
 [data-theme="solarized"] .hover\:shadow-md:hover   { box-shadow: 0 4px 6px -1px rgba(7,54,66,.15); }
@@ -402,6 +406,7 @@ html, body {
 [data-theme="tokyo"] .text-gray-300 { color: #9AA5CE; }
 [data-theme="tokyo"] .hover\:bg-white:hover     { background-color: #1F2335; }
 [data-theme="tokyo"] .hover\:bg-gray-50:hover  { background-color: #24283B; }
+[data-theme="tokyo"] .hover\:text-gray-900:hover { color: #C0CAF5; }
 [data-theme="tokyo"] .hover\:bg-gray-100:hover { background-color: #292E42; }
 [data-theme="tokyo"] .hover\:bg-gray-200:hover { background-color: #343952; }
 [data-theme="tokyo"] .hover\:bg-gray-300:hover { background-color: #3E4368; }
@@ -442,6 +447,7 @@ html, body {
 [data-theme="catppuccin"] .text-gray-300 { color: #A6ADC8; }
 [data-theme="catppuccin"] .hover\:bg-white:hover     { background-color: #313244; }
 [data-theme="catppuccin"] .hover\:bg-gray-50:hover  { background-color: #24273A; }
+[data-theme="catppuccin"] .hover\:text-gray-900:hover { color: #CDD6F4; }
 [data-theme="catppuccin"] .hover\:bg-gray-100:hover { background-color: #363749; }
 [data-theme="catppuccin"] .hover\:bg-gray-200:hover { background-color: #414257; }
 [data-theme="catppuccin"] .hover\:bg-gray-300:hover { background-color: #4A4D66; }
