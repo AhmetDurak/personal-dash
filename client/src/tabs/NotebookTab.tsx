@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 're
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage, IconPalace, IconImage, IconExternalLink,
   IconBook, IconMessage, IconLayers, IconMenu, IconChevronRight, IconChevronLeft, IconUpload, IconReading, IconTranscript } from '../lib/icons'
-import { buildFolderTree, collectFolderPaths, getItemsInFolder } from '../lib/folderTree'
+import { buildFolderTree, collectFolderPaths, getItemsInFolder, sortFolderTree, treeSortOptions } from '../lib/folderTree'
 import { useSortFilter } from '../hooks/useSortFilter'
+import { useTreeSort } from '../hooks/useTreeSort'
 import { SortFilterBar } from '../components/web/SortFilterBar'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -205,18 +206,15 @@ function NotesView() {
   const folders = allFolderPaths
   const selectedNote = notes.find(n => String(n.id) === selectedId) ?? null
 
+  const noteSorts = treeSortOptions<Note>({ label: n => n.title || 'Untitled', created: n => n.created_at, updated: n => n.updated_at })
   const { query, setQuery, sortKey, setSortKey, result: filteredNotes, sortOptions } = useSortFilter(notes, {
     search: (n: Note) => n.title || 'Untitled',
     defaultSort: 'updated',
-    sorts: [
-      { value: 'updated',  label: 'Last edited',   compare: (a: Note, b: Note) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime() },
-      { value: 'created',  label: 'Date created',   compare: (a: Note, b: Note) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime() },
-      { value: 'az',       label: 'A → Z',          compare: (a: Note, b: Note) => (a.title || '').localeCompare(b.title || '') },
-    ],
+    sorts: noteSorts,
   })
 
-  // Build tree from sorted notes so sort order takes effect in the sidebar
-  const tree = buildFolderTree(query ? notes : filteredNotes)
+  const activeNoteSort = noteSorts.find(s => s.value === sortKey) ?? noteSorts[0]
+  const tree = sortFolderTree(buildFolderTree(notes), activeNoteSort.compare, activeNoteSort.foldersDesc)
 
   useLayoutEffect(() => {
     const el = preview ? previewRef.current : textareaRef.current
@@ -1748,7 +1746,9 @@ function VocabView() {
   const [vocabSearch, setVocabSearch] = useState('')
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
-  const vocabTree = buildFolderTree(vocab)
+  const { sort: vocabSort, sortItems: sortVocab, sortTree: sortVocabTree } = useTreeSort<VocabCard>(
+    'tree-sort:vocab', { label: v => v.word, created: v => v.created_at, due: v => v.due_at }, 'created')
+  const vocabTree = sortVocabTree(buildFolderTree(vocab))
 
   useEffect(() => {
     if (!csvTooltipOpen) return
@@ -1781,7 +1781,7 @@ function VocabView() {
   const dueCards = vocab.filter(v => new Date(v.due_at) <= today)
   const q = vocabSearch.trim().toLowerCase()
   const scopedWords = getItemsInFolder(vocabTree, selectedFolder)
-  const listItems = q ? scopedWords.filter(v => [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))) : scopedWords
+  const listItems = sortVocab(q ? scopedWords.filter(v => [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))) : scopedWords)
   const scopeLabel = selectedFolder === null ? 'All Words' : selectedFolder === '' ? 'Unsorted' : selectedFolder
   // Reviewing one picked word uses a snapshot so it stays put after its due date moves.
   const reviewCards = singleReview ? [singleReview] : dueCards
@@ -2004,6 +2004,7 @@ function VocabView() {
           onRenameFolder={renameVocabFolder}
           onDeleteFolder={path => setConfirmDeleteFolder(path)}
           onMoveItemToFolder={(id, folder) => moveVocabToFolder(id, folder)}
+          sort={vocabSort}
         />
       </div>
     )
@@ -3228,12 +3229,14 @@ function SentenceView() {
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
   const [sentSearch, setSentSearch] = useState('')
 
-  const sentTree = buildFolderTree(sentences)
+  const { sort: sentSort, sortItems: sortSentences, sortTree: sortSentTree } = useTreeSort<LanguageSentence>(
+    'tree-sort:sentences', { label: s => s.source_text, created: s => s.created_at, updated: s => s.updated_at, due: s => s.due_at }, 'due')
+  const sentTree = sortSentTree(buildFolderTree(sentences))
   const dueItems = sentences.filter(s => isDueSR(s.due_at))
   const activeSentence = sentences.find(s => s.id === editingId) ?? null
   const scopedSentences = getItemsInFolder(sentTree, selectedFolder)
   const sq = sentSearch.trim().toLowerCase()
-  const listSentences = sq ? scopedSentences.filter(s => [s.source_text, s.translation ?? ''].some(v => v.toLowerCase().includes(sq))) : scopedSentences
+  const listSentences = sortSentences(sq ? scopedSentences.filter(s => [s.source_text, s.translation ?? ''].some(v => v.toLowerCase().includes(sq))) : scopedSentences)
   const sentScopeLabel = selectedFolder === null ? 'All Sentences' : selectedFolder === '' ? 'Unsorted' : selectedFolder
 
   async function handleNew(folder: string | null = null) {
@@ -3432,6 +3435,7 @@ function SentenceView() {
           onRenameFolder={renameSentenceFolder}
           onDeleteFolder={path => setConfirmDeleteFolder(path)}
           onMoveItemToFolder={(id, folder) => moveSentenceToFolder(id, folder)}
+          sort={sentSort}
         />
       </div>
     )
@@ -3755,12 +3759,14 @@ function ScenarioView() {
   const [scenSearch, setScenSearch] = useState('')
   const [scenPreview, setScenPreview] = useState(true)
 
-  const scenTree = buildFolderTree(scenarios)
+  const { sort: scenSort, sortItems: sortScenarios, sortTree: sortScenTree } = useTreeSort<LanguageScenario>(
+    'tree-sort:scenarios', { label: s => s.title, created: s => s.created_at, updated: s => s.updated_at, due: s => s.due_at }, 'due')
+  const scenTree = sortScenTree(buildFolderTree(scenarios))
   const active   = scenarios.find(s => s.id === activeId) ?? null
   const dueItems = scenarios.filter(s => isDueSR(s.due_at))
   const scopedScenarios = getItemsInFolder(scenTree, selectedFolder)
   const scq = scenSearch.trim().toLowerCase()
-  const listScenarios = scq ? scopedScenarios.filter(s => [s.title, s.content ?? ''].some(v => v.toLowerCase().includes(scq))) : scopedScenarios
+  const listScenarios = sortScenarios(scq ? scopedScenarios.filter(s => [s.title, s.content ?? ''].some(v => v.toLowerCase().includes(scq))) : scopedScenarios)
   const scenScopeLabel = selectedFolder === null ? 'All Scenarios' : selectedFolder === '' ? 'Unsorted' : selectedFolder
 
   async function handleNew(folder: string | null = null) {
@@ -3892,6 +3898,7 @@ function ScenarioView() {
           onRenameFolder={renameScenarioFolder}
           onDeleteFolder={path => setConfirmDeleteFolder(path)}
           onMoveItemToFolder={(id, folder) => moveScenarioToFolder(id, folder)}
+          sort={scenSort}
         />
       </div>
     )
@@ -5127,7 +5134,9 @@ function MemoryPalaceView() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
 
-  const tree = buildFolderTree(palaces)
+  const { sort: palaceSort, sortTree: sortPalaceTree } = useTreeSort<MemoryPalaceMeta>(
+    'tree-sort:palaces', { label: p => p.title || 'Untitled', created: p => p.created_at, updated: p => p.updated_at }, 'updated')
+  const tree = sortPalaceTree(buildFolderTree(palaces))
 
   async function handleNewPalace(folder: string | null) {
     const p = await createPalace('New Memory Palace', folder)
@@ -5151,6 +5160,7 @@ function MemoryPalaceView() {
         onRenameFolder={renamePalaceFolder}
         onDeleteFolder={path => setConfirmDeleteFolder(path)}
         onMoveItemToFolder={(id, folder) => movePalaceToFolder(id, folder)}
+        sort={palaceSort}
       />
     )
   }

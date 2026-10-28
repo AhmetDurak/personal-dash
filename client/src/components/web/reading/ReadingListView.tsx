@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../ConfirmDialog'
 import { ItemFolderTree, isTouch } from '../ItemFolderTree'
 import { ResizableSidebar } from '../ResizableSidebar'
 import { buildFolderTree, getItemsInFolder } from '../../../lib/folderTree'
+import { useTreeSort } from '../../../hooks/useTreeSort'
 import { IconAdd, IconDelete, IconReading, IconMenu } from '../../../lib/icons'
 import { formatDate } from '../../../utils/format'
 
@@ -53,8 +54,10 @@ export function ReadingListView() {
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
   const deleting = sessions.find(s => s.id === confirmDeleteId) ?? null
 
-  const sessionTree = buildFolderTree(sessions)
-  const scopedSessions = getItemsInFolder(sessionTree, selectedFolder)
+  const { sort, sortItems, sortTree } = useTreeSort<ReadingSession>(
+    'tree-sort:reading', { label: s => s.title, created: s => s.createdAt, updated: s => s.updatedAt }, 'created')
+  const sessionTree = sortTree(buildFolderTree(sessions))
+  const scopedSessions = sortItems(getItemsInFolder(sessionTree, selectedFolder))
   const scopeLabel = selectedFolder === null ? t.readingAllSessions : selectedFolder === '' ? t.readingUnsorted : selectedFolder
 
   function TreePane() {
@@ -83,6 +86,7 @@ export function ReadingListView() {
           onRenameFolder={renameSessionFolder}
           onDeleteFolder={path => setConfirmDeleteFolder(path)}
           onMoveItemToFolder={(id, folder) => moveSessionToFolder(id, folder)}
+          sort={sort}
         />
       </div>
     )

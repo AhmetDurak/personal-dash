@@ -99,3 +99,43 @@ export function findNode<T>(node: FolderNode<T>, path: string): FolderNode<T> | 
   }
   return null
 }
+
+export interface TreeSortAccessors<T> {
+  label: (item: T) => string
+  created: (item: T) => string
+  updated?: (item: T) => string
+  due?: (item: T) => string
+}
+
+export interface TreeSortOption<T> {
+  value: string
+  label: string
+  compare: (a: T, b: T) => number
+  foldersDesc?: boolean
+}
+
+const time = (iso: string) => new Date(iso).getTime()
+
+// The sort choices shared by every folder tree; date options only appear when the
+// item type has that date.
+export function treeSortOptions<T>({ label, created, updated, due }: TreeSortAccessors<T>): TreeSortOption<T>[] {
+  const options: TreeSortOption<T>[] = []
+  if (due) options.push({ value: 'due', label: 'Due first', compare: (a, b) => time(due(a)) - time(due(b)) })
+  if (updated) options.push({ value: 'updated', label: 'Last edited', compare: (a, b) => time(updated(b)) - time(updated(a)) })
+  options.push(
+    { value: 'created', label: 'Newest', compare: (a, b) => time(created(b)) - time(created(a)) },
+    { value: 'created-asc', label: 'Oldest', compare: (a, b) => time(created(a)) - time(created(b)) },
+    { value: 'az', label: 'A → Z', compare: (a, b) => label(a).localeCompare(label(b)) },
+    { value: 'za', label: 'Z → A', compare: (a, b) => label(b).localeCompare(label(a)), foldersDesc: true },
+  )
+  return options
+}
+
+// Sorts items at every level with `compare`. Folders are always ordered by name
+// (reversed for Z → A) so they stay easy to find whatever the item order.
+export function sortFolderTree<T>(node: FolderNode<T>, compare: (a: T, b: T) => number, foldersDesc = false): FolderNode<T> {
+  const children = [...node.children]
+    .sort((a, b) => foldersDesc ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name))
+    .map(c => sortFolderTree(c, compare, foldersDesc))
+  return { ...node, children, items: [...node.items].sort(compare) }
+}

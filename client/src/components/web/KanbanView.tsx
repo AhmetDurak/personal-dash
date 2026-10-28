@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useStories } from '../../hooks/useKanban'
 import { buildFolderTree } from '../../lib/folderTree'
+import { useTreeSort } from '../../hooks/useTreeSort'
 import { ItemFolderTree } from './ItemFolderTree'
 import type { Story } from '../../hooks/useKanban'
 import { KanbanBoard } from './KanbanBoard'
@@ -18,7 +19,9 @@ export function KanbanView() {
   const [confirmDeleteStory, setConfirmDeleteStory] = useState<Story | null>(null)
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
 
-  const tree = buildFolderTree(stories)
+  const { sort, sortTree } = useTreeSort<Story>(
+    'tree-sort:stories', { label: s => s.title || 'Untitled', created: s => s.created_at, updated: s => s.updated_at }, 'updated')
+  const tree = sortTree(buildFolderTree(stories))
   const selectedStory = stories.find(s => s.id === selectedId) ?? null
 
   async function handleNew(folder: string | null) {
@@ -44,6 +47,7 @@ export function KanbanView() {
             onRenameFolder={renameFolder}
             onDeleteFolder={path => setConfirmDeleteFolder(path)}
             onMoveItemToFolder={(id, folder) => moveStoryToFolder(id, folder)}
+            sort={sort}
           />
         )}
       </div>

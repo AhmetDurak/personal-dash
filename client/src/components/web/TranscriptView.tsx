@@ -5,6 +5,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { ItemFolderTree } from './ItemFolderTree'
 import { ResizableSidebar } from './ResizableSidebar'
 import { buildFolderTree } from '../../lib/folderTree'
+import { useTreeSort } from '../../hooks/useTreeSort'
 import { IconTranscript, IconDelete, IconExternalLink } from '../../lib/icons'
 
 // Maps the backend's stable reason codes (see errorReason() in src/api/routes/transcript.ts)
@@ -42,7 +43,9 @@ export function TranscriptView() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [deletingFolderPath, setDeletingFolderPath] = useState<string | null>(null)
 
-  const tree = buildFolderTree(transcripts)
+  const { sort, sortTree } = useTreeSort<Transcript>(
+    'tree-sort:transcripts', { label: item => item.title, created: item => item.createdAt, updated: item => item.updatedAt }, 'created')
+  const tree = sortTree(buildFolderTree(transcripts))
   const selected = transcripts.find(item => item.id === selectedId) ?? null
   const showDetail = isNew || selected !== null
 
@@ -115,6 +118,7 @@ export function TranscriptView() {
         onRenameFolder={renameTranscriptFolder}
         onDeleteFolder={path => setDeletingFolderPath(path)}
         onMoveItemToFolder={(id, folder) => moveTranscriptToFolder(id, folder)}
+        sort={sort}
       />
     )
   }
