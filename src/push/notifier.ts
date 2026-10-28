@@ -41,7 +41,7 @@ async function loadSnapshot(pool: Pool, uid: number, localDate: string): Promise
     pool.query('SELECT COUNT(*)::int AS n FROM language_sentences WHERE user_id=$1 AND due_at <= $2::date', [uid, localDate]),
     pool.query('SELECT COUNT(*)::int AS n FROM language_scenarios WHERE user_id=$1 AND due_at <= $2::date', [uid, localDate]),
     pool.query(
-      `SELECT c.title AS challenge, cp->>'id' AS id, cp->>'label' AS label, cp->>'target_date' AS target_date
+      `SELECT c.title AS challenge, c.scope, cp->>'id' AS id, cp->>'label' AS label, cp->>'target_date' AS target_date
        FROM challenges c, jsonb_array_elements(c.checkpoints) cp
        WHERE c.user_id=$1 AND c.status='active'
          AND NOT COALESCE((cp->>'completed')::boolean, FALSE) AND cp->>'target_date' < $2`,

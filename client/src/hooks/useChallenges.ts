@@ -104,18 +104,18 @@ export function useChallenges(scope: ChallengeScope) {
 }
 
 /** Returns all missed checkpoints across all challenges (for notification use) */
-export async function fetchMissedCheckpoints(): Promise<{ title: string; checkpoint: Checkpoint }[]> {
+export async function fetchMissedCheckpoints(): Promise<{ title: string; scope: ChallengeScope; checkpoint: Checkpoint }[]> {
   try {
     const res = await fetch('/api/sport/challenges')
     if (!res.ok) return []
     const challenges = await res.json() as Challenge[]
     const today = new Date().toISOString().slice(0, 10)
-    const missed: { title: string; checkpoint: Checkpoint }[] = []
+    const missed: { title: string; scope: ChallengeScope; checkpoint: Checkpoint }[] = []
     for (const c of challenges) {
       if (c.status !== 'active') continue
       for (const cp of c.checkpoints) {
         if (!cp.completed && cp.target_date < today) {
-          missed.push({ title: c.title, checkpoint: cp })
+          missed.push({ title: c.title, scope: c.scope, checkpoint: cp })
         }
       }
     }

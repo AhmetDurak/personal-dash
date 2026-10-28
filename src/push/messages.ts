@@ -12,7 +12,7 @@ export interface DueSnapshot {
   vocabDue:          number
   sentencesDue:      number
   scenariosDue:      number
-  missedCheckpoints: { id: string; challenge: string; label: string; target_date: string }[]
+  missedCheckpoints: { id: string; challenge: string; scope: string; label: string; target_date: string }[]
 }
 
 export interface PushMessage {
@@ -41,7 +41,7 @@ export function buildMessages(d: DueSnapshot, localDate: string, localHour: numb
       key: `challenge:${cp.id}:${localDate}`,
       title: `Challenge checkpoint overdue: ${cp.challenge}`,
       body: `"${cp.label}" was due ${cp.target_date}.`,
-      url: '/life/sport',
+      url: cp.scope === 'sport' ? '/life/sport?view=challenges' : '/planner',
     })
   }
 
@@ -51,7 +51,7 @@ export function buildMessages(d: DueSnapshot, localDate: string, localHour: numb
       key: `language:due:${localDate}`,
       title: 'Language Review Due',
       body: `${plural(langTotal, 'item')} to review (${plural(d.sentencesDue, 'sentence')}, ${plural(d.scenariosDue, 'scenario')}).`,
-      url: '/learn/language/scenario',
+      url: d.scenariosDue > 0 ? '/learn/language/scenario' : '/learn/language/sentence',
     })
   }
 

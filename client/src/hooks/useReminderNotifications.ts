@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { Reminder } from './useNotifications'
 import { fetchMissedCheckpoints } from './useChallenges'
 import { getPushSubscription, syncPushSubscription } from '../lib/push'
@@ -35,17 +36,25 @@ async function fetchDueReminders(): Promise<Reminder[]> {
   } catch { return [] }
 }
 
+// Route opener for notification clicks; set by the hook to React Router's navigate.
+let openRoute: (url: string) => void = url => { window.location.href = url }
+
+function show(title: string, options: NotificationOptions, url: string) {
+  const n = new Notification(title, options)
+  n.onclick = () => { window.focus(); openRoute(url); n.close() }
+}
+
 function fireNotifications(reminders: Reminder[]) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return
   const fired = getFired()
   for (const r of reminders) {
     const key = firingKey(r)
     if (fired.has(key)) continue
-    new Notification(`Reminder: ${r.title}`, {
+    show(`Reminder: ${r.title}`, {
       body: r.note ?? '',
       icon: '/favicon.ico',
       tag: `reminder-${r.id}`,
-    })
+    }, '/reminders')
     addFired(key)
   }
 }
@@ -56,14 +65,14 @@ async function checkChallengeNotifications() {
   if (!missed.length) return
   const fired = getFired()
   const today = new Date().toISOString().slice(0, 10)
-  for (const { title, checkpoint } of missed) {
+  for (const { title, scope, checkpoint } of missed) {
     const key = `challenge:${checkpoint.id}:${today}`
     if (fired.has(key)) continue
-    new Notification(`Challenge checkpoint overdue: ${title}`, {
+    show(`Challenge checkpoint overdue: ${title}`, {
       body: `"${checkpoint.label}" was due ${checkpoint.target_date}.`,
       icon: '/favicon.ico',
       tag: `challenge-${checkpoint.id}`,
-    })
+    }, scope === 'sport' ? '/life/sport?view=challenges' : '/planner')
     addFired(key)
   }
 }
@@ -86,11 +95,11 @@ async function checkLanguageDueNotifications() {
     if (total === 0) return
     const key = `language:due:${today}`
     if (fired.has(key)) return
-    new Notification('Language Review Due', {
+    show('Language Review Due', {
       body: `${total} item${total !== 1 ? 's' : ''} to review (${dueSent} sentence${dueSent !== 1 ? 's' : ''}, ${dueScen} scenario${dueScen !== 1 ? 's' : ''}).`,
       icon: '/favicon.ico',
       tag: 'language-due',
-    })
+    }, dueScen > 0 ? '/learn/language/scenario' : '/learn/language/sentence')
     addFired(key)
   } catch { /* ignore */ }
 }
@@ -108,17 +117,31 @@ async function checkVocabNotifications() {
     const today = new Date(); today.setHours(0, 0, 0, 0)
     const n = cards.filter(c => new Date(c.due_at) <= today).length
     if (n < 20) return
-    new Notification('Vocabulary Review', {
+    show('Vocabulary Review', {
       body: `You have ${n} card${n !== 1 ? 's' : ''} to review today.`,
       icon: '/favicon.ico',
       tag: 'vocab-due',
-    })
+    }, '/learn/language/vocab')
     addFired(key)
   } catch { /* ignore */ }
 }
 
 export function useReminderNotifications() {
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const navigate = useNavigate()
+  openRoute = url => navigate(url)
+
+  // Taps on pushed notifications: the service worker posts the target route here.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    function onMessage(e: MessageEvent) {
+      const data = e.data as { type?: string; url?: string } | null
+      if (data?.type === 'navigate' && data.url) navigate(data.url)
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    navigator.serviceWorker.startMessages()
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [navigate])
 
   async function check() {
     // Once this device receives server push, the server sends these — skip in-tab copies.

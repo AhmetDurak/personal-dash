@@ -17,14 +17,17 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close()
-  const url = new URL(event.notification.data?.url || '/home', self.location.origin).href
+  const path = event.notification.data?.url || '/home'
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     const existing = windows.find(w => w.url.startsWith(self.location.origin))
     if (existing) {
+      // The running app routes client-side (useReminderNotifications listens for this);
+      // WindowClient.navigate() is unreliable in installed iOS web apps.
       await existing.focus()
-      return existing.navigate(url)
+      existing.postMessage({ type: 'navigate', url: path })
+      return
     }
-    return self.clients.openWindow(url)
+    return self.clients.openWindow(new URL(path, self.location.origin).href)
   })())
 })
