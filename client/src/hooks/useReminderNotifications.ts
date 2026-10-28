@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Reminder } from './useNotifications'
 import { fetchMissedCheckpoints } from './useChallenges'
+import { getPushSubscription, syncPushSubscription } from '../lib/push'
 
 const FIRED_KEY = 'fd:notified'
 const INTERVAL_MS = 60_000
@@ -120,6 +121,8 @@ export function useReminderNotifications() {
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   async function check() {
+    // Once this device receives server push, the server sends these — skip in-tab copies.
+    if (await getPushSubscription().catch(() => null)) return
     fireNotifications(await fetchDueReminders())
     await checkVocabNotifications()
     await checkChallengeNotifications()
@@ -127,7 +130,7 @@ export function useReminderNotifications() {
   }
 
   useEffect(() => {
-    check()
+    syncPushSubscription().finally(check)
     timer.current = setInterval(check, INTERVAL_MS)
     return () => { if (timer.current) clearInterval(timer.current) }
   }, [])
@@ -137,6 +140,6 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   if (!('Notification' in window)) return 'denied'
   if (Notification.permission !== 'default') return Notification.permission
   const perm = await Notification.requestPermission()
-  if (perm === 'granted') fireNotifications(await fetchDueReminders())
+  if (perm === 'granted' && !(await syncPushSubscription())) fireNotifications(await fetchDueReminders())
   return perm
 }

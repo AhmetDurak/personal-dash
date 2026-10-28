@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNotifications } from '../../hooks/useNotifications'
 import { requestNotificationPermission } from '../../hooks/useReminderNotifications'
+import { isIos, isStandalone, pushSupported, sendTestPush } from '../../lib/push'
 import { ConfirmDialog } from './ConfirmDialog'
 import { IconBell, IconClose, IconIncome, IconExpense } from '../../lib/icons'
 
@@ -38,12 +39,19 @@ export function NotificationsPanel() {
   const [permState, setPermState] = useState<NotificationPermission>(
     'Notification' in window ? Notification.permission : 'denied'
   )
+  const [testMsg, setTestMsg] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const { data, isLoading, badgeCount, addReminder, toggleDone, deleteReminder } = useNotifications()
 
   async function handleEnableNotifications() {
     const perm = await requestNotificationPermission()
     setPermState(perm)
+  }
+
+  async function handleTestPush() {
+    const reached = await sendTestPush()
+    setTestMsg(reached ? `Sent to ${reached} device${reached !== 1 ? 's' : ''}` : 'No device reached')
+    setTimeout(() => setTestMsg(null), 4000)
   }
 
   // Close on outside click
@@ -91,6 +99,11 @@ export function NotificationsPanel() {
             <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 p-0.5 rounded"><IconClose className="w-4 h-4" strokeWidth={2} /></button>
           </div>
 
+          {isIos() && !isStandalone() && (
+            <div className="px-5 py-3 bg-amber-50 border-b border-amber-100">
+              <p className="text-xs text-amber-700">To get notifications on iPhone/iPad: tap Share → <span className="font-semibold">Add to Home Screen</span>, then open Dashboard from your home screen and sign in there.</p>
+            </div>
+          )}
           {'Notification' in window && permState === 'default' && (
             <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 flex items-center justify-between gap-3">
               <p className="text-xs text-amber-700 flex-1">Enable browser notifications to get alerts for due reminders.</p>
@@ -110,7 +123,12 @@ export function NotificationsPanel() {
           {'Notification' in window && permState === 'granted' && (
             <div className="px-5 py-2 border-b border-gray-100 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-xero-green flex-shrink-0" />
-              <p className="text-[10px] text-gray-400">Browser notifications active</p>
+              <p className="text-[10px] text-gray-400 flex-1">{testMsg ?? 'Browser notifications active'}</p>
+              {pushSupported() && (
+                <button onClick={handleTestPush} className="text-[10px] text-gray-400 hover:text-gray-600 underline min-h-[44px] px-2 -my-2">
+                  Send test
+                </button>
+              )}
             </div>
           )}
 

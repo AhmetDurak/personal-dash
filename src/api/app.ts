@@ -39,6 +39,8 @@ import { mcpWellKnownRouter } from './routes/mcpWellKnown'
 import { mcpOAuthRouter } from './routes/mcpOAuth'
 import { mcpConsentApiRouter } from './routes/mcpConsentApi'
 import { mcpRouter } from './routes/mcp'
+import { pushRouter, pushTickHandler } from './routes/push'
+import { pushTick, pushConfigured } from '../push/notifier'
 
 const PgSession = connectPgSimple(session)
 
@@ -70,6 +72,9 @@ app.use('/auth', authRouter(pool))
 app.use(mcpWellKnownRouter())
 app.use(mcpOAuthRouter(pool))
 app.use(mcpRouter(pool))
+
+// Push cron trigger (public — guarded by PUSH_CRON_SECRET)
+app.post('/push/tick', pushTickHandler(pool))
 
 // Require login for all API routes (session cookie OR Bearer token)
 async function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -125,6 +130,7 @@ app.use('/api/transcript',   transcriptRouter(pool))
 app.use('/api/links',        linksRouter(pool))
 app.use('/api/kanban',       kanbanRouter(pool))
 app.use('/api/mcp',          mcpConsentApiRouter(pool))
+app.use('/api/push',         pushRouter(pool))
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
 
@@ -135,5 +141,9 @@ app.get('*', (_req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')))
 
 const PORT = process.env.PORT ?? 3001
 migrate()
-  .then(() => app.listen(PORT, () => console.log(`API listening on :${PORT}`)))
+  .then(() => {
+    app.listen(PORT, () => console.log(`API listening on :${PORT}`))
+    // While awake, check for due pushes every minute; the external cron covers sleep.
+    if (pushConfigured) setInterval(() => { pushTick(pool).catch(err => console.error('[push] tick failed:', err)) }, 60_000)
+  })
   .catch(err => { console.error('Migration failed:', err); process.exit(1) })

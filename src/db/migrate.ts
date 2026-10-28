@@ -661,6 +661,27 @@ CREATE TABLE IF NOT EXISTS transcripts (
 );
 CREATE INDEX IF NOT EXISTS idx_transcripts_user ON transcripts(user_id);
 CREATE INDEX IF NOT EXISTS idx_transcripts_user_folder ON transcripts(user_id, folder);
+
+-- Web Push (installed PWA on iPhone/iPad + desktop browsers). One row per device.
+-- tz is the device's IANA timezone, used to hold daily digests until morning.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id),
+  endpoint   TEXT NOT NULL UNIQUE,
+  p256dh     TEXT NOT NULL,
+  auth       TEXT NOT NULL,
+  tz         TEXT NOT NULL DEFAULT 'UTC',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);
+
+-- Dedupe log: a key (e.g. "reminder:12:2026-10-28") is pushed at most once per user.
+CREATE TABLE IF NOT EXISTS push_sent (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  key     TEXT NOT NULL,
+  sent_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (user_id, key)
+);
 `
 
 // [name, category, kcal/100g, emoji, name_de, name_tr]
