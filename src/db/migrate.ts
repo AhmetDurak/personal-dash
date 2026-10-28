@@ -334,6 +334,10 @@ ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS ease_factor  NUMERIC  NO
 ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS due_at       DATE     NOT NULL DEFAULT CURRENT_DATE;
 ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS memory_palace TEXT;
 
+-- Optional notes + word list (entries may link to a vocabulary row) for scenarios
+ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS notes     TEXT;
+ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS word_list JSONB NOT NULL DEFAULT '[]';
+
 -- Folders for notes and mindmaps
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
 ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;

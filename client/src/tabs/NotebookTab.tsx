@@ -17,7 +17,7 @@ import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, u
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
-import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, WordLink, Note,
+import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, ScenarioWord, WordLink, Note,
   PalaceCheckpoint, PalaceConnection, PalaceContentType, PalaceSide, MemoryPalaceMeta } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChainsView } from '../components/web/ChainsView'
@@ -3585,6 +3585,109 @@ function SentenceView() {
   )
 }
 
+// ─── ScenarioWordList ─────────────────────────────────────────────────────────
+
+function ScenarioWordList({ words, vocab, sourceLang, onChange }: {
+  words:      ScenarioWord[]
+  vocab:      VocabCard[]
+  sourceLang: string
+  onChange:   (words: ScenarioWord[]) => void
+}) {
+  const { t } = useLanguage()
+  const navigate = useNavigate()
+  const [word, setWord] = useState('')
+  const [translation, setTranslation] = useState('')
+
+  const [wordFocused, setWordFocused] = useState(false)
+
+  const q = word.trim().toLowerCase()
+  const suggestions = q && wordFocused
+    ? vocab.filter(v => v.language === sourceLang && v.word.toLowerCase().includes(q) && !words.some(w => w.vocab_id === v.id)).slice(0, 6)
+    : []
+
+  function findExact(w: string) {
+    return vocab.find(v => v.language === sourceLang && v.word.trim().toLowerCase() === w.trim().toLowerCase())
+  }
+
+  function addLinked(card: VocabCard) {
+    onChange([...words, { word: card.word, translation: card.translation, vocab_id: card.id }])
+    setWord(''); setTranslation('')
+  }
+
+  function addManual() {
+    if (!word.trim()) return
+    onChange([...words, { word: word.trim(), translation: translation.trim() || null }])
+    setWord(''); setTranslation('')
+  }
+
+  const inputCls = 'text-sm border rounded-lg px-3 py-2 min-h-[44px] focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-400'
+
+  return (
+    <div className="space-y-2">
+      {words.length > 0 && (
+        <ul className="divide-y divide-gray-100 dark:divide-slate-700">
+          {words.map((w, i) => {
+            const card = w.vocab_id != null ? vocab.find(v => v.id === w.vocab_id) : undefined
+            const match = !card ? findExact(w.word) : undefined
+            return (
+              <li key={i} className="flex items-center gap-2 py-1 text-sm min-w-0">
+                {card ? (
+                  <button onClick={() => navigate(`/learn/language/vocab?highlight=${card.id}`)} title={t.goToVocab}
+                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline truncate text-left min-h-[44px] min-w-[44px]">
+                    {card.word}
+                  </button>
+                ) : (
+                  <span className="font-medium text-gray-800 dark:text-slate-100 truncate">{w.word}</span>
+                )}
+                <span className="text-gray-400 dark:text-slate-500 flex-shrink-0">—</span>
+                <span className="text-gray-600 dark:text-slate-300 truncate flex-1 min-w-0">{card?.translation ?? w.translation ?? ''}</span>
+                {match && (
+                  <button onClick={() => onChange(words.map((x, j) => j === i ? { word: match.word, translation: match.translation, vocab_id: match.id } : x))}
+                    title={t.linkToVocab}
+                    className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 dark:text-slate-500 hover:text-blue-500 dark:hover:text-blue-400">
+                    🔗
+                  </button>
+                )}
+                <button onClick={() => onChange(words.filter((_, j) => j !== i))} title={t.delete}
+                  className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400">
+                  ×
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <div className="relative flex flex-col sm:flex-row gap-2">
+        <input value={word} onChange={e => setWord(e.target.value)}
+          onFocus={() => setWordFocused(true)} onBlur={() => setWordFocused(false)}
+          onKeyDown={e => { if (e.key === 'Enter') addManual() }}
+          placeholder={t.word} className={`${inputCls} flex-1 min-w-0`} />
+        <input value={translation} onChange={e => setTranslation(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') addManual() }}
+          placeholder={t.translation} className={`${inputCls} flex-1 min-w-0`} />
+        <button onClick={addManual} disabled={!word.trim()}
+          className="text-sm px-4 min-h-[44px] rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50">
+          {t.add}
+        </button>
+        {suggestions.length > 0 && (
+          <ul className="absolute left-0 right-0 sm:right-auto sm:w-72 top-full mt-1 z-40 rounded-lg border shadow-lg overflow-hidden bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600">
+            {suggestions.map(card => (
+              <li key={card.id}>
+                <button onMouseDown={e => e.preventDefault()} onClick={() => addLinked(card)}
+                  className="w-full text-left px-3 min-h-[44px] text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-700">
+                  <span className="text-blue-500 flex-shrink-0">🔗</span>
+                  <span className="font-medium text-gray-800 dark:text-slate-100 truncate">{card.word}</span>
+                  <span className="text-gray-400 dark:text-slate-400 truncate">{card.translation}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── ScenarioView ─────────────────────────────────────────────────────────────
 
 function ScenarioView() {
@@ -3605,6 +3708,7 @@ function ScenarioView() {
   const [reviewMode, setReviewMode]     = useState(false)
   const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notesTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [scenImportMsg, setScenImportMsg] = useState<string | null>(null)
   const scenCsvRef = useRef<HTMLInputElement>(null)
   const [scenCsvTooltipOpen, setScenCsvTooltipOpen] = useState(false)
@@ -3685,6 +3789,17 @@ function ScenarioView() {
   function scheduleContent(id: number, content: string) {
     if (contentTimer.current) clearTimeout(contentTimer.current)
     contentTimer.current = setTimeout(() => saveScenario(id, { content }), 1200)
+  }
+
+  function scheduleNotes(id: number, notes: string) {
+    if (notesTimer.current) clearTimeout(notesTimer.current)
+    notesTimer.current = setTimeout(() => saveScenario(id, { notes: notes || null }), 1200)
+  }
+
+  function handleWordListChange(word_list: ScenarioWord[]) {
+    if (!activeId) return
+    setDraft(d => ({ ...d, word_list }))
+    saveScenario(activeId, { word_list })
   }
 
   async function handleTranslate() {
@@ -3967,6 +4082,30 @@ function ScenarioView() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Word list */}
+        <div className="space-y-1">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">{t.scenarioWordList}</h3>
+          <ScenarioWordList
+            words={draft.word_list ?? []}
+            vocab={vocab}
+            sourceLang={draft.source_lang ?? 'de'}
+            onChange={handleWordListChange}
+          />
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-1">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">{t.notes}</h3>
+          <AutoGrowTextarea
+            value={draft.notes ?? ''}
+            onChange={e => { const v = e.target.value; setDraft(d => ({ ...d, notes: v })); scheduleNotes(active.id, v) }}
+            onBlur={() => { if (notesTimer.current) clearTimeout(notesTimer.current); saveScenario(active.id, { notes: draft.notes || null }) }}
+            placeholder={t.scenarioNotesPlaceholder}
+            minRows={3}
+            className={`w-full resize-none rounded-xl border p-3 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-blue-400 ${dark ? 'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500' : 'bg-white border-gray-100 text-gray-800'}`}
+          />
         </div>
 
         {/* Due status */}

@@ -97,6 +97,12 @@ export interface LanguageSentence {
   updated_at:    string
 }
 
+export interface ScenarioWord {
+  word:         string
+  translation?: string | null
+  vocab_id?:    number | null  // set when linked to a Vocabulary card
+}
+
 export interface LanguageScenario {
   id:            number
   user_id:       number
@@ -105,6 +111,8 @@ export interface LanguageScenario {
   source_lang:   string
   target_lang:   string
   word_links:    WordLink[]
+  notes:         string | null
+  word_list:     ScenarioWord[]
   interval:      number
   repetitions:   number
   ease_factor:   number

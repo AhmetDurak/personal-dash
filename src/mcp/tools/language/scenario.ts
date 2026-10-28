@@ -4,6 +4,12 @@ import type { Request } from 'express'
 import type { Pool } from 'pg'
 import { json, uidOf, sm2, qualitySchema } from './shared'
 
+const wordListSchema = z.array(z.object({
+  word: z.string(),
+  translation: z.string().nullable().optional(),
+  vocab_id: z.number().int().nullable().optional().describe('Link to a Vocabulary card (id from language_vocab_list)'),
+})).describe('Scenario word list; each entry may link to a Vocabulary card')
+
 export function registerScenarioTools(server: McpServer, req: Request, pool: Pool) {
   server.registerTool('language_scenario_list', {
     title: 'List language scenarios',
@@ -24,13 +30,15 @@ export function registerScenarioTools(server: McpServer, req: Request, pool: Poo
       source_lang: z.string().optional().describe('Default "de"'),
       target_lang: z.string().optional().describe('Default "tr"'),
       folder: z.string().nullable().optional().describe('Folder path, e.g. "Travel/Airport". Omit or null for the root folder.'),
+      notes: z.string().nullable().optional().describe('Free-form personal notes about the scenario'),
+      word_list: wordListSchema.optional(),
     },
-  }, async ({ title, content, source_lang, target_lang, folder }) => {
+  }, async ({ title, content, source_lang, target_lang, folder, notes, word_list }) => {
     const uid = uidOf(req)
     const { rows } = await pool.query(
-      `INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang, folder)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [uid, title ?? 'Untitled', content ?? '', source_lang ?? 'de', target_lang ?? 'tr', folder ?? null]
+      `INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang, folder, notes, word_list)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [uid, title ?? 'Untitled', content ?? '', source_lang ?? 'de', target_lang ?? 'tr', folder ?? null, notes ?? null, JSON.stringify(word_list ?? [])]
     )
     return json(rows[0])
   })
@@ -45,6 +53,8 @@ export function registerScenarioTools(server: McpServer, req: Request, pool: Poo
         source_lang: z.string().optional().describe('Default "de"'),
         target_lang: z.string().optional().describe('Default "tr"'),
         folder: z.string().nullable().optional().describe('Folder path, e.g. "Travel/Airport". Omit or null for the root folder.'),
+        notes: z.string().nullable().optional().describe('Free-form personal notes about the scenario'),
+        word_list: wordListSchema.optional(),
       })).min(1),
     },
   }, async ({ scenarios }) => {
@@ -52,9 +62,9 @@ export function registerScenarioTools(server: McpServer, req: Request, pool: Poo
     const created = []
     for (const s of scenarios) {
       const { rows } = await pool.query(
-        `INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang, folder)
-         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-        [uid, s.title ?? 'Untitled', s.content ?? '', s.source_lang ?? 'de', s.target_lang ?? 'tr', s.folder ?? null]
+        `INSERT INTO language_scenarios (user_id, title, content, source_lang, target_lang, folder, notes, word_list)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [uid, s.title ?? 'Untitled', s.content ?? '', s.source_lang ?? 'de', s.target_lang ?? 'tr', s.folder ?? null, s.notes ?? null, JSON.stringify(s.word_list ?? [])]
       )
       created.push(rows[0])
     }
@@ -92,20 +102,23 @@ export function registerScenarioTools(server: McpServer, req: Request, pool: Poo
 
   server.registerTool('language_scenario_update', {
     title: 'Update a language scenario',
-    description: 'Edit an existing scenario.',
+    description: 'Edit an existing scenario. notes and word_list are left unchanged when omitted; word_list replaces the whole list.',
     inputSchema: {
       id: z.number().int(),
       title: z.string(),
       content: z.string(),
       source_lang: z.string(),
       target_lang: z.string(),
+      notes: z.string().optional().describe('Free-form personal notes; pass "" to clear'),
+      word_list: wordListSchema.optional(),
     },
-  }, async ({ id, title, content, source_lang, target_lang }) => {
+  }, async ({ id, title, content, source_lang, target_lang, notes, word_list }) => {
     const uid = uidOf(req)
     const { rows } = await pool.query(
-      `UPDATE language_scenarios SET title=$1, content=$2, source_lang=$3, target_lang=$4, updated_at=now()
-       WHERE id=$5 AND user_id=$6 RETURNING *`,
-      [title, content, source_lang, target_lang, id, uid]
+      `UPDATE language_scenarios SET title=$1, content=$2, source_lang=$3, target_lang=$4,
+         notes=COALESCE($5, notes), word_list=COALESCE($6::jsonb, word_list), updated_at=now()
+       WHERE id=$7 AND user_id=$8 RETURNING *`,
+      [title, content, source_lang, target_lang, notes ?? null, word_list ? JSON.stringify(word_list) : null, id, uid]
     )
     return json(rows[0] ?? null)
   })
