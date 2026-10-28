@@ -7,10 +7,11 @@ import { useLanguage } from '../../hooks/useLanguage'
 import type { Lang } from '../../hooks/useLanguage'
 import { NotificationsPanel } from './NotificationsPanel'
 import { ConfirmDialog } from './ConfirmDialog'
+import { SetPasswordDialog } from './SetPasswordDialog'
 import { resetTour } from './AppTour'
 import {
   IconSettings, IconSignOut, IconMobile, IconChevronRight, IconChevronLeft,
-  IconCheck, IconChevronDown,
+  IconCheck, IconChevronDown, IconKey,
 } from '../../lib/icons'
 import { THEMES } from '../../hooks/useDarkMode'
 import { useBackendStatus } from '../../hooks/useBackendStatus'
@@ -36,11 +37,12 @@ function Logo() {
 export function TopBar() {
   const { pathname } = useLocation()
   const { theme, setTheme } = useDarkMode()
-  const { user, logout } = useAuth()
+  const { user, logout, refresh: refreshUser } = useAuth()
   const { lang, t, setLang } = useLanguage()
   const backendStatus = useBackendStatus()
   const { unreadCount: unreadUpdates } = usePublications()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showSetPassword, setShowSetPassword] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -249,6 +251,17 @@ export function TopBar() {
                       <span>{tokenCopied ? 'Copied!' : 'Copy mobile token'}</span>
                     </button>
 
+                    {/* Email + password login (not offered for the shared demo account) */}
+                    {user.email !== 'demo@personaldashboard.app' && (
+                      <button
+                        onClick={() => { setUserMenuOpen(false); setShowSetPassword(true) }}
+                        className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors flex items-center gap-2"
+                      >
+                        <IconKey className="w-3.5 h-3.5" strokeWidth={2} />
+                        <span>{user.hasPassword ? 'Change password' : 'Set password'}</span>
+                      </button>
+                    )}
+
                     <div className="border-t border-xero-navy-light my-1" />
 
                     {/* Sign out */}
@@ -273,6 +286,14 @@ export function TopBar() {
         confirmLabel={t.signOut}
         onConfirm={logout}
         onCancel={() => setShowLogoutConfirm(false)}
+      />
+    )}
+    {showSetPassword && user && (
+      <SetPasswordDialog
+        email={user.email}
+        hasPassword={user.hasPassword}
+        onDone={() => { setShowSetPassword(false); refreshUser() }}
+        onCancel={() => setShowSetPassword(false)}
       />
     )}
     </>

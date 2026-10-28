@@ -18,6 +18,9 @@ UPDATE users SET bearer_token = gen_random_uuid()::text WHERE bearer_token IS NU
 ALTER TABLE users ALTER COLUMN google_id DROP NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email);
 
+-- Optional email+password login (scrypt hash, see src/auth/password.ts).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
 CREATE TABLE IF NOT EXISTS magic_link_tokens (
   token_hash TEXT PRIMARY KEY,
   email      TEXT NOT NULL,

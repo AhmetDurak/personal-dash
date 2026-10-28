@@ -5,11 +5,39 @@ export function LoginPage() {
   const [params] = useSearchParams()
   const hasLinkError = params.get('error') === 'invalid_link'
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>(hasLinkError ? 'error' : 'idle')
   const [error, setError] = useState(hasLinkError ? 'That link is invalid or has expired. Please request a new one.' : '')
 
-  async function handleMagicLinkRequest(e: React.FormEvent) {
+  async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault()
+    setStatus('sending')
+    setError('')
+    try {
+      const res = await fetch('/auth/password/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(body.error ?? 'Something went wrong. Please try again.')
+        setStatus('error')
+        return
+      }
+      window.location.href = body.redirect ?? '/'
+    } catch {
+      setError('Something went wrong. Please try again.')
+      setStatus('error')
+    }
+  }
+
+  async function handleMagicLinkRequest() {
+    if (!email) {
+      setError('Enter your email first.')
+      setStatus('error')
+      return
+    }
     setStatus('sending')
     setError('')
     try {
@@ -134,7 +162,7 @@ export function LoginPage() {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleMagicLinkRequest} className="w-full">
+            <form onSubmit={handlePasswordLogin} className="w-full">
               <input
                 type="email"
                 required
@@ -145,6 +173,15 @@ export function LoginPage() {
                 placeholder="you@example.com"
                 className="w-full bg-gray-900 border border-gray-700 text-white placeholder-gray-600 px-4 py-3 rounded-xl text-sm outline-none focus:border-gray-500 transition-colors mb-2"
               />
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Password"
+                className="w-full bg-gray-900 border border-gray-700 text-white placeholder-gray-600 px-4 py-3 rounded-xl text-sm outline-none focus:border-gray-500 transition-colors mb-2"
+              />
               {status === 'error' && (
                 <p role="alert" className="text-xs text-red-400 mb-2">{error}</p>
               )}
@@ -153,7 +190,15 @@ export function LoginPage() {
                 disabled={status === 'sending'}
                 className="w-full flex items-center justify-center gap-2 bg-gray-800/80 border border-gray-700 text-gray-200 px-5 py-3 rounded-xl font-semibold text-sm hover:bg-gray-800 hover:border-gray-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
               >
-                {status === 'sending' ? 'Sending…' : 'Continue with email'}
+                {status === 'sending' ? 'Signing in…' : 'Sign in'}
+              </button>
+              <button
+                type="button"
+                onClick={handleMagicLinkRequest}
+                disabled={status === 'sending'}
+                className="block w-full text-xs text-gray-500 hover:text-gray-300 underline underline-offset-2 py-3 disabled:opacity-50"
+              >
+                No password? Email me a sign-in link
               </button>
             </form>
           )}

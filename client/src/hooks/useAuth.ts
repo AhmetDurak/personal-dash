@@ -5,6 +5,7 @@ export interface AuthUser {
   email: string
   name: string
   picture: string | null
+  hasPassword: boolean
 }
 
 const fetcher = (url: string) =>
@@ -21,5 +22,5 @@ export function useAuth() {
     mutate(null)
   }
 
-  return { user: data ?? null, isLoading, logout }
+  return { user: data ?? null, isLoading, logout, refresh: () => mutate() }
 }

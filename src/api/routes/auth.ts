@@ -3,6 +3,10 @@ import passport from 'passport'
 import { Pool } from 'pg'
 import { seedDemoUser, DEMO_GOOGLE_ID } from '../../db/seed-demo'
 import { requestMagicLink, consumeMagicLinkToken } from '../../auth/magicLink'
+import {
+  hashPassword, verifyPassword, MIN_PASSWORD_LENGTH,
+  isLoginLocked, recordLoginFailure, clearLoginFailures,
+} from '../../auth/password'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -22,7 +26,8 @@ export function authRouter(pool?: Pool) {
 
   router.get('/me', (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated' })
-    res.json(req.user)
+    const { password_hash, ...user } = req.user as Express.User & { password_hash?: string | null }
+    res.json({ ...user, hasPassword: !!password_hash })
   })
 
   // Return the personal bearer token for mobile app setup
@@ -80,6 +85,53 @@ export function authRouter(pool?: Pool) {
         if (err) return next(err)
         res.redirect(req.session.mcpAuthRequest ? '/mcp-consent' : (process.env.FRONTEND_URL ?? '/'))
       })
+    } catch (err) { next(err) }
+  })
+
+  // Email + password login (password is set from the user menu while signed in)
+  router.post('/password/login', async (req: Request, res: Response, next) => {
+    if (!pool) { res.status(503).json({ error: 'Not available' }); return }
+    const email = (req.body?.email as string | undefined)?.trim().toLowerCase()
+    const password = req.body?.password as string | undefined
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email and password are required' })
+      return
+    }
+    if (isLoginLocked(email)) {
+      res.status(429).json({ error: 'Too many failed attempts. Try again in 15 minutes or use an email link.' })
+      return
+    }
+    try {
+      const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email])
+      if (!(await verifyPassword(password, rows[0]?.password_hash))) {
+        recordLoginFailure(email)
+        res.status(401).json({ error: 'Incorrect email or password' })
+        return
+      }
+      clearLoginFailures(email)
+      req.login(rows[0], (err) => {
+        if (err) return next(err)
+        res.json({ ok: true, redirect: req.session.mcpAuthRequest ? '/mcp-consent' : '/' })
+      })
+    } catch (err) { next(err) }
+  })
+
+  router.post('/password/set', async (req: Request, res: Response, next) => {
+    if (!pool) { res.status(503).json({ error: 'Not available' }); return }
+    if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return }
+    const user = req.user as Express.User
+    if (user.google_id === DEMO_GOOGLE_ID) {
+      res.status(403).json({ error: 'The demo account cannot have a password' })
+      return
+    }
+    const password = req.body?.password as string | undefined
+    if (!password || password.length < MIN_PASSWORD_LENGTH) {
+      res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` })
+      return
+    }
+    try {
+      await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [await hashPassword(password), user.id])
+      res.json({ ok: true })
     } catch (err) { next(err) }
   })
 

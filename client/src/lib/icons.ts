@@ -80,6 +80,7 @@ export { AlertTriangle   as IconAlert       } from 'lucide-react'
 export { LogOut    as IconSignOut   } from 'lucide-react'
 export { User      as IconUser      } from 'lucide-react'
 export { Smartphone as IconMobile   } from 'lucide-react'
+export { KeyRound  as IconKey       } from 'lucide-react'
 
 // ── Sport ─────────────────────────────────────────────────────────────────────
 export { Trophy        as IconTrophy       } from 'lucide-react'
