@@ -374,6 +374,7 @@ function NotesView() {
           </div>
         ) : (
           <ItemFolderTree<Note>
+            storageKey="tree-expanded:notes"
             tree={tree}
             selectedId={selectedId}
             itemLabel={n => n.title || 'Untitled'}
@@ -1993,6 +1994,7 @@ function VocabView() {
           </button>
         </div>
         <ItemFolderTree<VocabCard>
+          storageKey="tree-expanded:vocab"
           tree={vocabTree}
           selectedId={null}
           showItems={false}
@@ -3429,6 +3431,7 @@ function SentenceView() {
           </button>
         </div>
         <ItemFolderTree<LanguageSentence>
+          storageKey="tree-expanded:sentences"
           tree={sentTree}
           selectedId={null}
           showItems={false}
@@ -3895,6 +3898,7 @@ function ScenarioView() {
           </button>
         </div>
         <ItemFolderTree<LanguageScenario>
+          storageKey="tree-expanded:scenarios"
           tree={scenTree}
           selectedId={null}
           showItems={false}
@@ -5169,6 +5173,7 @@ function MemoryPalaceView() {
   function TreePane() {
     return (
       <ItemFolderTree<MemoryPalaceMeta>
+        storageKey="tree-expanded:palaces"
         tree={tree}
         selectedId={selectedId}
         itemLabel={p => p.title || 'Untitled'}

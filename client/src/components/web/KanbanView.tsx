@@ -37,6 +37,7 @@ export function KanbanView() {
           <p className="text-xs text-gray-400 p-4">Loading…</p>
         ) : (
           <ItemFolderTree<Story>
+            storageKey="tree-expanded:stories"
             tree={tree}
             selectedId={selectedId}
             itemLabel={s => `${s.title || 'Untitled'}${s.total_count ? ` · ${s.done_count}/${s.total_count}` : ''}`}

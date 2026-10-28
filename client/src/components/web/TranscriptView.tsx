@@ -107,6 +107,7 @@ export function TranscriptView() {
   function TreePane() {
     return (
       <ItemFolderTree<Transcript>
+        storageKey="tree-expanded:transcripts"
         tree={tree}
         selectedId={selectedId}
         itemLabel={item => item.title}

@@ -153,6 +153,8 @@ function ItemTreeRow<T extends AnyItem>({ item, depth }: { item: T; depth: numbe
 }
 
 export interface ItemFolderTreeProps<T extends AnyItem> {
+  /** localStorage key under which expanded folder paths are remembered per browser. */
+  storageKey: string
   tree: FolderNode<T>
   selectedId: T['id'] | null
   itemLabel: (item: T) => string
@@ -182,9 +184,14 @@ export interface ItemFolderTreeProps<T extends AnyItem> {
 export function ItemFolderTree<T extends AnyItem>({
   tree, selectedId, itemLabel, itemIcon, newItemLabel,
   onSelectItem, onNewItem, onDeleteItem, onRenameFolder, onDeleteFolder, onMoveItemToFolder,
-  showItems = true, selectedFolder, onSelectFolder, sort,
+  showItems = true, selectedFolder, onSelectFolder, sort, storageKey,
 }: ItemFolderTreeProps<T>) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(storageKey) ?? '[]') as string[]) } catch { return new Set() }
+  })
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify([...expanded])) } catch { /* storage unavailable — keep in memory only */ }
+  }, [storageKey, expanded])
   const [renaming, setRenaming] = useState<{ path: string; val: string } | null>(null)
   const [addingFolderIn, setAddingFolderIn] = useState<string | null>(null)
   const [folderInputVal, setFolderInputVal] = useState('')

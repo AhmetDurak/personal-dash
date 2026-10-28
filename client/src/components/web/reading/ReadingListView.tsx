@@ -74,6 +74,7 @@ export function ReadingListView() {
           </button>
         </div>
         <ItemFolderTree<ReadingSession>
+          storageKey="tree-expanded:reading"
           tree={sessionTree}
           selectedId={null}
           showItems={false}
