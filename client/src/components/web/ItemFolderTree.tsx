@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useContext, createContext, type ReactNode } from 'react'
 import { IconCheck, IconChevronRight, IconFolder, IconSort } from '../../lib/icons'
-import { collectFolderPaths, type FolderNode } from '../../lib/folderTree'
+import { addFolderPaths, collectFolderPaths, type FolderNode } from '../../lib/folderTree'
 
 export const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
@@ -182,8 +182,8 @@ export interface ItemFolderTreeProps<T extends AnyItem> {
 }
 
 export function ItemFolderTree<T extends AnyItem>({
-  tree, selectedId, itemLabel, itemIcon, newItemLabel,
-  onSelectItem, onNewItem, onDeleteItem, onRenameFolder, onDeleteFolder, onMoveItemToFolder,
+  tree: itemTree, selectedId, itemLabel, itemIcon, newItemLabel,
+  onSelectItem, onNewItem, onDeleteItem, onRenameFolder: renameItemFolder, onDeleteFolder: deleteItemFolder, onMoveItemToFolder,
   showItems = true, selectedFolder, onSelectFolder, sort, storageKey,
 }: ItemFolderTreeProps<T>) {
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -192,6 +192,32 @@ export function ItemFolderTree<T extends AnyItem>({
   useEffect(() => {
     try { localStorage.setItem(storageKey, JSON.stringify([...expanded])) } catch { /* storage unavailable — keep in memory only */ }
   }, [storageKey, expanded])
+  // Folders only exist through their items' `folder` field, so a newly created
+  // (still empty) folder is kept here, per browser, until an item is put into it.
+  const emptyFoldersKey = `${storageKey}:empty-folders`
+  const [emptyFolders, setEmptyFolders] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(emptyFoldersKey) ?? '[]') as string[] } catch { return [] }
+  })
+  useEffect(() => {
+    try { localStorage.setItem(emptyFoldersKey, JSON.stringify(emptyFolders)) } catch { /* storage unavailable — keep in memory only */ }
+  }, [emptyFoldersKey, emptyFolders])
+  const itemFolderPaths = collectFolderPaths(itemTree)
+  const pendingFolders = emptyFolders.filter(p => !itemFolderPaths.includes(p))
+  useEffect(() => {
+    if (pendingFolders.length !== emptyFolders.length) setEmptyFolders(pendingFolders)
+  }, [pendingFolders.length, emptyFolders.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  const tree = pendingFolders.length ? addFolderPaths(itemTree, pendingFolders) : itemTree
+
+  const inPath = (p: string, path: string) => p === path || p.startsWith(path + '/')
+  function onRenameFolder(oldPath: string, newPath: string) {
+    setEmptyFolders(fs => fs.map(p => inPath(p, oldPath) ? newPath + p.slice(oldPath.length) : p))
+    if (itemFolderPaths.includes(oldPath)) renameItemFolder(oldPath, newPath)
+  }
+  function onDeleteFolder(path: string) {
+    if (itemFolderPaths.includes(path)) deleteItemFolder(path)
+    else setEmptyFolders(fs => fs.filter(p => !inPath(p, path)))
+  }
+
   const [renaming, setRenaming] = useState<{ path: string; val: string } | null>(null)
   const [addingFolderIn, setAddingFolderIn] = useState<string | null>(null)
   const [folderInputVal, setFolderInputVal] = useState('')
@@ -223,8 +249,8 @@ export function ItemFolderTree<T extends AnyItem>({
     const newPath = addingFolderIn ? `${addingFolderIn}/${name}` : name
     setAddingFolderIn(null)
     setFolderInputVal('')
-    onNewItem(newPath)
-    setExpanded(s => new Set([...s, newPath]))
+    setEmptyFolders(fs => fs.includes(newPath) ? fs : [...fs, newPath])
+    setExpanded(s => new Set([...s, addingFolderIn, newPath]))
   }
 
   function commitRename() {

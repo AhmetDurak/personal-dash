@@ -55,6 +55,30 @@ export function applyManualOrder<T>(node: FolderNode<T>, order: string[]): Folde
   return { ...node, children }
 }
 
+// Returns a copy of `node` with any missing folder paths inserted as empty folders
+// (siblings kept in name order). Used for folders that don't hold an item yet.
+export function addFolderPaths<T>(node: FolderNode<T>, paths: string[]): FolderNode<T> {
+  const root = cloneFolders(node)
+  for (const path of paths) {
+    let cur = root
+    const parts = path.split('/')
+    parts.forEach((name, i) => {
+      const childPath = parts.slice(0, i + 1).join('/')
+      let child = cur.children.find(c => c.path === childPath)
+      if (!child) {
+        child = { path: childPath, name, children: [], items: [] }
+        cur.children = [...cur.children, child].sort((a, b) => a.name.localeCompare(b.name))
+      }
+      cur = child
+    })
+  }
+  return root
+}
+
+function cloneFolders<T>(node: FolderNode<T>): FolderNode<T> {
+  return { ...node, children: node.children.map(cloneFolders) }
+}
+
 export function collectFolderPaths<T>(node: FolderNode<T>): string[] {
   const paths: string[] = []
   function walk(n: FolderNode<T>) {
