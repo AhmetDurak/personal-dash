@@ -3468,8 +3468,8 @@ function SentenceView() {
           </select>
         </div>
         {draft.source_text && (
-          <div className={`rounded-xl p-3 text-sm ${dark ? 'bg-slate-700' : 'bg-gray-50'}`}>
-            <p className="text-[10px] text-gray-400 dark:text-slate-500 mb-1.5 uppercase tracking-wider">{t.linkToVocab}</p>
+          <div className={`rounded-xl p-3 text-sm ${dark ? 'bg-slate-700 text-slate-100' : 'bg-gray-50 text-gray-800'}`}>
+            <p className="text-[10px] text-gray-400 dark:text-slate-400 mb-1.5 uppercase tracking-wider">{t.linkToVocab}</p>
             <WordLinker
               text={draft.source_text}
               links={draft.word_links ?? []}
