@@ -1834,9 +1834,9 @@ function VocabView() {
     e.target.value = ''
   }
 
-  const dueCards = vocab.filter(v => isDueSR(v.due_at))
   const q = vocabSearch.trim().toLowerCase()
   const scopedWords = getItemsInFolder(vocabTree, selectedFolder)
+  const dueCards = scopedWords.filter(isReviewDue)
   const listItems = sortVocab(q ? scopedWords.filter(v => [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))) : scopedWords)
   const sel = useSelection()
   const scopeLabel = selectedFolder === null ? 'All Words' : selectedFolder === '' ? 'Unsorted' : selectedFolder
@@ -2093,7 +2093,7 @@ function VocabView() {
           )}
           {dueCards.length > 0 && (
             <button
-              onClick={() => setReviewMode(true)}
+              onClick={() => { setSingleReview(dueCards); setReviewIdx(0); setFlipped(false); setAnswer(''); setAnswerResult(null); setReviewMode(true) }}
               className="text-xs bg-xero-green text-white px-2.5 py-1.5 rounded-lg font-medium hover:bg-xero-green-dark transition-colors flex-shrink-0"
             >
               {t.reviewNow} ({dueCards.length})
@@ -3093,6 +3093,12 @@ function DueDot({ item }: { item: SRItem }) {
   )
 }
 
+// "Review Now" queue: items reviewed before whose due date has come. Never-reviewed
+// items are started individually (their own Review button or Select → Review).
+function isReviewDue(item: SRItem): boolean {
+  return dueStatus(item).kind !== 'new' && isDueSR(item.due_at)
+}
+
 // due_at arrives as 'YYYY-MM-DD' or a full timestamp — compare the date part with the local date.
 function isDueSR(dateStr: string): boolean {
   const d = new Date()
@@ -3285,7 +3291,6 @@ function SentenceView() {
   const [translateResult, setTranslateResult] = useState<{ translation: string; alternatives: string[] } | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
-  const [reviewMode, setReviewMode]   = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sentImportMsg, setSentImportMsg] = useState<string | null>(null)
   const sentCsvRef = useRef<HTMLInputElement>(null)
@@ -3321,9 +3326,9 @@ function SentenceView() {
   const { sort: sentSort, sortItems: sortSentences, sortTree: sortSentTree } = useTreeSort<LanguageSentence>(
     'tree-sort:sentences', { label: s => s.source_text, created: s => s.created_at, updated: s => s.updated_at, due: s => s.due_at }, 'due')
   const sentTree = sortSentTree(buildFolderTree(sentences))
-  const dueItems = sentences.filter(s => isDueSR(s.due_at))
   const activeSentence = sentences.find(s => s.id === editingId) ?? null
   const scopedSentences = getItemsInFolder(sentTree, selectedFolder)
+  const dueItems = scopedSentences.filter(isReviewDue)
   const sq = sentSearch.trim().toLowerCase()
   const listSentences = sortSentences(sq ? scopedSentences.filter(s => [s.source_text, s.translation ?? ''].some(v => v.toLowerCase().includes(sq))) : scopedSentences)
   const sel = useSelection()
@@ -3495,13 +3500,6 @@ function SentenceView() {
         onDone={() => setSingleReviewItem(null)}
         allowTyping
       />
-    ) : reviewMode ? (
-      <ReviewSession
-        items={dueItems.map(s => ({ id: s.id, front: s.source_text, back: s.translation, palace: s.memory_palace }))}
-        onRate={async (id, q) => { await reviewSentence(id, q) }}
-        onDone={() => setReviewMode(false)}
-        allowTyping
-      />
     ) : null
 
   function TreePane() {
@@ -3569,7 +3567,7 @@ function SentenceView() {
           )}
           {dueItems.length > 0 && (
             <button
-              onClick={() => setReviewMode(true)}
+              onClick={() => setSingleReviewItem(dueItems)}
               className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1 flex-shrink-0"
             >
               🏛️ {dueItems.length} due
@@ -3874,7 +3872,6 @@ function ScenarioView() {
   const [translating, setTranslating]   = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
-  const [reviewMode, setReviewMode]     = useState(false)
   const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const notesTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -3914,8 +3911,8 @@ function ScenarioView() {
     'tree-sort:scenarios', { label: s => s.title, created: s => s.created_at, updated: s => s.updated_at, due: s => s.due_at }, 'due')
   const scenTree = sortScenTree(buildFolderTree(scenarios))
   const active   = scenarios.find(s => s.id === activeId) ?? null
-  const dueItems = scenarios.filter(s => isDueSR(s.due_at))
   const scopedScenarios = getItemsInFolder(scenTree, selectedFolder)
+  const dueItems = scopedScenarios.filter(isReviewDue)
   const scq = scenSearch.trim().toLowerCase()
   const listScenarios = sortScenarios(scq ? scopedScenarios.filter(s => [s.title, s.content ?? ''].some(v => v.toLowerCase().includes(scq))) : scopedScenarios)
   const sel = useSelection()
@@ -4011,12 +4008,6 @@ function ScenarioView() {
         onRate={async (id, q) => { await reviewScenario(id, q) }}
         onDone={() => setSingleReviewItem(null)}
       />
-    ) : reviewMode ? (
-      <ReviewSession
-        items={dueItems.map(s => ({ id: s.id, front: s.title, back: s.content || null, palace: s.memory_palace }))}
-        onRate={async (id, q) => { await reviewScenario(id, q) }}
-        onDone={() => setReviewMode(false)}
-      />
     ) : null
 
   function TreePane() {
@@ -4084,7 +4075,7 @@ function ScenarioView() {
           )}
           {dueItems.length > 0 && (
             <button
-              onClick={() => setReviewMode(true)}
+              onClick={() => setSingleReviewItem(dueItems)}
               className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-violet-500 text-white hover:bg-violet-600 transition-colors flex items-center gap-1 flex-shrink-0"
             >
               🏛️ {dueItems.length} due
