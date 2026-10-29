@@ -353,6 +353,26 @@ CREATE TABLE IF NOT EXISTS vocab_reviews (
 );
 CREATE INDEX IF NOT EXISTS vocab_reviews_vocab_idx ON vocab_reviews (vocab_id, reviewed_at);
 
+CREATE TABLE IF NOT EXISTS sentence_reviews (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  sentence_id INTEGER NOT NULL REFERENCES language_sentences(id) ON DELETE CASCADE,
+  quality     SMALLINT NOT NULL,
+  interval    INTEGER NOT NULL,
+  reviewed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sentence_reviews_item_idx ON sentence_reviews (sentence_id, reviewed_at);
+
+CREATE TABLE IF NOT EXISTS scenario_reviews (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  scenario_id INTEGER NOT NULL REFERENCES language_scenarios(id) ON DELETE CASCADE,
+  quality     SMALLINT NOT NULL,
+  interval    INTEGER NOT NULL,
+  reviewed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS scenario_reviews_item_idx ON scenario_reviews (scenario_id, reviewed_at);
+
 -- Folders for notes and mindmaps
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
 ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;

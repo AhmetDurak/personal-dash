@@ -330,9 +330,17 @@ export function useMemoryPalace(id: number) {
   return { palace: data, savePalace }
 }
 
-// Review history of one vocabulary word (oldest first).
-export function useVocabReviews(id: number | null): ReviewEntry[] {
-  const { data } = useSWR<ReviewEntry[]>(id !== null ? `/api/notebook/vocabulary/${id}/reviews` : null, fetcher)
+// Review history of one vocabulary word, sentence or scenario (oldest first).
+export type ReviewKind = 'vocab' | 'sentence' | 'scenario'
+const REVIEW_BASE: Record<ReviewKind, string> = {
+  vocab:    '/api/notebook/vocabulary',
+  sentence: '/api/notebook/language/sentences',
+  scenario: '/api/notebook/language/scenarios',
+}
+const reviewHistoryKey = (kind: ReviewKind, id: number) => `${REVIEW_BASE[kind]}/${id}/reviews`
+
+export function useReviewHistory(kind: ReviewKind, id: number | null): ReviewEntry[] {
+  const { data } = useSWR<ReviewEntry[]>(id !== null ? reviewHistoryKey(kind, id) : null, fetcher)
   return data ?? []
 }
 
@@ -387,7 +395,7 @@ export function useVocabulary() {
       body: JSON.stringify({ quality }),
     })
     await mutate()
-    await globalMutate(`/api/notebook/vocabulary/${id}/reviews`)
+    await globalMutate(reviewHistoryKey('vocab', id))
   }
 
   async function updateWord(id: number, payload: { word: string; translation: string; language: string; translation_language?: string; example?: string; image_url?: string }) {
@@ -500,6 +508,7 @@ export function useLanguageSentences() {
       body: JSON.stringify({ quality }),
     })
     await mutate()
+    await globalMutate(reviewHistoryKey('sentence', id))
   }
 
   async function deleteSentence(id: number) {
@@ -583,6 +592,7 @@ export function useLanguageScenarios() {
       body: JSON.stringify({ quality }),
     })
     await mutate()
+    await globalMutate(reviewHistoryKey('scenario', id))
   }
 
   async function deleteScenario(id: number) {

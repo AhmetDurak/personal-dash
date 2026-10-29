@@ -14,7 +14,7 @@ import { ConnectionsPanel } from '../components/notebook/ConnectionsPanel'
 import { renderMermaid } from '../lib/mermaid'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios,
-  useMemoryPalaceList, useMemoryPalace, useVocabReviews } from '../hooks/useNotebook'
+  useMemoryPalaceList, useMemoryPalace, useReviewHistory, type ReviewKind } from '../hooks/useNotebook'
 import { retentionSeries, type RetentionPoint } from '../lib/retention'
 import { dueStatus, type SRItem } from '../lib/dueStatus'
 import { LogTab } from './LogTab'
@@ -1640,11 +1640,11 @@ const REVIEW_COLORS: Array<{ min: number; color: string; label: string }> = [
 const reviewStyle = (q: number) => REVIEW_COLORS.find(c => q >= c.min) ?? REVIEW_COLORS[REVIEW_COLORS.length - 1]
 
 // Estimated retention over time with one dot per review (colored by rating) —
-// SM-2 targets 90% retention at the due date.
-function VocabReviewChart({ card }: { card: VocabCard }) {
+// SM-2 targets 90% retention at the due date. Used for words, sentences and scenarios.
+function ReviewChart({ kind, item }: { kind: ReviewKind; item: { id: number; interval: number } }) {
   const { t } = useLanguage()
-  const reviews = useVocabReviews(card.id)
-  const data = retentionSeries(reviews, card.interval, new Date())
+  const reviews = useReviewHistory(kind, item.id)
+  const data = retentionSeries(reviews, item.interval, new Date())
   const todayLabel = data.find(p => p.today)?.date
   const last = reviews[reviews.length - 1]
   return (
@@ -2297,7 +2297,7 @@ function VocabView() {
           {/* Forgetting curve with review history */}
           {(() => {
             const vocabCard = vocab.find(c => c.id === editCard.id)
-            return vocabCard ? <VocabReviewChart card={vocabCard} /> : null
+            return vocabCard ? <ReviewChart kind="vocab" item={vocabCard} /> : null
           })()}
           {/* Conjugation panel — DE only */}
           {editCard.language === 'de' && (
@@ -3690,6 +3690,8 @@ function SentenceView() {
 
         {editFormFields()}
 
+        <ReviewChart kind="sentence" item={activeSentence} />
+
         {/* Due status */}
         <div className="flex items-center justify-between">
           <span className={`text-[10px] rounded-full px-2 py-0.5 font-medium ${isDueSR(activeSentence.due_at) ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-slate-500'}`}>
@@ -4325,6 +4327,8 @@ function ScenarioView() {
             className={`w-full resize-none rounded-xl border p-3 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-blue-400 ${dark ? 'bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500' : 'bg-white border-gray-100 text-gray-800'}`}
           />
         </div>
+
+        <ReviewChart kind="scenario" item={active} />
 
         {/* Due status */}
         <div className="flex items-center justify-between">

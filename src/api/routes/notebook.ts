@@ -5,7 +5,7 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
 import { parseBulkAction, bulkActionQuery, type BulkTable } from '../../lib/bulkAction'
-import { logVocabReview } from '../../mcp/tools/language/shared'
+import { logReview, REVIEW_LOG, type ReviewKind } from '../../mcp/tools/language/shared'
 
 const ATTACHMENT_DIR = path.join(process.cwd(), 'uploads', 'notebook')
 fs.mkdirSync(ATTACHMENT_DIR, { recursive: true })
@@ -305,18 +305,27 @@ export function notebookRouter(pool: Pool): Router {
       'UPDATE vocabulary SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
       [interval, repetitions, easeFactor, dueAt, req.params.id, uid]
     )
-    await logVocabReview(pool, uid, Number(req.params.id), quality, interval)
+    await logReview(pool, 'vocab', uid, Number(req.params.id), quality, interval)
     res.json(updated[0])
   })
 
-  router.get('/vocabulary/:id/reviews', async (req: Request, res: Response) => {
-    const uid = (req.user as Express.User).id
-    const { rows } = await pool.query(
-      'SELECT quality, interval, reviewed_at FROM vocab_reviews WHERE vocab_id=$1 AND user_id=$2 ORDER BY reviewed_at',
-      [req.params.id, uid]
-    )
-    res.json(rows)
-  })
+  // Review history (oldest first) of one vocab word, sentence or scenario.
+  const historyRoutes: Record<string, ReviewKind> = {
+    '/vocabulary/:id/reviews': 'vocab',
+    '/language/sentences/:id/reviews': 'sentence',
+    '/language/scenarios/:id/reviews': 'scenario',
+  }
+  for (const [route, kind] of Object.entries(historyRoutes)) {
+    router.get(route, async (req: Request, res: Response) => {
+      const uid = (req.user as Express.User).id
+      const { table, column } = REVIEW_LOG[kind]
+      const { rows } = await pool.query(
+        `SELECT quality, interval, reviewed_at FROM ${table} WHERE ${column}=$1 AND user_id=$2 ORDER BY reviewed_at`,
+        [req.params.id, uid]
+      )
+      res.json(rows)
+    })
+  }
 
   router.patch('/vocabulary/folder-rename', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
@@ -434,6 +443,7 @@ export function notebookRouter(pool: Pool): Router {
       'UPDATE language_sentences SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
       [sr.interval, sr.repetitions, sr.easeFactor, sr.dueAt, req.params.id, uid]
     )
+    await logReview(pool, 'sentence', uid, Number(req.params.id), quality, sr.interval)
     res.json(updated[0])
   })
 
@@ -543,6 +553,7 @@ export function notebookRouter(pool: Pool): Router {
       'UPDATE language_scenarios SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
       [sr.interval, sr.repetitions, sr.easeFactor, sr.dueAt, req.params.id, uid]
     )
+    await logReview(pool, 'scenario', uid, Number(req.params.id), quality, sr.interval)
     res.json(updated[0])
   })
 

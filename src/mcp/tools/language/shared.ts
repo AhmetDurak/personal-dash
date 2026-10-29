@@ -24,11 +24,19 @@ export function sm2(interval: number, repetitions: number, easeFactor: number, q
   return { interval: i, repetitions: r, easeFactor: e, dueAt: due.toISOString().slice(0, 10) }
 }
 
-// Appends a vocabulary review to the history log (shared by the REST route and MCP tool).
-export async function logVocabReview(pool: Pool, uid: number, vocabId: number, quality: number, interval: number) {
+// Review history log per item kind (shared by the REST routes and MCP tools).
+export type ReviewKind = 'vocab' | 'sentence' | 'scenario'
+export const REVIEW_LOG: Record<ReviewKind, { table: string; column: string }> = {
+  vocab:    { table: 'vocab_reviews',    column: 'vocab_id' },
+  sentence: { table: 'sentence_reviews', column: 'sentence_id' },
+  scenario: { table: 'scenario_reviews', column: 'scenario_id' },
+}
+
+export async function logReview(pool: Pool, kind: ReviewKind, uid: number, itemId: number, quality: number, interval: number) {
+  const { table, column } = REVIEW_LOG[kind]
   await pool.query(
-    'INSERT INTO vocab_reviews (user_id, vocab_id, quality, interval) VALUES ($1, $2, $3, $4)',
-    [uid, vocabId, quality, interval]
+    `INSERT INTO ${table} (user_id, ${column}, quality, interval) VALUES ($1, $2, $3, $4)`,
+    [uid, itemId, quality, interval]
   )
 }
 

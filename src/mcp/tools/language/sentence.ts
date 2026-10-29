@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { Request } from 'express'
 import type { Pool } from 'pg'
-import { json, uidOf, sm2, qualitySchema } from './shared'
+import { json, uidOf, sm2, qualitySchema, logReview } from './shared'
 
 export function registerSentenceTools(server: McpServer, req: Request, pool: Pool) {
   server.registerTool('language_sentence_list', {
@@ -136,6 +136,7 @@ export function registerSentenceTools(server: McpServer, req: Request, pool: Poo
       'UPDATE language_sentences SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
       [sr.interval, sr.repetitions, sr.easeFactor, sr.dueAt, id, uid]
     )
+    await logReview(pool, 'sentence', uid, id, quality, sr.interval)
     return json(updated[0])
   })
 }
