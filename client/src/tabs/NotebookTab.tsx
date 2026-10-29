@@ -1904,7 +1904,6 @@ function VocabView() {
       example: editCard.example || undefined,
       image_url: editCard.image_url || undefined,
     })
-    setEditCard(null)
   }
 
   function openEdit(card: VocabCard) {
