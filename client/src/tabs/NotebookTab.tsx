@@ -25,6 +25,7 @@ import { ChainsView } from '../components/web/ChainsView'
 import { TranscriptView } from '../components/web/TranscriptView'
 import { ItemFolderTree, isTouch } from '../components/web/ItemFolderTree'
 import { FolderMoveButton } from '../components/web/FolderMoveButton'
+import { SortMenuButton } from '../components/web/SortMenuButton'
 import { ResizableSidebar } from '../components/web/ResizableSidebar'
 import { AutoGrowTextarea } from '../components/web/AutoGrowTextarea'
 import { useLanguage } from '../hooks/useLanguage'
@@ -2068,6 +2069,7 @@ function VocabView() {
               </button>
             )}
           </div>
+          <SortMenuButton sort={vocabSort} />
           <button onClick={() => handleNewItemRequest(selectedFolder)} title={t.addWord}
             className={`text-gray-400 hover:text-xero-green transition-colors p-2 -m-0.5 flex-shrink-0 flex items-center justify-center ${isTouch ? 'min-w-[44px] min-h-[44px]' : ''}`}>
             <IconAdd className="w-4 h-4" strokeWidth={2.5} />
@@ -3509,6 +3511,7 @@ function SentenceView() {
               </button>
             )}
           </div>
+          <SortMenuButton sort={sentSort} />
           <button onClick={() => handleNew(selectedFolder)} title={t.addSentence}
             className={`text-gray-400 hover:text-xero-green transition-colors p-2 -m-0.5 flex-shrink-0 flex items-center justify-center ${isTouch ? 'min-w-[44px] min-h-[44px]' : ''}`}>
             <IconAdd className="w-4 h-4" strokeWidth={2.5} />
@@ -3976,6 +3979,7 @@ function ScenarioView() {
               </button>
             )}
           </div>
+          <SortMenuButton sort={scenSort} />
           <button onClick={() => handleNew(selectedFolder)} title={t.addScenario}
             className={`text-gray-400 hover:text-xero-green transition-colors p-2 -m-0.5 flex-shrink-0 flex items-center justify-center ${isTouch ? 'min-w-[44px] min-h-[44px]' : ''}`}>
             <IconAdd className="w-4 h-4" strokeWidth={2.5} />
