@@ -1803,7 +1803,6 @@ function VocabView() {
     const pct = strSimilarity(answer, reviewCard.translation)
     const correct = pct >= 0.9
     setAnswerResult({ correct, pct })
-    setTimeout(() => handleRate(correct ? 4 : 0), 1500)
   }
 
   useEffect(() => {
@@ -1907,9 +1906,6 @@ function VocabView() {
             <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm min-h-[160px] flex flex-col items-center justify-center gap-3 select-none">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Word</p>
               <p className="text-2xl font-bold text-gray-900 text-center">{reviewCard.word}</p>
-              {!typeMode && !flipped && (
-                <p className="text-xs text-gray-300 mt-1 cursor-pointer" onClick={() => setFlipped(true)}>Tap to reveal translation</p>
-              )}
               {!typeMode && flipped && (
                 <>
                   <p className="text-lg font-semibold text-gray-600 text-center">{reviewCard.translation}</p>
@@ -1948,8 +1944,20 @@ function VocabView() {
               )
             )}
 
-            {/* Flip mode rating buttons */}
-            {!typeMode && flipped && (
+            {!typeMode && !flipped && (
+              <button
+                onClick={() => setFlipped(true)}
+                className="w-full min-h-[44px] py-2.5 text-sm font-medium rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-xero-green hover:text-xero-green transition-colors"
+              >
+                Show translation →
+              </button>
+            )}
+
+            {/* Self-rating — feeds the spaced-repetition interval in both modes */}
+            {(typeMode ? answerResult !== null : flipped) && (
+              <p className="text-xs font-medium text-gray-500 text-center pt-1">How hard was it to remember?</p>
+            )}
+            {(typeMode ? answerResult !== null : flipped) && (
               <div className="grid grid-cols-4 gap-2">
                 {[
                   { q: 0, label: t.again, cls: 'bg-red-100 text-red-700 hover:bg-red-200',       tip: 'Failed. Resets to 1 day — you\'ll see it again soon.' },
@@ -1958,7 +1966,7 @@ function VocabView() {
                   { q: 5, label: t.easy,  cls: 'bg-sky-100 text-sky-700 hover:bg-sky-200',       tip: 'Recalled instantly. Longer interval + easier factor.' },
                 ].map(({ q, label, cls, tip }) => (
                   <RateTooltip key={q} text={tip}>
-                    <button onClick={() => handleRate(q)} className={`w-full text-xs font-semibold rounded-lg py-2.5 transition-colors ${cls}`}>
+                    <button onClick={() => handleRate(q)} className={`w-full min-h-[44px] text-xs font-semibold rounded-lg py-2.5 transition-colors ${cls}`}>
                       {label}
                     </button>
                   </RateTooltip>
