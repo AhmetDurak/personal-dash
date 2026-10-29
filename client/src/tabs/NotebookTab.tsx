@@ -1833,8 +1833,7 @@ function VocabView() {
     e.target.value = ''
   }
 
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const dueCards = vocab.filter(v => new Date(v.due_at) <= today)
+  const dueCards = vocab.filter(v => isDueSR(v.due_at))
   const q = vocabSearch.trim().toLowerCase()
   const scopedWords = getItemsInFolder(vocabTree, selectedFolder)
   const listItems = sortVocab(q ? scopedWords.filter(v => [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))) : scopedWords)
@@ -2371,14 +2370,15 @@ function VocabView() {
             <button type="submit" disabled={!editDirty} className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium transition-colors disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-slate-700 dark:disabled:text-slate-500 disabled:cursor-not-allowed">{t.save}</button>
             <button
               type="button"
+              disabled={!savedCard || !isDueSR(savedCard.due_at)}
+              title={savedCard && !isDueSR(savedCard.due_at) ? `Next review: ${nextReviewLabel(savedCard.due_at)}` : undefined}
               onClick={() => {
-                const card = vocab.find(v => v.id === editCard.id)
-                if (!card) return
-                setSingleReview([card]); setReviewIdx(0); setFlipped(false); setAnswer(''); setAnswerResult(null); setReviewMode(true)
+                if (!savedCard) return
+                setSingleReview([savedCard]); setReviewIdx(0); setFlipped(false); setAnswer(''); setAnswerResult(null); setReviewMode(true)
               }}
-              className="text-sm border border-xero-green text-xero-green px-4 py-2 rounded-lg font-medium hover:bg-xero-green/10 transition-colors flex-shrink-0"
+              className="text-sm border border-xero-green text-xero-green px-4 py-2 rounded-lg font-medium hover:bg-xero-green/10 transition-colors flex-shrink-0 disabled:border-gray-200 disabled:text-gray-400 dark:disabled:border-slate-700 dark:disabled:text-slate-500 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
-              {t.reviewWord}
+              {savedCard && !isDueSR(savedCard.due_at) ? nextReviewLabel(savedCard.due_at) : t.reviewWord}
             </button>
             <button type="button" onClick={() => setConfirmDeleteVocabId(editCard.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors flex-shrink-0">{t.delete}</button>
           </div>
@@ -3102,8 +3102,11 @@ const PALACE_SUGGESTIONS = [
   'Morning commute', 'At school / University', 'Meeting', 'At home',
 ]
 
+// due_at arrives as 'YYYY-MM-DD' or a full timestamp — compare the date part with the local date.
 function isDueSR(dateStr: string): boolean {
-  return dateStr <= new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return dateStr.slice(0, 10) <= today
 }
 
 function nextReviewLabel(dateStr: string): string {
@@ -3683,7 +3686,9 @@ function SentenceView() {
           </span>
           <div className="flex items-center gap-3">
             <FolderMoveButton folder={activeSentence.folder} folders={collectFolderPaths(sentTree)} onMove={f => moveSentenceToFolder(activeSentence.id, f)} />
-            <button onClick={() => setSingleReviewItem([activeSentence])} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
+            <button onClick={() => setSingleReviewItem([activeSentence])} disabled={!isDueSR(activeSentence.due_at)}
+              title={isDueSR(activeSentence.due_at) ? undefined : `Not due yet — next review: ${nextReviewLabel(activeSentence.due_at)}`}
+              className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors disabled:text-gray-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed">Review</button>
             <button onClick={() => setConfirmDeleteId(activeSentence.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
           </div>
         </div>
@@ -4317,7 +4322,9 @@ function ScenarioView() {
           </span>
           <div className="flex items-center gap-3">
             <FolderMoveButton folder={active.folder} folders={collectFolderPaths(scenTree)} onMove={f => moveScenarioToFolder(active.id, f)} />
-            <button onClick={() => setSingleReviewItem([active])} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
+            <button onClick={() => setSingleReviewItem([active])} disabled={!isDueSR(active.due_at)}
+              title={isDueSR(active.due_at) ? undefined : `Not due yet — next review: ${nextReviewLabel(active.due_at)}`}
+              className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors disabled:text-gray-300 dark:disabled:text-slate-600 disabled:cursor-not-allowed">Review</button>
             <button onClick={() => setConfirmDeleteId(active.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
           </div>
         </div>
