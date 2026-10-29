@@ -14,7 +14,8 @@ import { ConnectionsPanel } from '../components/notebook/ConnectionsPanel'
 import { renderMermaid } from '../lib/mermaid'
 import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom'
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios,
-  useMemoryPalaceList, useMemoryPalace } from '../hooks/useNotebook'
+  useMemoryPalaceList, useMemoryPalace, useVocabReviews } from '../hooks/useNotebook'
+import { retentionSeries, type RetentionPoint } from '../lib/retention'
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
@@ -1629,14 +1630,65 @@ function RateTooltip({ children, text }: { children: ReactNode; text: string }) 
   )
 }
 
-// SM-2 targets 90% retention at due_at. Solve: 0.9 = e^(-1/k) → k = -1/ln(0.9) ≈ 9.49
-const LN09K = -1 / Math.log(0.9)
+const REVIEW_COLORS: Array<{ min: number; color: string; label: string }> = [
+  { min: 5, color: '#0EA5E9', label: 'Easy' },
+  { min: 4, color: '#10B981', label: 'Good' },
+  { min: 2, color: '#F59E0B', label: 'Hard' },
+  { min: 0, color: '#EF4444', label: 'Again' },
+]
+const reviewStyle = (q: number) => REVIEW_COLORS.find(c => q >= c.min) ?? REVIEW_COLORS[REVIEW_COLORS.length - 1]
 
-function forgettingCurveData(card: VocabCard): { day: string; pct: number }[] {
-  return Array.from({ length: 31 }, (_, i) => ({
-    day: i === 0 ? '0' : `+${i}d`,
-    pct: Math.max(0, Math.round(Math.exp(-i / (card.interval * LN09K)) * 100)),
-  }))
+// Estimated retention over time with one dot per review (colored by rating) —
+// SM-2 targets 90% retention at the due date.
+function VocabReviewChart({ card }: { card: VocabCard }) {
+  const { t } = useLanguage()
+  const reviews = useVocabReviews(card.id)
+  const data = retentionSeries(reviews, card.interval, new Date())
+  const todayLabel = data.find(p => p.today)?.date
+  const last = reviews[reviews.length - 1]
+  return (
+    <div className="pt-3 border-t border-gray-100 dark:border-slate-700">
+      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+        <p className="text-xs text-gray-400 dark:text-slate-500">{t.forgettingCurve}</p>
+        <p className="text-[11px] text-gray-500 dark:text-slate-400">
+          {reviews.length === 0 ? 'No reviews logged yet'
+            : `Reviewed ${reviews.length}× · last ${new Date(last.reviewed_at).toLocaleDateString()}`}
+        </p>
+      </div>
+      <ResponsiveContainer width="100%" height={110}>
+        <AreaChart data={data} margin={{ top: 6, right: 6, bottom: 0, left: -20 }}>
+          <defs>
+            <linearGradient id="retGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area type="linear" dataKey="pct" stroke="#10B981" strokeWidth={1.5} fill="url(#retGrad)" isAnimationActive={false}
+            dot={(p: { cx?: number; cy?: number; index?: number; payload?: RetentionPoint }) =>
+              p.payload?.review !== undefined
+                ? <circle key={p.index} cx={p.cx} cy={p.cy} r={3.5} fill={reviewStyle(p.payload.review).color} stroke="white" strokeWidth={1} />
+                : <g key={p.index} />} />
+          <XAxis dataKey="date" fontSize={8} tickLine={false} axisLine={false} minTickGap={24} />
+          <YAxis domain={[0, 100]} fontSize={8} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}%`} />
+          <ReferenceLine y={90} stroke="#F59E0B" strokeDasharray="3 3" />
+          {todayLabel && <ReferenceLine x={todayLabel} stroke="#94A3B8" strokeDasharray="2 2" />}
+          <Tooltip
+            formatter={(v: number, _n: string, item: { payload?: RetentionPoint }) =>
+              [`${v}%${item.payload?.review !== undefined ? ` · reviewed: ${reviewStyle(item.payload.review).label}` : ''}`, t.retentionLabel]}
+            contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+        </AreaChart>
+      </ResponsiveContainer>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] text-gray-500 dark:text-slate-400">
+        {[...REVIEW_COLORS].reverse().map(c => (
+          <span key={c.label} className="inline-flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />{c.label}
+          </span>
+        ))}
+        <span className="text-amber-500">─ ─ {t.reviewThreshold} (90%)</span>
+        <span>┆ today</span>
+      </div>
+    </div>
+  )
 }
 
 const LANG_BCP47: Record<string, string> = {
@@ -2243,31 +2295,10 @@ function VocabView() {
           {editCard.image_url && (
             <img src={editCard.image_url} alt="preview" className="w-full rounded-lg max-h-32 object-cover" />
           )}
-          {/* Forgetting curve chart */}
+          {/* Forgetting curve with review history */}
           {(() => {
             const vocabCard = vocab.find(c => c.id === editCard.id)
-            if (!vocabCard) return null
-            return (
-              <div className="pt-3 border-t border-gray-100 dark:border-slate-700">
-                <p className="text-xs text-gray-400 dark:text-slate-500 mb-1.5">{t.forgettingCurve}</p>
-                <ResponsiveContainer width="100%" height={80}>
-                  <AreaChart data={forgettingCurveData(vocabCard)} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                    <defs>
-                      <linearGradient id="retGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <Area type="monotone" dataKey="pct" stroke="#10B981" strokeWidth={1.5} fill="url(#retGrad)" dot={false} />
-                    <XAxis dataKey="day" fontSize={8} tickLine={false} axisLine={false} interval={4} />
-                    <YAxis domain={[0, 100]} fontSize={8} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}%`} />
-                    <ReferenceLine y={90} stroke="#F59E0B" strokeDasharray="3 3" />
-                    <Tooltip formatter={(v: number) => [`${v}%`, t.retentionLabel]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-                <p className="text-[10px] text-amber-500 mt-0.5">─ ─ {t.reviewThreshold} (90%)</p>
-              </div>
-            )
+            return vocabCard ? <VocabReviewChart card={vocabCard} /> : null
           })()}
           {/* Conjugation panel — DE only */}
           {editCard.language === 'de' && (
@@ -4561,9 +4592,9 @@ function CheckpointEditor({ checkpoint, onSave, onClose }: {
         <div>
           <label className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-slate-500">Linked content</label>
           {content ? (
-            <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-xero-border dark:border-slate-600 px-3 py-2">
-              <span className="text-[10px] font-medium uppercase text-xero-green flex-shrink-0">{content.type}</span>
-              <span className="text-xs text-gray-700 dark:text-slate-300 truncate flex-1">{contentLabel(content)}</span>
+            <div className="mt-1.5 flex items-start gap-2 rounded-lg border border-xero-border dark:border-slate-600 px-3 py-2">
+              <span className="text-[10px] font-medium uppercase text-xero-green flex-shrink-0 pt-0.5">{content.type}</span>
+              <span className="text-xs text-gray-700 dark:text-slate-300 break-words flex-1 min-w-0">{contentLabel(content)}</span>
               {contentLabel(content) !== '(linked item removed)' && (
                 <button
                   onClick={() => {
@@ -4612,7 +4643,7 @@ function CheckpointEditor({ checkpoint, onSave, onClose }: {
                   <button
                     key={item.id}
                     onClick={() => { setContent({ type: pickerTab, id: item.id }); setPickerOpen(false); setQuery('') }}
-                    className="w-full text-left text-xs px-3 py-2 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 truncate"
+                    className="w-full text-left text-xs px-3 py-2 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 break-words"
                   >
                     {item.label}
                   </button>
@@ -4688,6 +4719,12 @@ function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
     if (c.type === 'vocab') { const v = vocab.find(v => v.id === c.id); return v ? `${v.word} → ${v.translation}` : null }
     if (c.type === 'sentence') { const s = sentences.find(s => s.id === c.id); return s ? s.source_text : null }
     const s = scenarios.find(s => s.id === c.id); return s ? s.title : null
+  }
+
+  // Secondary line shown with the full text (e.g. a sentence's translation).
+  function pcContentDetail(c: { type: PalaceContentType; id: number }): string | null {
+    if (c.type === 'sentence') return sentences.find(s => s.id === c.id)?.translation ?? null
+    return null
   }
 
   useEffect(() => { checkpointsRef.current = checkpoints }, [checkpoints])
@@ -5073,6 +5110,7 @@ function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
                   onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ nodeId: c.id, screenX: e.clientX, screenY: e.clientY }) }}
                   style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                 >
+                  <title>{[c.label, contentPreview, c.content ? pcContentDetail(c.content) : null].filter(Boolean).join('\n')}</title>
                   <rect x={x + 3} y={y + 3} width={PW} height={PH} rx={16} fill="rgba(0,0,0,0.06)" />
                   {isTarget && <rect x={x - 4} y={y - 4} width={PW + 8} height={PH + 8} rx={20} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.6} strokeDasharray="4 3" />}
                   <clipPath id={`pclip-${c.id}`}><rect x={x} y={y} width={PW} height={PH} rx={16} /></clipPath>
@@ -5134,7 +5172,8 @@ function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
                       {contentPreview ? (
                         <>
                           <text x={x + PW / 2} y={y + 46} textAnchor="middle" fontSize={8.5} fontWeight={700} fill={color} style={{ pointerEvents: 'none', userSelect: 'none' }}>{c.content!.type.toUpperCase()}</text>
-                          {pcWrapLines(contentPreview, 16).slice(0, 3).map((line, i) => (
+                          {pcWrapLines(contentPreview, 16).map((line, i, all) => i < 2 || all.length <= 3 ? line : i === 2 ? line.replace(/.?$/, '…') : null)
+                            .filter((line): line is string => line !== null).map((line, i) => (
                             <text key={i} x={x + PW / 2} y={y + 60 + i * 13} textAnchor="middle" fontSize={10} fill={dark ? '#CBD5E1' : '#475569'} style={{ pointerEvents: 'none', userSelect: 'none' }}>{line}</text>
                           ))}
                         </>
@@ -5210,8 +5249,17 @@ function MemoryPalaceCanvas({ palaceId }: { palaceId: number }) {
             onClick={e => e.stopPropagation()}
             onContextMenu={e => e.preventDefault()}
           >
-            <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700">
-              <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 truncate">{ctxNode.label}</p>
+            <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700 space-y-1">
+              <p className="text-xs font-semibold text-gray-600 dark:text-slate-300 break-words">{ctxNode.label}</p>
+              {ctxNode.content && pcContentPreview(ctxNode.content) && (
+                <div className="text-xs leading-snug">
+                  <span className="text-[10px] font-medium uppercase text-xero-green mr-1.5">{ctxNode.content.type}</span>
+                  <span className="text-gray-800 dark:text-slate-100 break-words">{pcContentPreview(ctxNode.content)}</span>
+                  {pcContentDetail(ctxNode.content) && (
+                    <p className="text-gray-500 dark:text-slate-400 italic break-words mt-0.5">{pcContentDetail(ctxNode.content)}</p>
+                  )}
+                </div>
+              )}
             </div>
             {[
               { icon: <IconEdit className="w-3.5 h-3.5" strokeWidth={2} />, label: 'Edit checkpoint', onClick: () => { setEditingId(ctxNode.id); setCtxMenu(null) } },

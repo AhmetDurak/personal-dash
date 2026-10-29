@@ -342,6 +342,17 @@ ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS notes     TEXT;
 ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS word_list JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE language_sentences ADD COLUMN IF NOT EXISTS word_list JSONB NOT NULL DEFAULT '[]';
 
+-- One row per vocabulary review — feeds the per-word review history chart
+CREATE TABLE IF NOT EXISTS vocab_reviews (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  vocab_id    INTEGER NOT NULL REFERENCES vocabulary(id) ON DELETE CASCADE,
+  quality     SMALLINT NOT NULL,
+  interval    INTEGER NOT NULL,
+  reviewed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS vocab_reviews_vocab_idx ON vocab_reviews (vocab_id, reviewed_at);
+
 -- Folders for notes and mindmaps
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;
 ALTER TABLE mindmaps       ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;

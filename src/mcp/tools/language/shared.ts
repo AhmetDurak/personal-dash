@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Request } from 'express'
+import type { Pool } from 'pg'
 
 export function json(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] }
@@ -21,6 +22,14 @@ export function sm2(interval: number, repetitions: number, easeFactor: number, q
   const due = new Date()
   due.setDate(due.getDate() + i)
   return { interval: i, repetitions: r, easeFactor: e, dueAt: due.toISOString().slice(0, 10) }
+}
+
+// Appends a vocabulary review to the history log (shared by the REST route and MCP tool).
+export async function logVocabReview(pool: Pool, uid: number, vocabId: number, quality: number, interval: number) {
+  await pool.query(
+    'INSERT INTO vocab_reviews (user_id, vocab_id, quality, interval) VALUES ($1, $2, $3, $4)',
+    [uid, vocabId, quality, interval]
+  )
 }
 
 export const qualitySchema = z.number().int().min(0).max(5).describe('Recall quality 0-5 (SM-2 scale): 0 = total blackout, 5 = perfect recall')

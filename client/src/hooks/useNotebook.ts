@@ -1,4 +1,5 @@
 import useSWR, { mutate as globalMutate } from 'swr'
+import type { ReviewEntry } from '../lib/retention'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -329,6 +330,12 @@ export function useMemoryPalace(id: number) {
   return { palace: data, savePalace }
 }
 
+// Review history of one vocabulary word (oldest first).
+export function useVocabReviews(id: number | null): ReviewEntry[] {
+  const { data } = useSWR<ReviewEntry[]>(id !== null ? `/api/notebook/vocabulary/${id}/reviews` : null, fetcher)
+  return data ?? []
+}
+
 // ─── Bulk actions (vocab / sentences / scenarios) ─────────────────────────────
 
 export type BulkAction = { action: 'delete' } | { action: 'reset' } | { action: 'move'; folder: string | null }
@@ -380,6 +387,7 @@ export function useVocabulary() {
       body: JSON.stringify({ quality }),
     })
     await mutate()
+    await globalMutate(`/api/notebook/vocabulary/${id}/reviews`)
   }
 
   async function updateWord(id: number, payload: { word: string; translation: string; language: string; translation_language?: string; example?: string; image_url?: string }) {

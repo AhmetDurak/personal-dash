@@ -5,6 +5,7 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
 import { parseBulkAction, bulkActionQuery, type BulkTable } from '../../lib/bulkAction'
+import { logVocabReview } from '../../mcp/tools/language/shared'
 
 const ATTACHMENT_DIR = path.join(process.cwd(), 'uploads', 'notebook')
 fs.mkdirSync(ATTACHMENT_DIR, { recursive: true })
@@ -304,7 +305,17 @@ export function notebookRouter(pool: Pool): Router {
       'UPDATE vocabulary SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
       [interval, repetitions, easeFactor, dueAt, req.params.id, uid]
     )
+    await logVocabReview(pool, uid, Number(req.params.id), quality, interval)
     res.json(updated[0])
+  })
+
+  router.get('/vocabulary/:id/reviews', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const { rows } = await pool.query(
+      'SELECT quality, interval, reviewed_at FROM vocab_reviews WHERE vocab_id=$1 AND user_id=$2 ORDER BY reviewed_at',
+      [req.params.id, uid]
+    )
+    res.json(rows)
   })
 
   router.patch('/vocabulary/folder-rename', async (req: Request, res: Response) => {
