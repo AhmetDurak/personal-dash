@@ -1,13 +1,15 @@
 import { createPortal } from 'react-dom'
+import type { ReactNode } from 'react'
 
 interface Props {
   message: string
+  children?: ReactNode   // extra fields shown under the message
   confirmLabel?: string
   onConfirm: () => void
   onCancel: () => void
 }
 
-export function ConfirmDialog({ message, confirmLabel = 'Yes, proceed', onConfirm, onCancel }: Props) {
+export function ConfirmDialog({ message, confirmLabel = 'Yes, proceed', onConfirm, onCancel, children }: Props) {
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
@@ -16,6 +18,7 @@ export function ConfirmDialog({ message, confirmLabel = 'Yes, proceed', onConfir
           <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">Are you sure?</p>
           <p className="text-sm text-gray-500 dark:text-slate-400">{message}</p>
         </div>
+        {children}
         <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}

@@ -338,7 +338,7 @@ export function useVocabReviews(id: number | null): ReviewEntry[] {
 
 // ─── Bulk actions (vocab / sentences / scenarios) ─────────────────────────────
 
-export type BulkAction = { action: 'delete' } | { action: 'reset' } | { action: 'move'; folder: string | null }
+export type BulkAction = { action: 'delete' } | { action: 'reset'; dueAt: string } | { action: 'move'; folder: string | null }
 
 async function postBulkAction(url: string, ids: number[], a: BulkAction) {
   await fetch(url, {

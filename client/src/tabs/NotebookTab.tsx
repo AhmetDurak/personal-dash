@@ -2183,7 +2183,7 @@ function VocabView() {
             onExit={sel.exit}
             onReview={() => { setSingleReview(vocab.filter(w => sel.selected.has(w.id))); setReviewIdx(0); setFlipped(false); setAnswer(''); setAnswerResult(null); setReviewMode(true); sel.exit() }}
             onMove={async folder => { await bulkVocabAction([...sel.selected], { action: 'move', folder }); sel.exit() }}
-            onReset={async () => { await bulkVocabAction([...sel.selected], { action: 'reset' }); sel.exit() }}
+            onReset={async dueAt => { await bulkVocabAction([...sel.selected], { action: 'reset', dueAt }); sel.exit() }}
             onDelete={async () => { if (editCard && sel.selected.has(editCard.id)) setEditCard(null); await bulkVocabAction([...sel.selected], { action: 'delete' }); sel.exit() }}
           />
         )}
@@ -3637,7 +3637,7 @@ function SentenceView() {
             onExit={sel.exit}
             onReview={() => { setSingleReviewItem(sentences.filter(x => sel.selected.has(x.id))); sel.exit() }}
             onMove={async folder => { await bulkSentenceAction([...sel.selected], { action: 'move', folder }); sel.exit() }}
-            onReset={async () => { await bulkSentenceAction([...sel.selected], { action: 'reset' }); sel.exit() }}
+            onReset={async dueAt => { await bulkSentenceAction([...sel.selected], { action: 'reset', dueAt }); sel.exit() }}
             onDelete={async () => { if (editingId !== null && sel.selected.has(editingId)) setEditingId(null); await bulkSentenceAction([...sel.selected], { action: 'delete' }); sel.exit() }}
           />
         )}
@@ -4153,7 +4153,7 @@ function ScenarioView() {
             onExit={sel.exit}
             onReview={() => { setSingleReviewItem(scenarios.filter(x => sel.selected.has(x.id))); sel.exit() }}
             onMove={async folder => { await bulkScenarioAction([...sel.selected], { action: 'move', folder }); sel.exit() }}
-            onReset={async () => { await bulkScenarioAction([...sel.selected], { action: 'reset' }); sel.exit() }}
+            onReset={async dueAt => { await bulkScenarioAction([...sel.selected], { action: 'reset', dueAt }); sel.exit() }}
             onDelete={async () => { if (activeId !== null && sel.selected.has(activeId)) setActiveId(null); await bulkScenarioAction([...sel.selected], { action: 'delete' }); sel.exit() }}
           />
         )}

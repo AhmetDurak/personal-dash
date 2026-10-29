@@ -25,6 +25,12 @@ export function SelectCheckbox({ checked }: { checked: boolean }) {
   )
 }
 
+// YYYY-MM-DD in the user's local timezone (toISOString would give the UTC date).
+function localToday(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 const btn = 'text-xs px-2.5 min-h-[44px] md:min-h-0 md:py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40'
 
 // Toolbar shown above a list while selecting: select all / by language, then
@@ -40,11 +46,12 @@ export function SelectionBar({ count, visibleCount, languages, folders, onSelect
   onExit: () => void
   onReview: () => void
   onMove: (folder: string | null) => void
-  onReset: () => Promise<void>
+  onReset: (startDate: string) => Promise<void>
   onDelete: () => Promise<void>
 }) {
   const [langOpen, setLangOpen] = useState(false)
   const [confirm, setConfirm] = useState<'reset' | 'delete' | null>(null)
+  const [startDate, setStartDate] = useState(localToday)
   const langRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -86,18 +93,26 @@ export function SelectionBar({ count, visibleCount, languages, folders, onSelect
         {none
           ? <button disabled className={`${btn} bg-gray-100 dark:bg-slate-700 text-gray-500`}>Move</button>
           : <FolderMoveButton folder={null} folders={folders} onMove={onMove} label="Move" openDown />}
-        <button onClick={() => setConfirm('reset')} disabled={none} className={`${btn} bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100`}>Reset</button>
+        <button onClick={() => { setStartDate(localToday()); setConfirm('reset') }} disabled={none} className={`${btn} bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100`}>Reset</button>
         <button onClick={() => setConfirm('delete')} disabled={none} className={`${btn} bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100`}>Delete</button>
       </div>
       {confirm && (
         <ConfirmDialog
           message={confirm === 'delete'
             ? `Delete ${count} item${count === 1 ? '' : 's'}? This cannot be undone.`
-            : `Reset progress for ${count} item${count === 1 ? '' : 's'}? They become due today and start over.`}
+            : `Reset progress for ${count} item${count === 1 ? '' : 's'}? Their forgetting curve starts over and they become due on the start date.`}
           confirmLabel={confirm === 'delete' ? 'Delete' : 'Reset'}
-          onConfirm={async () => { const c = confirm; setConfirm(null); await (c === 'delete' ? onDelete() : onReset()) }}
+          onConfirm={async () => { const c = confirm; setConfirm(null); await (c === 'delete' ? onDelete() : onReset(startDate || localToday())) }}
           onCancel={() => setConfirm(null)}
-        />
+        >
+          {confirm === 'reset' && (
+            <label className="flex items-center justify-between gap-3 text-sm text-gray-700 dark:text-slate-200">
+              Start on
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                className="text-base md:text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-slate-100 rounded-lg px-2.5 min-h-[44px] focus:outline-none focus:ring-1 focus:ring-xero-green" />
+            </label>
+          )}
+        </ConfirmDialog>
       )}
     </div>
   )
