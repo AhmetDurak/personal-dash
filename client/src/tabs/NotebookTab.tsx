@@ -1933,8 +1933,7 @@ function VocabView() {
     }
   }, [highlightParams, vocab]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (reviewMode) {
-    return (
+  const reviewView = reviewMode ? (
       <div className="flex flex-col items-center justify-center gap-6 p-6 h-full">
         <div className="flex items-center gap-4">
           <button
@@ -2022,8 +2021,7 @@ function VocabView() {
           </div>
         )}
       </div>
-    )
-  }
+    ) : null
 
   // "+ New word" in the tree can't create immediately like Notes/Sentence/Scenario do —
   // word + translation are required by the backend — so it opens the quick-add form
@@ -2083,7 +2081,7 @@ function VocabView() {
       )}
 
       {/* Item list column */}
-      <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={editCard !== null ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
+      <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={editCard !== null || reviewView ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <button onClick={() => setMobileTreeOpen(true)}
             className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
@@ -2195,8 +2193,8 @@ function VocabView() {
       </ResizableSidebar>
 
       {/* Detail / edit pane */}
-      <div className={`${editCard === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
-      {editCard ? (
+      <div className={`${editCard === null && !reviewView ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
+      {reviewView ?? (editCard ? (
         <form onSubmit={handleEditSave} className="p-4 max-w-lg mx-auto space-y-3 w-full">
           <button type="button" onClick={() => setEditCard(null)}
             className="md:hidden text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors -ml-3 p-3 min-w-[44px] min-h-[44px] flex items-center">
@@ -2370,7 +2368,7 @@ function VocabView() {
         <div className="flex-1 flex items-center justify-center text-gray-400 text-sm px-6 text-center">
           {isLoading ? 'Loading…' : 'Select or add a word to get started.'}
         </div>
-      )}
+      ))}
       </div>
 
       {/* Quick-add-word modal — word + translation are required before a word (or a
@@ -3489,27 +3487,22 @@ function SentenceView() {
     )
   }
 
-  if (singleReviewItem) {
-    return (
+  // Review runs inside the detail pane — folder tree and list stay usable.
+  const reviewView = singleReviewItem ? (
       <ReviewSession
         items={singleReviewItem.map(s => ({ id: s.id, front: s.source_text, back: s.translation, palace: s.memory_palace }))}
         onRate={async (id, q) => { await reviewSentence(id, q) }}
         onDone={() => setSingleReviewItem(null)}
         allowTyping
       />
-    )
-  }
-
-  if (reviewMode) {
-    return (
+    ) : reviewMode ? (
       <ReviewSession
         items={dueItems.map(s => ({ id: s.id, front: s.source_text, back: s.translation, palace: s.memory_palace }))}
         onRate={async (id, q) => { await reviewSentence(id, q) }}
         onDone={() => setReviewMode(false)}
         allowTyping
       />
-    )
-  }
+    ) : null
 
   function TreePane() {
     return (
@@ -3564,7 +3557,7 @@ function SentenceView() {
       )}
 
       {/* Item list column */}
-      <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={editingId !== null ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
+      <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={editingId !== null || reviewView ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <button onClick={() => setMobileTreeOpen(true)}
             className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
@@ -3675,8 +3668,8 @@ function SentenceView() {
       </ResizableSidebar>
 
       {/* Detail / edit pane */}
-      <div className={`${editingId === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
-      {editingId !== null && activeSentence ? (
+      <div className={`${editingId === null && !reviewView ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
+      {reviewView ?? (editingId !== null && activeSentence ? (
       <div className="p-4 max-w-2xl mx-auto space-y-3 w-full">
         <button onClick={() => setEditingId(null)}
           className="md:hidden text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors -ml-3 p-3 min-w-[44px] min-h-[44px] flex items-center">
@@ -3721,7 +3714,7 @@ function SentenceView() {
             {isLoading ? 'Loading…' : 'Select or create a sentence to get started.'}
           </div>
         </div>
-      )}
+      ))}
       </div>
 
       {confirmDeleteFolder !== null && (
@@ -4011,25 +4004,20 @@ function ScenarioView() {
   }
 
   // ── Review mode ──────────────────────────────────────────────────────────────
-  if (singleReviewItem) {
-    return (
+  // Review runs inside the detail pane — folder tree and list stay usable.
+  const reviewView = singleReviewItem ? (
       <ReviewSession
         items={singleReviewItem.map(s => ({ id: s.id, front: s.title, back: s.content || null, palace: s.memory_palace }))}
         onRate={async (id, q) => { await reviewScenario(id, q) }}
         onDone={() => setSingleReviewItem(null)}
       />
-    )
-  }
-
-  if (reviewMode) {
-    return (
+    ) : reviewMode ? (
       <ReviewSession
         items={dueItems.map(s => ({ id: s.id, front: s.title, back: s.content || null, palace: s.memory_palace }))}
         onRate={async (id, q) => { await reviewScenario(id, q) }}
         onDone={() => setReviewMode(false)}
       />
-    )
-  }
+    ) : null
 
   function TreePane() {
     return (
@@ -4084,7 +4072,7 @@ function ScenarioView() {
       )}
 
       {/* Item list column */}
-      <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={activeId !== null ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
+      <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={activeId !== null || reviewView ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
           <button onClick={() => setMobileTreeOpen(true)}
             className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
@@ -4195,8 +4183,8 @@ function ScenarioView() {
       </ResizableSidebar>
 
       {/* Detail / edit pane */}
-      <div className={`${activeId === null ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
-      {activeId !== null && active ? (
+      <div className={`${activeId === null && !reviewView ? 'hidden md:flex' : 'flex'} flex-1 flex-col overflow-y-auto`}>
+      {reviewView ?? (activeId !== null && active ? (
       <div className="p-4 max-w-2xl mx-auto space-y-3 w-full">
         <button onClick={() => { setActiveId(null); setIsEditingContent(false) }}
           className="md:hidden text-xs text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors -ml-3 p-3 min-w-[44px] min-h-[44px] flex items-center">
@@ -4359,7 +4347,7 @@ function ScenarioView() {
             {isLoading ? 'Loading…' : 'Select or create a scenario to get started.'}
           </div>
         </div>
-      )}
+      ))}
       </div>
 
       {confirmDeleteFolder !== null && (

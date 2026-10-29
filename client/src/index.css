@@ -86,12 +86,16 @@ html, body {
 .dark input::placeholder, .dark textarea::placeholder { color: #475569; }
 .dark input:focus, .dark textarea:focus { border-color: #00B087; }
 
-/* Recharts tooltip — override all inline styles in dark mode */
-.dark .recharts-tooltip-wrapper .recharts-default-tooltip,
-.dark .recharts-tooltip-wrapper .recharts-tooltip-label,
-.dark .recharts-tooltip-wrapper .recharts-tooltip-item {
+/* Recharts tooltip — override all inline styles in dark mode (box only; label/items stay flat) */
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
   background-color: #1E293B !important;
   border: 1px solid #334155 !important;
+  color: #F1F5F9 !important;
+}
+.dark .recharts-tooltip-wrapper .recharts-tooltip-label,
+.dark .recharts-tooltip-wrapper .recharts-tooltip-item {
+  background-color: transparent !important;
+  border: none !important;
   color: #F1F5F9 !important;
 }
 .dark .recharts-tooltip-wrapper .recharts-tooltip-item-name,
