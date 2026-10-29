@@ -1831,9 +1831,19 @@ function VocabView() {
     openEdit(card)
   }
 
+  // Save is enabled only when the open word differs from its saved version.
+  const savedCard = editCard ? vocab.find(v => v.id === editCard.id) : undefined
+  const editDirty = !!editCard && (!savedCard ||
+    editCard.word !== savedCard.word ||
+    editCard.translation !== savedCard.translation ||
+    editCard.language !== savedCard.language ||
+    editCard.translation_language !== savedCard.translation_language ||
+    editCard.example !== (savedCard.example ?? '') ||
+    editCard.image_url !== (savedCard.image_url ?? ''))
+
   async function handleEditSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!editCard) return
+    if (!editCard || !editDirty) return
     await updateWord(editCard.id, {
       word: editCard.word,
       translation: editCard.translation,
@@ -2328,7 +2338,7 @@ function VocabView() {
             <FolderMoveButton folder={vocab.find(v => v.id === editCard.id)?.folder ?? null} folders={collectFolderPaths(vocabTree)} onMove={f => moveVocabToFolder(editCard.id, f)} />
           </div>
           <div className="flex items-center gap-3 pt-1">
-            <button type="submit" className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium">{t.save}</button>
+            <button type="submit" disabled={!editDirty} className="flex-1 text-sm bg-xero-green text-white py-2 rounded-lg font-medium transition-colors disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-slate-700 dark:disabled:text-slate-500 disabled:cursor-not-allowed">{t.save}</button>
             <button
               type="button"
               onClick={() => {
