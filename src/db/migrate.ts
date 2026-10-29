@@ -1,4 +1,5 @@
 import { pool } from './pool'
+import { SRS_CONFIG } from '../lib/srs'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -372,6 +373,11 @@ CREATE TABLE IF NOT EXISTS scenario_reviews (
   reviewed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS scenario_reviews_item_idx ON scenario_reviews (scenario_id, reviewed_at);
+
+-- Starting ease per item kind (see SRS_CONFIG); only affects newly created rows
+ALTER TABLE vocabulary         ALTER COLUMN ease_factor SET DEFAULT ${SRS_CONFIG.vocab.startEase};
+ALTER TABLE language_sentences ALTER COLUMN ease_factor SET DEFAULT ${SRS_CONFIG.sentence.startEase};
+ALTER TABLE language_scenarios ALTER COLUMN ease_factor SET DEFAULT ${SRS_CONFIG.scenario.startEase};
 
 -- Folders for notes and mindmaps
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;

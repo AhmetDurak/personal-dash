@@ -2,7 +2,11 @@
 // (vocabulary, sentences, scenarios). Pure so it can be unit-tested; the route
 // only validates input and runs the query.
 
+import { SRS_CONFIG, type ReviewKind } from './srs'
+
 export type BulkTable = 'vocabulary' | 'language_sentences' | 'language_scenarios'
+
+const TABLE_KIND: Record<BulkTable, ReviewKind> = { vocabulary: 'vocab', language_sentences: 'sentence', language_scenarios: 'scenario' }
 
 export type BulkAction =
   | { action: 'delete' }
@@ -32,7 +36,7 @@ export function bulkActionQuery(table: BulkTable, uid: number, ids: number[], a:
       return { text: `DELETE FROM ${table} WHERE user_id=$1 AND id = ANY($2::int[])`, values: [uid, ids] }
     case 'reset':
       return {
-        text: `UPDATE ${table} SET interval=1, repetitions=0, ease_factor=2.5, due_at=COALESCE($3::date, CURRENT_DATE) WHERE user_id=$1 AND id = ANY($2::int[])`,
+        text: `UPDATE ${table} SET interval=1, repetitions=0, ease_factor=${SRS_CONFIG[TABLE_KIND[table]].startEase}, due_at=COALESCE($3::date, CURRENT_DATE) WHERE user_id=$1 AND id = ANY($2::int[])`,
         values: [uid, ids, a.dueAt],
       }
     case 'move':

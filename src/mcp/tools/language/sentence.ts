@@ -131,7 +131,7 @@ export function registerSentenceTools(server: McpServer, req: Request, pool: Poo
     const { rows } = await pool.query('SELECT * FROM language_sentences WHERE id=$1 AND user_id=$2', [id, uid])
     if (!rows[0]) return json(null)
     const row = rows[0] as { interval: number; repetitions: number; ease_factor: string }
-    const sr = sm2(row.interval, row.repetitions, Number(row.ease_factor), quality)
+    const sr = sm2('sentence', row.interval, row.repetitions, Number(row.ease_factor), quality)
     const { rows: updated } = await pool.query(
       'UPDATE language_sentences SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
       [sr.interval, sr.repetitions, sr.easeFactor, sr.dueAt, id, uid]

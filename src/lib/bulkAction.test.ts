@@ -33,9 +33,10 @@ describe('bulkActionQuery', () => {
     }
   })
 
-  it('reset restores SM-2 defaults and makes items due on the start date (default today)', () => {
+  it('reset restores the kind\'s starting schedule and makes items due on the start date (default today)', () => {
     const q = bulkActionQuery('language_sentences', 1, [5], { action: 'reset', dueAt: '2026-11-15' })
-    expect(q.text).toContain('interval=1, repetitions=0, ease_factor=2.5, due_at=COALESCE($3::date, CURRENT_DATE)')
+    expect(q.text).toContain('interval=1, repetitions=0, ease_factor=2.3, due_at=COALESCE($3::date, CURRENT_DATE)')
     expect(q.values[2]).toBe('2026-11-15')
+    expect(bulkActionQuery('vocabulary', 1, [5], { action: 'reset', dueAt: null }).text).toContain('ease_factor=2.5')
   })
 })

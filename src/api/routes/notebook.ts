@@ -6,6 +6,7 @@ import path from 'path'
 import fs from 'fs'
 import { parseBulkAction, bulkActionQuery, type BulkTable } from '../../lib/bulkAction'
 import { logReview, REVIEW_LOG, type ReviewKind } from '../../mcp/tools/language/shared'
+import { sm2 } from '../../lib/srs'
 
 const ATTACHMENT_DIR = path.join(process.cwd(), 'uploads', 'notebook')
 fs.mkdirSync(ATTACHMENT_DIR, { recursive: true })
@@ -279,33 +280,13 @@ export function notebookRouter(pool: Pool): Router {
     const { rows } = await pool.query('SELECT * FROM vocabulary WHERE id=$1 AND user_id=$2', [req.params.id, uid])
     if (!rows[0]) { res.status(404).json({ error: 'not found' }); return }
 
-    let { interval, repetitions } = rows[0] as { interval: number; repetitions: number }
-    let easeFactor = Number((rows[0] as { ease_factor: string }).ease_factor)
-
-    if (quality >= 3) {
-      if (repetitions === 0)      interval = 1
-      else if (repetitions === 1) interval = 6
-      else                        interval = Math.round(interval * easeFactor)
-      repetitions += 1
-    } else {
-      repetitions = 0
-      interval    = 1
-    }
-
-    easeFactor = Math.max(
-      1.3,
-      easeFactor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)
-    )
-
-    const due = new Date()
-    due.setDate(due.getDate() + interval)
-    const dueAt = due.toISOString().slice(0, 10)
-
+    const row = rows[0] as { interval: number; repetitions: number; ease_factor: string }
+    const sr = sm2('vocab', row.interval, row.repetitions, Number(row.ease_factor), quality)
     const { rows: updated } = await pool.query(
       'UPDATE vocabulary SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
-      [interval, repetitions, easeFactor, dueAt, req.params.id, uid]
+      [sr.interval, sr.repetitions, sr.easeFactor, sr.dueAt, req.params.id, uid]
     )
-    await logReview(pool, 'vocab', uid, Number(req.params.id), quality, interval)
+    await logReview(pool, 'vocab', uid, Number(req.params.id), quality, sr.interval)
     res.json(updated[0])
   })
 
@@ -359,20 +340,6 @@ export function notebookRouter(pool: Pool): Router {
     )
     res.json({ ok: true })
   })
-
-  // ─── SM-2 helper (shared by sentences and scenarios) ─────────────────────────
-
-  function sm2(interval: number, repetitions: number, easeFactor: number, quality: number) {
-    let i = interval, r = repetitions, e = easeFactor
-    if (quality >= 3) {
-      i = r === 0 ? 1 : r === 1 ? 6 : Math.round(i * e)
-      r += 1
-    } else { i = 1; r = 0 }
-    e = Math.max(1.3, e + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
-    const due = new Date()
-    due.setDate(due.getDate() + i)
-    return { interval: i, repetitions: r, easeFactor: e, dueAt: due.toISOString().slice(0, 10) }
-  }
 
   // ─── Language Sentences ───────────────────────────────────────────────────────
 
@@ -438,7 +405,7 @@ export function notebookRouter(pool: Pool): Router {
     const { rows } = await pool.query('SELECT * FROM language_sentences WHERE id=$1 AND user_id=$2', [req.params.id, uid])
     if (!rows[0]) { res.status(404).json({ error: 'not found' }); return }
     const { interval, repetitions, ease_factor } = rows[0] as { interval: number; repetitions: number; ease_factor: string }
-    const sr = sm2(interval, repetitions, Number(ease_factor), quality)
+    const sr = sm2('sentence', interval, repetitions, Number(ease_factor), quality)
     const { rows: updated } = await pool.query(
       'UPDATE language_sentences SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
       [sr.interval, sr.repetitions, sr.easeFactor, sr.dueAt, req.params.id, uid]
@@ -548,7 +515,7 @@ export function notebookRouter(pool: Pool): Router {
     const { rows } = await pool.query('SELECT * FROM language_scenarios WHERE id=$1 AND user_id=$2', [req.params.id, uid])
     if (!rows[0]) { res.status(404).json({ error: 'not found' }); return }
     const { interval, repetitions, ease_factor } = rows[0] as { interval: number; repetitions: number; ease_factor: string }
-    const sr = sm2(interval, repetitions, Number(ease_factor), quality)
+    const sr = sm2('scenario', interval, repetitions, Number(ease_factor), quality)
     const { rows: updated } = await pool.query(
       'UPDATE language_scenarios SET interval=$1, repetitions=$2, ease_factor=$3, due_at=$4 WHERE id=$5 AND user_id=$6 RETURNING *',
       [sr.interval, sr.repetitions, sr.easeFactor, sr.dueAt, req.params.id, uid]
