@@ -93,6 +93,7 @@ export interface LanguageSentence {
   memory_palace: string | null
   image_url:     string | null
   folder:        string | null
+  word_list:     ScenarioWord[]
   created_at:    string
   updated_at:    string
 }

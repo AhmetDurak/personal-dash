@@ -3436,6 +3436,16 @@ function SentenceView() {
             />
           </div>
         )}
+        <div className="space-y-1 pt-1">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">{t.scenarioWordList}</h3>
+          <WordList
+            words={draft.word_list ?? []}
+            vocab={vocab}
+            sourceLang={draft.source_lang ?? 'de'}
+            targetLang={draft.target_lang ?? 'tr'}
+            onChange={word_list => { setDraft(d => ({ ...d, word_list })); saveSentence(editingId, { word_list }) }}
+          />
+        </div>
       </div>
     )
   }
@@ -3683,16 +3693,21 @@ function SentenceView() {
   )
 }
 
-// ─── ScenarioWordList ─────────────────────────────────────────────────────────
+// ─── WordList ─────────────────────────────────────────────────────────────────
 
-function ScenarioWordList({ words, vocab, sourceLang, onChange }: {
+// Word list of a scenario or sentence. Every entry is backed by a Vocabulary card:
+// an existing card is linked (picked from suggestions or matched by spelling),
+// a new word is added to Vocabulary first.
+function WordList({ words, vocab, sourceLang, targetLang, onChange }: {
   words:      ScenarioWord[]
   vocab:      VocabCard[]
   sourceLang: string
+  targetLang: string
   onChange:   (words: ScenarioWord[]) => void
 }) {
   const { t } = useLanguage()
   const navigate = useNavigate()
+  const { addWord } = useVocabulary()
   const [word, setWord] = useState('')
   const [translation, setTranslation] = useState('')
 
@@ -3708,14 +3723,22 @@ function ScenarioWordList({ words, vocab, sourceLang, onChange }: {
   }
 
   function addLinked(card: VocabCard) {
-    onChange([...words, { word: card.word, translation: card.translation, vocab_id: card.id }])
+    if (!words.some(w => w.vocab_id === card.id)) onChange([...words, { word: card.word, translation: card.translation, vocab_id: card.id }])
     setWord(''); setTranslation('')
   }
 
-  function addManual() {
-    if (!word.trim()) return
-    onChange([...words, { word: word.trim(), translation: translation.trim() || null }])
-    setWord(''); setTranslation('')
+  const existing = word.trim() ? findExact(word) : undefined
+  const canAdd = !!word.trim() && (!!existing || !!translation.trim())
+
+  async function addManual() {
+    if (!canAdd) return
+    if (existing) { addLinked(existing); return }
+    addLinked(await addWord({ word: word.trim(), translation: translation.trim(), language: sourceLang, translation_language: targetLang }))
+  }
+
+  async function addToVocab(i: number, w: ScenarioWord) {
+    const card = await addWord({ word: w.word, translation: w.translation ?? '', language: sourceLang, translation_language: targetLang })
+    onChange(words.map((x, j) => j === i ? { word: card.word, translation: card.translation, vocab_id: card.id } : x))
   }
 
   const inputCls = 'text-sm border rounded-lg px-3 py-2 min-h-[44px] focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-400'
@@ -3746,6 +3769,12 @@ function ScenarioWordList({ words, vocab, sourceLang, onChange }: {
                     🔗
                   </button>
                 )}
+                {!card && !match && w.translation && (
+                  <button onClick={() => addToVocab(i, w)} title="Add to vocabulary"
+                    className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 dark:text-slate-500 hover:text-xero-green">
+                    ＋
+                  </button>
+                )}
                 <button onClick={() => onChange(words.filter((_, j) => j !== i))} title={t.delete}
                   className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400">
                   ×
@@ -3762,8 +3791,9 @@ function ScenarioWordList({ words, vocab, sourceLang, onChange }: {
           placeholder={t.word} className={`${inputCls} flex-1 min-w-0`} />
         <input value={translation} onChange={e => setTranslation(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addManual() }}
-          placeholder={t.translation} className={`${inputCls} flex-1 min-w-0`} />
-        <button onClick={addManual} disabled={!word.trim()}
+          placeholder={existing ? existing.translation : t.translation} disabled={!!existing}
+          className={`${inputCls} flex-1 min-w-0 disabled:opacity-60`} />
+        <button onClick={addManual} disabled={!canAdd}
           className="text-sm px-4 min-h-[44px] rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50">
           {t.add}
         </button>
@@ -3782,6 +3812,11 @@ function ScenarioWordList({ words, vocab, sourceLang, onChange }: {
           </ul>
         )}
       </div>
+      {word.trim() && (
+        <p className="text-[11px] text-gray-400 dark:text-slate-500">
+          {existing ? 'Already in your vocabulary — Add links it.' : 'New word — it will also be added to your vocabulary (translation required).'}
+        </p>
+      )}
     </div>
   )
 }
@@ -4223,10 +4258,11 @@ function ScenarioView() {
         {/* Word list */}
         <div className="space-y-1">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500">{t.scenarioWordList}</h3>
-          <ScenarioWordList
+          <WordList
             words={draft.word_list ?? []}
             vocab={vocab}
             sourceLang={draft.source_lang ?? 'de'}
+            targetLang={draft.target_lang ?? 'tr'}
             onChange={handleWordListChange}
           />
         </div>

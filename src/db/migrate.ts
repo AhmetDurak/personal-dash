@@ -340,6 +340,7 @@ ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS memory_palace TEXT;
 -- Optional notes + word list (entries may link to a vocabulary row) for scenarios
 ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS notes     TEXT;
 ALTER TABLE language_scenarios ADD COLUMN IF NOT EXISTS word_list JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE language_sentences ADD COLUMN IF NOT EXISTS word_list JSONB NOT NULL DEFAULT '[]';
 
 -- Folders for notes and mindmaps
 ALTER TABLE notebook_notes ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT NULL;

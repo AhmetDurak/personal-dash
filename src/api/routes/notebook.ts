@@ -398,14 +398,16 @@ export function notebookRouter(pool: Pool): Router {
   router.put('/language/sentences/:id', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id
     const { source_text, translation, source_lang, target_lang, word_links = [],
-            memory_palace = null, image_url = null } = req.body as Record<string, unknown>
+            memory_palace = null, image_url = null, word_list } = req.body as Record<string, unknown>
     const { rows } = await pool.query(
       `UPDATE language_sentences
        SET source_text=$1, translation=$2, source_lang=$3, target_lang=$4,
-           word_links=$5, memory_palace=$6, image_url=$7, updated_at=now()
+           word_links=$5, memory_palace=$6, image_url=$7,
+           word_list=COALESCE($10::jsonb, word_list), updated_at=now()
        WHERE id=$8 AND user_id=$9 RETURNING *`,
       [source_text, translation, source_lang, target_lang,
-       JSON.stringify(word_links), memory_palace, image_url, req.params.id, uid]
+       JSON.stringify(word_links), memory_palace, image_url, req.params.id, uid,
+       word_list === undefined ? null : JSON.stringify(word_list)]
     )
     res.json(rows[0] ?? null)
   })
