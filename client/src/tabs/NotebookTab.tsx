@@ -2018,25 +2018,7 @@ function VocabView() {
             )}
 
             {/* Self-rating — feeds the spaced-repetition interval in both modes */}
-            {(typeMode ? answerResult !== null : flipped) && (
-              <p className="text-xs font-medium text-gray-500 text-center pt-1">How hard was it to remember?</p>
-            )}
-            {(typeMode ? answerResult !== null : flipped) && (
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { q: 0, label: t.again, cls: 'bg-red-100 text-red-700 hover:bg-red-200',       tip: 'Failed. Resets to 1 day — you\'ll see it again soon.' },
-                  { q: 2, label: t.hard,  cls: 'bg-amber-100 text-amber-700 hover:bg-amber-200', tip: 'Barely recalled. Resets interval — needs more practice.' },
-                  { q: 4, label: t.good,  cls: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200', tip: 'Recalled correctly. Interval advances normally.' },
-                  { q: 5, label: t.easy,  cls: 'bg-sky-100 text-sky-700 hover:bg-sky-200',       tip: 'Recalled instantly. Longer interval + easier factor.' },
-                ].map(({ q, label, cls, tip }) => (
-                  <RateTooltip key={q} text={tip}>
-                    <button onClick={() => handleRate(q)} className={`w-full min-h-[44px] text-xs font-semibold rounded-lg py-2.5 transition-colors ${cls}`}>
-                      {label}
-                    </button>
-                  </RateTooltip>
-                ))}
-              </div>
-            )}
+            {(typeMode ? answerResult !== null : flipped) && <RatingButtons onRate={handleRate} />}
           </div>
         )}
       </div>
@@ -3130,7 +3112,33 @@ function nextReviewLabel(dateStr: string): string {
 // ─── Review Session (shared by sentence + scenario) ───────────────────────────
 
 type ReviewItem = { id: number; front: string; back: string | null; palace: string | null }
-type ReviewQuality = 1 | 3 | 5   // again | good | easy
+type ReviewQuality = 0 | 2 | 4 | 5   // again | hard | good | easy (SM-2 scale)
+
+// Self-rating after recall — the same four choices for words, sentences and scenarios.
+function RatingButtons({ onRate, disabled = false }: { onRate: (q: ReviewQuality) => void; disabled?: boolean }) {
+  const { t } = useLanguage()
+  const ratings: Array<{ q: ReviewQuality; label: string; cls: string; tip: string }> = [
+    { q: 0, label: t.again, cls: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50',                 tip: 'Failed. Resets to 1 day — you\'ll see it again soon.' },
+    { q: 2, label: t.hard,  cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50',     tip: 'Barely recalled. Resets interval — needs more practice.' },
+    { q: 4, label: t.good,  cls: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50', tip: 'Recalled correctly. Interval advances normally.' },
+    { q: 5, label: t.easy,  cls: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 hover:bg-sky-200 dark:hover:bg-sky-900/50',                 tip: 'Recalled instantly. Longer interval + easier factor.' },
+  ]
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-gray-500 dark:text-slate-400 text-center pt-1">How hard was it to remember?</p>
+      <div className="grid grid-cols-4 gap-2">
+        {ratings.map(({ q, label, cls, tip }) => (
+          <RateTooltip key={q} text={tip}>
+            <button onClick={() => onRate(q)} disabled={disabled}
+              className={`w-full min-h-[44px] text-xs font-semibold rounded-lg py-2.5 transition-colors disabled:opacity-50 ${cls}`}>
+              {label}
+            </button>
+          </RateTooltip>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function ReviewSession({
   items, onRate, onDone, allowTyping = false,
@@ -3177,7 +3185,6 @@ function ReviewSession({
     const pct = strSimilarity(answer, current.back)
     const correct = pct >= 0.9
     setAnswerResult({ correct, pct })
-    setTimeout(() => rate(correct ? 5 : 1), 1500)
   }
 
   return (
@@ -3220,6 +3227,7 @@ function ReviewSession({
               <p className="text-xs text-gray-500 dark:text-slate-400 mt-1.5">
                 Answer: <span className="font-medium text-gray-800 dark:text-slate-200">{current.back}</span>
               </p>
+              <div className="mt-3"><RatingButtons onRate={rate} disabled={loading} /></div>
             </div>
           ) : (
             <div className="flex gap-2">
@@ -3244,7 +3252,7 @@ function ReviewSession({
         ) : !revealed ? (
           <button
             onClick={() => setRevealed(true)}
-            className="w-full py-2.5 text-sm font-medium rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-600 text-gray-400 dark:text-slate-500 hover:border-xero-green hover:text-xero-green transition-colors"
+            className="w-full min-h-[44px] py-2.5 text-sm font-medium rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-600 text-gray-400 dark:text-slate-500 hover:border-xero-green hover:text-xero-green transition-colors"
           >
             Show translation →
           </button>
@@ -3253,20 +3261,7 @@ function ReviewSession({
             <div className="pt-2 border-t border-gray-100 dark:border-slate-700">
               <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">{current.back ?? '—'}</p>
             </div>
-            <div className="flex gap-2 pt-1">
-              {[
-                { q: 1, label: 'Again', cls: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30',       tip: 'Failed. Resets to 1 day — you\'ll see it again soon.' },
-                { q: 3, label: 'Hard',  cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30', tip: 'Recalled with difficulty. Small interval advance.' },
-                { q: 5, label: 'Easy',  cls: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30', tip: 'Recalled instantly. Longer interval + easier factor.' },
-              ].map(({ q, label, cls, tip }) => (
-                <RateTooltip key={q} text={tip}>
-                  <button onClick={() => rate(q as ReviewQuality)} disabled={loading}
-                    className={`flex-1 py-2.5 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 ${cls}`}>
-                    {label}
-                  </button>
-                </RateTooltip>
-              ))}
-            </div>
+            <RatingButtons onRate={rate} disabled={loading} />
           </div>
         )}
       </div>
