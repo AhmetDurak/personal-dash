@@ -4,6 +4,7 @@ import { vault } from '../obsidian/vaultAdapter'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
+import { parseBulkAction, bulkActionQuery, type BulkTable } from '../../lib/bulkAction'
 
 const ATTACHMENT_DIR = path.join(process.cwd(), 'uploads', 'notebook')
 fs.mkdirSync(ATTACHMENT_DIR, { recursive: true })
@@ -222,6 +223,23 @@ export function notebookRouter(pool: Pool): Router {
     )
     res.json({ inserted: valid.length })
   })
+
+  // Bulk delete / reset progress / move-to-folder for selected vocab, sentences or scenarios.
+  const bulkTables: Record<string, BulkTable> = {
+    '/vocabulary/bulk-action': 'vocabulary',
+    '/language/sentences/bulk-action': 'language_sentences',
+    '/language/scenarios/bulk-action': 'language_scenarios',
+  }
+  for (const [route, table] of Object.entries(bulkTables)) {
+    router.post(route, async (req: Request, res: Response) => {
+      const uid = (req.user as Express.User).id
+      const parsed = parseBulkAction(req.body)
+      if (!parsed) { res.status(400).json({ error: 'ids and a valid action are required' }); return }
+      const { text, values } = bulkActionQuery(table, uid, parsed.ids, parsed.action)
+      const { rowCount } = await pool.query(text, values)
+      res.json({ affected: rowCount ?? 0 })
+    })
+  }
 
   router.put('/vocabulary/bulk-move', async (req: Request, res: Response) => {
     const uid = (req.user as Express.User).id

@@ -26,6 +26,7 @@ import { TranscriptView } from '../components/web/TranscriptView'
 import { ItemFolderTree, isTouch } from '../components/web/ItemFolderTree'
 import { FolderMoveButton } from '../components/web/FolderMoveButton'
 import { SortMenuButton } from '../components/web/SortMenuButton'
+import { SelectionBar, SelectCheckbox, useSelection } from '../components/web/SelectionBar'
 import { ResizableSidebar } from '../components/web/ResizableSidebar'
 import { AutoGrowTextarea } from '../components/web/AutoGrowTextarea'
 import { useLanguage } from '../hooks/useLanguage'
@@ -1709,13 +1710,13 @@ async function fetchDeConj(word: string): Promise<DeConjugation | null> {
 
 function VocabView() {
   const { t } = useLanguage()
-  const { vocab, isLoading, addWord, deleteWord, review, bulkImport, updateWord, moveVocabToFolder, renameVocabFolder, deleteVocabFolder } = useVocabulary()
+  const { vocab, isLoading, bulkVocabAction, addWord, deleteWord, review, bulkImport, updateWord, moveVocabToFolder, renameVocabFolder, deleteVocabFolder } = useVocabulary()
   const [confirmDeleteVocabId, setConfirmDeleteVocabId] = useState<number | null>(null)
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
   const [reviewMode, setReviewMode] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [reviewIdx, setReviewIdx] = useState(0)
-  const [singleReview, setSingleReview] = useState<VocabCard | null>(null)
+  const [singleReview, setSingleReview] = useState<VocabCard[] | null>(null)
   const [typeMode, setTypeMode]   = useState(false)
   const [answer, setAnswer]       = useState('')
   const [answerResult, setAnswerResult] = useState<{ correct: boolean; pct: number } | null>(null)
@@ -1785,9 +1786,10 @@ function VocabView() {
   const q = vocabSearch.trim().toLowerCase()
   const scopedWords = getItemsInFolder(vocabTree, selectedFolder)
   const listItems = sortVocab(q ? scopedWords.filter(v => [v.word, v.translation, v.example ?? ''].some(s => s.toLowerCase().includes(q))) : scopedWords)
+  const sel = useSelection()
   const scopeLabel = selectedFolder === null ? 'All Words' : selectedFolder === '' ? 'Unsorted' : selectedFolder
-  // Reviewing one picked word uses a snapshot so it stays put after its due date moves.
-  const reviewCards = singleReview ? [singleReview] : dueCards
+  // Reviewing picked words uses a snapshot so they stay put after their due dates move.
+  const reviewCards = singleReview ?? dueCards
   const reviewCard: VocabCard | null = reviewCards[reviewIdx] ?? null
 
   async function handleRate(quality: number) {
@@ -2045,6 +2047,9 @@ function VocabView() {
             <IconMenu className="w-4 h-4" strokeWidth={2} />
           </button>
           <span className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate flex-1">{scopeLabel}</span>
+          {!sel.selecting && listItems.length > 0 && (
+            <button onClick={sel.start} className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 px-2 min-h-[44px] md:min-h-0 md:py-1.5 rounded-lg flex-shrink-0">Select</button>
+          )}
           {dueCards.length > 0 && (
             <button
               onClick={() => setReviewMode(true)}
@@ -2104,6 +2109,23 @@ function VocabView() {
 
         {importMsg && <p className="text-xs text-xero-green font-medium px-3 pt-1.5">{importMsg}</p>}
 
+        {sel.selecting && (
+          <SelectionBar
+            count={sel.selected.size}
+            visibleCount={listItems.length}
+            languages={[...new Set(listItems.map(w => w.language))].map(l => ({ value: l, label: LANG_LABELS[l] ?? l }))}
+            folders={collectFolderPaths(vocabTree)}
+            onSelectAll={() => sel.set(listItems.map(w => w.id))}
+            onSelectLanguage={lang => sel.set(listItems.filter(w => w.language === lang).map(w => w.id))}
+            onClear={() => sel.set([])}
+            onExit={sel.exit}
+            onReview={() => { setSingleReview(vocab.filter(w => sel.selected.has(w.id))); setReviewIdx(0); setFlipped(false); setAnswer(''); setAnswerResult(null); setReviewMode(true); sel.exit() }}
+            onMove={async folder => { await bulkVocabAction([...sel.selected], { action: 'move', folder }); sel.exit() }}
+            onReset={async () => { await bulkVocabAction([...sel.selected], { action: 'reset' }); sel.exit() }}
+            onDelete={async () => { if (editCard && sel.selected.has(editCard.id)) setEditCard(null); await bulkVocabAction([...sel.selected], { action: 'delete' }); sel.exit() }}
+          />
+        )}
+
         <div className="flex-1 overflow-y-auto py-1 px-1 mt-1">
           {isLoading ? (
             <p className="text-xs text-gray-400 p-4">Loading…</p>
@@ -2113,12 +2135,14 @@ function VocabView() {
             listItems.map(v => (
               <div
                 key={v.id}
-                onClick={() => openEdit(v)}
+                onClick={() => sel.selecting ? sel.toggle(v.id) : openEdit(v)}
                 draggable={!isTouch}
                 onDragStart={e => { e.dataTransfer.setData('treeItemId', String(v.id)); e.dataTransfer.effectAllowed = 'move' }}
                 className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${isTouch ? 'min-h-[44px]' : ''} ${editCard?.id === v.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
               >
-                <IconBook className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+                {sel.selecting
+                  ? <SelectCheckbox checked={sel.selected.has(v.id)} />
+                  : <IconBook className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
                 <span className={`text-xs flex-1 truncate ${editCard?.id === v.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{v.word}</span>
                 <span className="text-[10px] text-gray-400 dark:text-slate-500 truncate max-w-[35%]">{v.translation}</span>
               </div>
@@ -2310,7 +2334,7 @@ function VocabView() {
               onClick={() => {
                 const card = vocab.find(v => v.id === editCard.id)
                 if (!card) return
-                setSingleReview(card); setReviewIdx(0); setFlipped(false); setAnswer(''); setAnswerResult(null); setReviewMode(true)
+                setSingleReview([card]); setReviewIdx(0); setFlipped(false); setAnswer(''); setAnswerResult(null); setReviewMode(true)
               }}
               className="text-sm border border-xero-green text-xero-green px-4 py-2 rounded-lg font-medium hover:bg-xero-green/10 transition-colors flex-shrink-0"
             >
@@ -3202,7 +3226,7 @@ function ReviewSession({
 function SentenceView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { sentences, isLoading, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences, moveSentenceToFolder, renameSentenceFolder, deleteSentenceFolder } = useLanguageSentences()
+  const { sentences, isLoading, bulkSentenceAction, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences, moveSentenceToFolder, renameSentenceFolder, deleteSentenceFolder } = useLanguageSentences()
   const { vocab } = useVocabulary()
   const [sentParams, setSentParams] = useSearchParams()
   const editingId = sentParams.get('sentence') ? Number(sentParams.get('sentence')) : null
@@ -3242,7 +3266,7 @@ function SentenceView() {
     e.target.value = ''
   }
 
-  const [singleReviewItem, setSingleReviewItem] = useState<LanguageSentence | null>(null)
+  const [singleReviewItem, setSingleReviewItem] = useState<LanguageSentence[] | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
   const [sentSearch, setSentSearch] = useState('')
@@ -3255,6 +3279,7 @@ function SentenceView() {
   const scopedSentences = getItemsInFolder(sentTree, selectedFolder)
   const sq = sentSearch.trim().toLowerCase()
   const listSentences = sortSentences(sq ? scopedSentences.filter(s => [s.source_text, s.translation ?? ''].some(v => v.toLowerCase().includes(sq))) : scopedSentences)
+  const sel = useSelection()
   const sentScopeLabel = selectedFolder === null ? 'All Sentences' : selectedFolder === '' ? 'Unsorted' : selectedFolder
 
   async function handleNew(folder: string | null = null) {
@@ -3408,7 +3433,7 @@ function SentenceView() {
   if (singleReviewItem) {
     return (
       <ReviewSession
-        items={[{ id: singleReviewItem.id, front: singleReviewItem.source_text, back: singleReviewItem.translation, palace: singleReviewItem.memory_palace }]}
+        items={singleReviewItem.map(s => ({ id: s.id, front: s.source_text, back: s.translation, palace: s.memory_palace }))}
         onRate={async (id, q) => { await reviewSentence(id, q) }}
         onDone={() => setSingleReviewItem(null)}
         allowTyping
@@ -3487,6 +3512,9 @@ function SentenceView() {
             <IconMenu className="w-4 h-4" strokeWidth={2} />
           </button>
           <span className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate flex-1">{sentScopeLabel}</span>
+          {!sel.selecting && listSentences.length > 0 && (
+            <button onClick={sel.start} className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 px-2 min-h-[44px] md:min-h-0 md:py-1.5 rounded-lg flex-shrink-0">Select</button>
+          )}
           {dueItems.length > 0 && (
             <button
               onClick={() => setReviewMode(true)}
@@ -3546,6 +3574,23 @@ function SentenceView() {
 
         {sentImportMsg && <p className="text-xs text-xero-green font-medium px-3 pt-1.5">{sentImportMsg}</p>}
 
+        {sel.selecting && (
+          <SelectionBar
+            count={sel.selected.size}
+            visibleCount={listSentences.length}
+            languages={[...new Set(listSentences.map(x => x.source_lang))].map(l => ({ value: l, label: LANG_LABELS[l] ?? l }))}
+            folders={collectFolderPaths(sentTree)}
+            onSelectAll={() => sel.set(listSentences.map(x => x.id))}
+            onSelectLanguage={lang => sel.set(listSentences.filter(x => x.source_lang === lang).map(x => x.id))}
+            onClear={() => sel.set([])}
+            onExit={sel.exit}
+            onReview={() => { setSingleReviewItem(sentences.filter(x => sel.selected.has(x.id))); sel.exit() }}
+            onMove={async folder => { await bulkSentenceAction([...sel.selected], { action: 'move', folder }); sel.exit() }}
+            onReset={async () => { await bulkSentenceAction([...sel.selected], { action: 'reset' }); sel.exit() }}
+            onDelete={async () => { if (editingId !== null && sel.selected.has(editingId)) setEditingId(null); await bulkSentenceAction([...sel.selected], { action: 'delete' }); sel.exit() }}
+          />
+        )}
+
         <div className="flex-1 overflow-y-auto py-1 px-1 mt-1">
           {isLoading ? (
             <p className="text-xs text-gray-400 p-4">Loading…</p>
@@ -3555,12 +3600,14 @@ function SentenceView() {
             listSentences.map(s => (
               <div
                 key={s.id}
-                onClick={() => openEdit(s)}
+                onClick={() => sel.selecting ? sel.toggle(s.id) : openEdit(s)}
                 draggable={!isTouch}
                 onDragStart={e => { e.dataTransfer.setData('treeItemId', String(s.id)); e.dataTransfer.effectAllowed = 'move' }}
                 className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${isTouch ? 'min-h-[44px]' : ''} ${editingId === s.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
               >
-                <IconMessage className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+                {sel.selecting
+                  ? <SelectCheckbox checked={sel.selected.has(s.id)} />
+                  : <IconMessage className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
                 <span className={`text-xs flex-1 truncate ${editingId === s.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{s.source_text || t.untitled}</span>
               </div>
             ))
@@ -3586,7 +3633,7 @@ function SentenceView() {
           </span>
           <div className="flex items-center gap-3">
             <FolderMoveButton folder={activeSentence.folder} folders={collectFolderPaths(sentTree)} onMove={f => moveSentenceToFolder(activeSentence.id, f)} />
-            <button onClick={() => setSingleReviewItem(activeSentence)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
+            <button onClick={() => setSingleReviewItem([activeSentence])} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
             <button onClick={() => setConfirmDeleteId(activeSentence.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
           </div>
         </div>
@@ -3734,7 +3781,7 @@ function ScenarioWordList({ words, vocab, sourceLang, onChange }: {
 function ScenarioView() {
   const { t } = useLanguage()
   const { dark } = useDarkMode()
-  const { scenarios, isLoading, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios, moveScenarioToFolder, renameScenarioFolder, deleteScenarioFolder } = useLanguageScenarios()
+  const { scenarios, isLoading, bulkScenarioAction, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios, moveScenarioToFolder, renameScenarioFolder, deleteScenarioFolder } = useLanguageScenarios()
   const { vocab } = useVocabulary()
   const [scenParams, setScenParams] = useSearchParams()
   const activeId = scenParams.get('scenario') ? Number(scenParams.get('scenario')) : null
@@ -3776,7 +3823,7 @@ function ScenarioView() {
     e.target.value = ''
   }
 
-  const [singleReviewItem, setSingleReviewItem] = useState<LanguageScenario | null>(null)
+  const [singleReviewItem, setSingleReviewItem] = useState<LanguageScenario[] | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
   const [scenSearch, setScenSearch] = useState('')
@@ -3790,6 +3837,7 @@ function ScenarioView() {
   const scopedScenarios = getItemsInFolder(scenTree, selectedFolder)
   const scq = scenSearch.trim().toLowerCase()
   const listScenarios = sortScenarios(scq ? scopedScenarios.filter(s => [s.title, s.content ?? ''].some(v => v.toLowerCase().includes(scq))) : scopedScenarios)
+  const sel = useSelection()
   const scenScopeLabel = selectedFolder === null ? 'All Scenarios' : selectedFolder === '' ? 'Unsorted' : selectedFolder
 
   async function handleNew(folder: string | null = null) {
@@ -3878,7 +3926,7 @@ function ScenarioView() {
   if (singleReviewItem) {
     return (
       <ReviewSession
-        items={[{ id: singleReviewItem.id, front: singleReviewItem.title, back: singleReviewItem.content || null, palace: singleReviewItem.memory_palace }]}
+        items={singleReviewItem.map(s => ({ id: s.id, front: s.title, back: s.content || null, palace: s.memory_palace }))}
         onRate={async (id, q) => { await reviewScenario(id, q) }}
         onDone={() => setSingleReviewItem(null)}
       />
@@ -3955,6 +4003,9 @@ function ScenarioView() {
             <IconMenu className="w-4 h-4" strokeWidth={2} />
           </button>
           <span className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate flex-1">{scenScopeLabel}</span>
+          {!sel.selecting && listScenarios.length > 0 && (
+            <button onClick={sel.start} className="text-xs text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 px-2 min-h-[44px] md:min-h-0 md:py-1.5 rounded-lg flex-shrink-0">Select</button>
+          )}
           {dueItems.length > 0 && (
             <button
               onClick={() => setReviewMode(true)}
@@ -4014,6 +4065,23 @@ function ScenarioView() {
 
         {scenImportMsg && <p className="text-xs text-xero-green font-medium px-3 pt-1.5">{scenImportMsg}</p>}
 
+        {sel.selecting && (
+          <SelectionBar
+            count={sel.selected.size}
+            visibleCount={listScenarios.length}
+            languages={[...new Set(listScenarios.map(x => x.source_lang))].map(l => ({ value: l, label: LANG_LABELS[l] ?? l }))}
+            folders={collectFolderPaths(scenTree)}
+            onSelectAll={() => sel.set(listScenarios.map(x => x.id))}
+            onSelectLanguage={lang => sel.set(listScenarios.filter(x => x.source_lang === lang).map(x => x.id))}
+            onClear={() => sel.set([])}
+            onExit={sel.exit}
+            onReview={() => { setSingleReviewItem(scenarios.filter(x => sel.selected.has(x.id))); sel.exit() }}
+            onMove={async folder => { await bulkScenarioAction([...sel.selected], { action: 'move', folder }); sel.exit() }}
+            onReset={async () => { await bulkScenarioAction([...sel.selected], { action: 'reset' }); sel.exit() }}
+            onDelete={async () => { if (activeId !== null && sel.selected.has(activeId)) setActiveId(null); await bulkScenarioAction([...sel.selected], { action: 'delete' }); sel.exit() }}
+          />
+        )}
+
         <div className="flex-1 overflow-y-auto py-1 px-1 mt-1">
           {isLoading ? (
             <p className="text-xs text-gray-400 p-4">Loading…</p>
@@ -4023,12 +4091,14 @@ function ScenarioView() {
             listScenarios.map(s => (
               <div
                 key={s.id}
-                onClick={() => openScenario(s)}
+                onClick={() => sel.selecting ? sel.toggle(s.id) : openScenario(s)}
                 draggable={!isTouch}
                 onDragStart={e => { e.dataTransfer.setData('treeItemId', String(s.id)); e.dataTransfer.effectAllowed = 'move' }}
                 className={`flex items-center gap-1.5 py-2 pr-1 pl-2 rounded-lg cursor-pointer ${isTouch ? 'min-h-[44px]' : ''} ${activeId === s.id ? 'bg-xero-green/10 dark:bg-xero-green/20' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}`}
               >
-                <IconLayers className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />
+                {sel.selecting
+                  ? <SelectCheckbox checked={sel.selected.has(s.id)} />
+                  : <IconLayers className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
                 <span className={`text-xs flex-1 truncate ${activeId === s.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{s.title || t.untitled}</span>
               </div>
             ))
@@ -4171,7 +4241,7 @@ function ScenarioView() {
           </span>
           <div className="flex items-center gap-3">
             <FolderMoveButton folder={active.folder} folders={collectFolderPaths(scenTree)} onMove={f => moveScenarioToFolder(active.id, f)} />
-            <button onClick={() => setSingleReviewItem(active)} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
+            <button onClick={() => setSingleReviewItem([active])} className="text-xs text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 transition-colors">Review</button>
             <button onClick={() => setConfirmDeleteId(active.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">{t.delete}</button>
           </div>
         </div>

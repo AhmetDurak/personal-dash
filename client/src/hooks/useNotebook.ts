@@ -328,6 +328,18 @@ export function useMemoryPalace(id: number) {
   return { palace: data, savePalace }
 }
 
+// ─── Bulk actions (vocab / sentences / scenarios) ─────────────────────────────
+
+export type BulkAction = { action: 'delete' } | { action: 'reset' } | { action: 'move'; folder: string | null }
+
+async function postBulkAction(url: string, ids: number[], a: BulkAction) {
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, ...a }),
+  })
+}
+
 // ─── Vocabulary ───────────────────────────────────────────────────────────────
 
 export function useVocabulary() {
@@ -410,7 +422,12 @@ export function useVocabulary() {
     await mutate()
   }
 
-  return { vocab: data ?? [], isLoading, addWord, deleteWord, review, bulkImport, updateWord, bulkMove, moveVocabToFolder, renameVocabFolder, deleteVocabFolder }
+  async function bulkVocabAction(ids: number[], a: BulkAction) {
+    await postBulkAction('/api/notebook/vocabulary/bulk-action', ids, a)
+    await mutate()
+  }
+
+  return { vocab: data ?? [], isLoading, bulkVocabAction, addWord, deleteWord, review, bulkImport, updateWord, bulkMove, moveVocabToFolder, renameVocabFolder, deleteVocabFolder }
 }
 
 // ─── All Reminders (notebook view — includes done) ────────────────────────────
@@ -515,7 +532,12 @@ export function useLanguageSentences() {
     await mutate()
   }
 
-  return { sentences: data ?? [], isLoading, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences, moveSentenceToFolder, renameSentenceFolder, deleteSentenceFolder }
+  async function bulkSentenceAction(ids: number[], a: BulkAction) {
+    await postBulkAction('/api/notebook/language/sentences/bulk-action', ids, a)
+    await mutate()
+  }
+
+  return { sentences: data ?? [], isLoading, bulkSentenceAction, createSentence, saveSentence, reviewSentence, deleteSentence, bulkImportSentences, moveSentenceToFolder, renameSentenceFolder, deleteSentenceFolder }
 }
 
 // ─── Language Scenarios ───────────────────────────────────────────────────────
@@ -593,5 +615,10 @@ export function useLanguageScenarios() {
     await mutate()
   }
 
-  return { scenarios: data ?? [], isLoading, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios, moveScenarioToFolder, renameScenarioFolder, deleteScenarioFolder }
+  async function bulkScenarioAction(ids: number[], a: BulkAction) {
+    await postBulkAction('/api/notebook/language/scenarios/bulk-action', ids, a)
+    await mutate()
+  }
+
+  return { scenarios: data ?? [], isLoading, bulkScenarioAction, createScenario, saveScenario, reviewScenario, deleteScenario, bulkImportScenarios, moveScenarioToFolder, renameScenarioFolder, deleteScenarioFolder }
 }
