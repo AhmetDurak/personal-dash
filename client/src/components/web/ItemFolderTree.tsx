@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useContext, createContext, type ReactNode } from 'react'
 import { IconCheck, IconChevronRight, IconFolder, IconSort } from '../../lib/icons'
-import { addFolderPaths, collectFolderPaths, type FolderNode } from '../../lib/folderTree'
+import { addFolderPaths, collectFolderPaths, countAllItems, type FolderNode } from '../../lib/folderTree'
 
 export const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
@@ -52,6 +52,11 @@ function useTreeCtx<T extends AnyItem>() {
   return useContext(TreeCtx) as unknown as TreeCtxType<T>
 }
 
+// Number of items in a folder, including its subfolders.
+function ItemCount({ n }: { n: number }) {
+  return <span className="text-[10px] tabular-nums text-gray-400 dark:text-slate-500 flex-shrink-0 px-1">{n}</span>
+}
+
 function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>; depth: number }) {
   const ctx = useTreeCtx<T>()
   const isOpen = ctx.expanded.has(node.path)
@@ -99,6 +104,7 @@ function FolderTreeRow<T extends AnyItem>({ node, depth }: { node: FolderNode<T>
         ) : (
           <span title={node.name} className={`text-xs flex-1 truncate ${isActiveFolder ? 'text-xero-green font-medium' : 'text-gray-700 dark:text-slate-300'}`}>{node.name}</span>
         )}
+        {!isRenaming && <ItemCount n={countAllItems(node)} />}
         {!isRenaming && (
           <div className={`flex items-center gap-2 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
             <button title="More" onClick={e => { e.stopPropagation(); ctx.openCtx(e, 'folder', node.path) }} className={`${isTouch ? 'p-3 min-w-[44px] min-h-[44px]' : 'p-1.5'} rounded flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-[10px] leading-none font-bold`}>•••</button>
@@ -314,6 +320,7 @@ export function ItemFolderTree<T extends AnyItem>({
           <span className="w-3 flex-shrink-0" />
           <IconFolder className="w-3.5 h-3.5 text-amber-400 dark:text-amber-500 flex-shrink-0" strokeWidth={1.75} />
           <span className="text-xs flex-1 truncate italic text-gray-500 dark:text-slate-400">Root</span>
+          <ItemCount n={countAllItems(tree)} />
           <div className={`flex items-center gap-2 flex-shrink-0 ml-auto ${isTouch ? '' : 'opacity-30 group-hover:opacity-100'}`}>
             {sort && (
               <button title={`Sort: ${sort.options.find(o => o.value === sort.key)?.label ?? ''}`} onClick={e => openCtx(e, 'sort')}
