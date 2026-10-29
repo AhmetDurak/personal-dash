@@ -6,6 +6,7 @@ import { ItemFolderTree } from './ItemFolderTree'
 import { ResizableSidebar } from './ResizableSidebar'
 import { buildFolderTree } from '../../lib/folderTree'
 import { useTreeSort } from '../../hooks/useTreeSort'
+import { useRememberedSelection } from '../../hooks/useRememberedSelection'
 import { IconTranscript, IconDelete, IconExternalLink } from '../../lib/icons'
 
 // Maps the backend's stable reason codes (see errorReason() in src/api/routes/transcript.ts)
@@ -33,6 +34,8 @@ export function TranscriptView() {
   }
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  useRememberedSelection('transcripts:lastSelected', selectedId, !isLoading,
+    id => setSelectedId(Number(id)), id => transcripts.some(x => String(x.id) === id))
   const [isNew, setIsNew] = useState(false)
   const [newFolder, setNewFolder] = useState<string | null>(null)
   const [url, setUrl] = useState('')

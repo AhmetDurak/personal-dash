@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useRememberedSelection } from '../../hooks/useRememberedSelection'
 import { useStories } from '../../hooks/useKanban'
 import { buildFolderTree } from '../../lib/folderTree'
 import { useTreeSort } from '../../hooks/useTreeSort'
@@ -16,6 +17,8 @@ export function KanbanView() {
   function setSelectedId(id: number | null) {
     setStoryParams(p => { id !== null ? p.set('story', String(id)) : p.delete('story'); return p }, { replace: true })
   }
+  useRememberedSelection('stories:lastSelected', selectedId, !isLoading,
+    id => setSelectedId(Number(id)), id => stories.some(s => String(s.id) === id))
   const [confirmDeleteStory, setConfirmDeleteStory] = useState<Story | null>(null)
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
 

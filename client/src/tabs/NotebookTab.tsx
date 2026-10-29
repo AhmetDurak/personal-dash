@@ -17,6 +17,7 @@ import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, u
   useMemoryPalaceList, useMemoryPalace, useReviewHistory, type ReviewKind } from '../hooks/useNotebook'
 import { retentionSeries, type RetentionPoint } from '../lib/retention'
 import { dueStatus, type SRItem } from '../lib/dueStatus'
+import { useRememberedSelection } from '../hooks/useRememberedSelection'
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
@@ -1425,6 +1426,8 @@ function MindmapView() {
   function setSelectedId(id: number | null) {
     setMapParams(p => { id !== null ? p.set('map', String(id)) : p.delete('map'); return p })
   }
+  useRememberedSelection('mindmap:lastSelected', selectedId, !isLoading,
+    id => setSelectedId(Number(id)), id => mindmaps.some(m => String(m.id) === id))
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [swipeResetKey, setSwipeResetKey] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -1932,6 +1935,9 @@ function VocabView() {
       setHighlightParams(p => { p.delete('highlight'); return p }, { replace: true })
     }
   }, [highlightParams, vocab]) // eslint-disable-line react-hooks/exhaustive-deps
+  useRememberedSelection('vocab:lastSelected', editCard?.id ?? null, !isLoading,
+    id => { const c = vocab.find(v => String(v.id) === id); if (c) openEdit(c) },
+    id => !highlightParams.get('highlight') && vocab.some(v => String(v.id) === id))
 
   const reviewView = reviewMode ? (
       <div className="flex flex-col items-center justify-center gap-6 p-6 h-full">
@@ -3286,6 +3292,9 @@ function SentenceView() {
   function setEditingId(id: number | null) {
     setSentParams(p => { id !== null ? p.set('sentence', String(id)) : p.delete('sentence'); return p })
   }
+  useRememberedSelection('sentences:lastSelected', editingId, !isLoading,
+    id => { const s = sentences.find(x => String(x.id) === id); if (s) openEdit(s) },
+    id => !sentParams.get('highlight') && sentences.some(x => String(x.id) === id))
   const [draft, setDraft]           = useState<Partial<LanguageSentence>>({})
   const [translating, setTranslating] = useState(false)
   const [translateResult, setTranslateResult] = useState<{ translation: string; alternatives: string[] } | null>(null)
@@ -3867,6 +3876,9 @@ function ScenarioView() {
   function setActiveId(id: number | null) {
     setScenParams(p => { id !== null ? p.set('scenario', String(id)) : p.delete('scenario'); return p })
   }
+  useRememberedSelection('scenarios:lastSelected', activeId, !isLoading,
+    id => { const s = scenarios.find(x => String(x.id) === id); if (s) openScenario(s) },
+    id => !scenParams.get('highlight') && scenarios.some(x => String(x.id) === id))
   const [draft, setDraft]               = useState<Partial<LanguageScenario>>({})
   const [isEditingContent, setIsEditingContent] = useState(false)
   const [translating, setTranslating]   = useState(false)
@@ -5325,6 +5337,8 @@ function MemoryPalaceView() {
   function setSelectedId(id: number | null) {
     setPalaceParams(p => { id !== null ? p.set('palace', String(id)) : p.delete('palace'); return p })
   }
+  useRememberedSelection('palaces:lastSelected', selectedId, !isLoading,
+    id => setSelectedId(Number(id)), id => palaces.some(p => String(p.id) === id))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
