@@ -238,7 +238,8 @@ html, body {
 .mermaid-diagram svg { display: block; height: auto; margin: 0 auto; }
 .dark .mermaid-diagram { background: #0F172A; }
 
-/* Scrollbar in dark mode */
+/* Scrollbar in dark mode — scrollbar-* (inherited) for Firefox, ::-webkit-* for Chrome/Safari */
+.dark { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
 .dark ::-webkit-scrollbar { width: 6px; height: 6px; }
 .dark ::-webkit-scrollbar-track { background: #0F172A; }
 .dark ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
@@ -289,6 +290,7 @@ html, body {
 [data-theme="nord"] input, [data-theme="nord"] textarea, [data-theme="nord"] select {
   background-color: #3B4252; color: #ECEFF4; border-color: #4C566A;
 }
+[data-theme="nord"] { scrollbar-color: #4C566A #2E3440; }
 [data-theme="nord"] ::-webkit-scrollbar-track { background: #2E3440; }
 [data-theme="nord"] ::-webkit-scrollbar-thumb { background: #4C566A; }
 
@@ -330,6 +332,7 @@ html, body {
 [data-theme="dracula"] input, [data-theme="dracula"] textarea, [data-theme="dracula"] select {
   background-color: #44475A; color: #F8F8F2; border-color: #6272A4;
 }
+[data-theme="dracula"] { scrollbar-color: #6272A4 #282A36; }
 [data-theme="dracula"] ::-webkit-scrollbar-track { background: #282A36; }
 [data-theme="dracula"] ::-webkit-scrollbar-thumb { background: #6272A4; }
 
@@ -370,6 +373,7 @@ html, body {
   background-color: #FDF6E3; color: #073642; border-color: #C3BCA9;
 }
 [data-theme="solarized"] input::placeholder, [data-theme="solarized"] textarea::placeholder { color: #93A1A1; }
+[data-theme="solarized"] { scrollbar-width: thin; scrollbar-color: #C3BCA9 #EEE8D5; }
 [data-theme="solarized"] ::-webkit-scrollbar-track { background: #EEE8D5; }
 [data-theme="solarized"] ::-webkit-scrollbar-thumb { background: #C3BCA9; }
 /* Un-dark certain .dark overrides that solarized doesn't need */
