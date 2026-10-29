@@ -16,6 +16,7 @@ import { NavLink, Routes, Route, Navigate, useLocation, useSearchParams, useNavi
 import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, useLanguageSentences, useLanguageScenarios,
   useMemoryPalaceList, useMemoryPalace, useVocabReviews } from '../hooks/useNotebook'
 import { retentionSeries, type RetentionPoint } from '../lib/retention'
+import { dueStatus, type SRItem } from '../lib/dueStatus'
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
@@ -2202,7 +2203,7 @@ function VocabView() {
               >
                 {sel.selecting
                   ? <SelectCheckbox checked={sel.selected.has(v.id)} />
-                  : <IconBook className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
+                  : <DueDot item={v} />}
                 <span className={`text-xs flex-1 truncate ${editCard?.id === v.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{v.word}</span>
                 <span className="text-[10px] text-gray-400 dark:text-slate-500 truncate max-w-[35%]">{v.translation}</span>
               </div>
@@ -3102,6 +3103,16 @@ const PALACE_SUGGESTIONS = [
   'Morning commute', 'At school / University', 'Meeting', 'At home',
 ]
 
+// List-row marker: color fades green → red as the item's review interval runs out.
+function DueDot({ item }: { item: SRItem }) {
+  const s = dueStatus(item)
+  return (
+    <span title={s.label} aria-label={s.label} className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center">
+      <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
+    </span>
+  )
+}
+
 // due_at arrives as 'YYYY-MM-DD' or a full timestamp — compare the date part with the local date.
 function isDueSR(dateStr: string): boolean {
   const d = new Date()
@@ -3660,7 +3671,7 @@ function SentenceView() {
               >
                 {sel.selecting
                   ? <SelectCheckbox checked={sel.selected.has(s.id)} />
-                  : <IconMessage className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
+                  : <DueDot item={s} />}
                 <span className={`text-xs flex-1 truncate ${editingId === s.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{s.source_text || t.untitled}</span>
               </div>
             ))
@@ -4178,7 +4189,7 @@ function ScenarioView() {
               >
                 {sel.selecting
                   ? <SelectCheckbox checked={sel.selected.has(s.id)} />
-                  : <IconLayers className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-slate-500" strokeWidth={1.75} />}
+                  : <DueDot item={s} />}
                 <span className={`text-xs flex-1 truncate ${activeId === s.id ? 'text-xero-green font-medium' : 'text-gray-600 dark:text-slate-400'}`}>{s.title || t.untitled}</span>
               </div>
             ))
