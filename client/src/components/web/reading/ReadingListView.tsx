@@ -8,7 +8,6 @@ import { ResizableSidebar } from '../ResizableSidebar'
 import { buildFolderTree, getItemsInFolder } from '../../../lib/folderTree'
 import { useTreeSort } from '../../../hooks/useTreeSort'
 import { IconAdd, IconDelete, IconReading, IconMenu } from '../../../lib/icons'
-import { useEdgeSwipe } from '../../../hooks/useEdgeSwipe'
 import { formatDate } from '../../../utils/format'
 
 function SessionCard({ session, onDeleteClick }: { session: ReadingSession; onDeleteClick: () => void }) {
@@ -53,7 +52,6 @@ export function ReadingListView() {
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
-  useEdgeSwipe(mobileTreeOpen, setMobileTreeOpen)
   const deleting = sessions.find(s => s.id === confirmDeleteId) ?? null
 
   const { sort, sortItems, sortTree } = useTreeSort<ReadingSession>(
