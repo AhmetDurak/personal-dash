@@ -8,7 +8,7 @@ export const DIGEST_HOUR = 8
 export const VOCAB_THRESHOLD = 20
 
 export interface DueSnapshot {
-  reminders:         { id: number; title: string; note: string | null }[]
+  reminders:         { id: number; title: string; note: string | null; due_at: string }[]
   vocabDue:          number
   sentencesDue:      number
   scenariosDue:      number
@@ -28,7 +28,7 @@ function plural(n: number, word: string) {
 
 export function buildMessages(d: DueSnapshot, localDate: string, localHour: number): PushMessage[] {
   const out: PushMessage[] = d.reminders.map(r => ({
-    key: `reminder:${r.id}:${localDate}`,
+    key: `reminder:${r.id}:${r.due_at}`,   // once per due time — snoozing or repeating notifies again
     title: `Reminder: ${r.title}`,
     body: r.note ?? '',
     url: '/reminders',

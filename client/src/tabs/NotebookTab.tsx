@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
 import { IconClose, IconFolder, IconEdit, IconAdd, IconLink, IconCut, IconDelete,
   IconLog, IconMeal, IconWorkout, IconNote, IconMindmap, IconLanguage, IconPalace, IconImage, IconExternalLink,
-  IconBook, IconMessage, IconLayers, IconMenu, IconChevronRight, IconChevronLeft, IconUpload, IconReading, IconTranscript } from '../lib/icons'
+  IconBook, IconMessage, IconLayers, IconMenu, IconChevronRight, IconChevronLeft, IconUpload, IconReading, IconTranscript, IconClock } from '../lib/icons'
 import { buildFolderTree, collectFolderPaths, getItemsInFolder, sortFolderTree, treeSortOptions } from '../lib/folderTree'
 import { useSortFilter } from '../hooks/useSortFilter'
 import { useTreeSort } from '../hooks/useTreeSort'
@@ -18,11 +18,12 @@ import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, u
 import { retentionSeries, type RetentionPoint } from '../lib/retention'
 import { dueStatus, type SRItem } from '../lib/dueStatus'
 import { useRememberedSelection } from '../hooks/useRememberedSelection'
+import { REPEAT_LABELS, toLocalParts, fromLocalParts, nextOccurrence, snoozeOptions, type ReminderRepeat } from '../lib/reminders'
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
 import type { MMNode, MMEdge, VocabCard, LanguageSentence, LanguageScenario, ScenarioWord, WordLink, Note,
-  PalaceCheckpoint, PalaceConnection, PalaceContentType, PalaceSide, MemoryPalaceMeta } from '../hooks/useNotebook'
+  PalaceCheckpoint, PalaceConnection, PalaceContentType, PalaceSide, MemoryPalaceMeta, Reminder } from '../hooks/useNotebook'
 import { ConfirmDialog } from '../components/web/ConfirmDialog'
 import { ChainsView } from '../components/web/ChainsView'
 import { TranscriptView } from '../components/web/TranscriptView'
@@ -2455,33 +2456,149 @@ function VocabView() {
 
 // ─── RemindersView ────────────────────────────────────────────────────────────
 
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const MINS  = ['00', '15', '30', '45']
+type ReminderFormValues = { title: string; note: string; date: string; time: string; repeat: ReminderRepeat }
+
+// Shared add / edit form — native date & time pickers; repeat needs a date.
+function ReminderForm({ initial, submitLabel, onSubmit, onCancel }: {
+  initial: ReminderFormValues
+  submitLabel: string
+  onSubmit: (v: ReminderFormValues) => Promise<void>
+  onCancel: () => void
+}) {
+  const { t } = useLanguage()
+  const [v, setV] = useState(initial)
+  const set = (patch: Partial<ReminderFormValues>) => setV(p => ({ ...p, ...patch }))
+  const field = 'text-base md:text-sm border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-800 dark:text-slate-100 rounded-lg px-3 min-h-[44px] focus:outline-none focus:ring-1 focus:ring-xero-green'
+
+  return (
+    <form
+      onSubmit={async e => { e.preventDefault(); if (v.title.trim()) await onSubmit(v) }}
+      className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 space-y-3 shadow-sm"
+    >
+      <input
+        autoFocus={!initial.title}
+        value={v.title}
+        onChange={e => set({ title: e.target.value })}
+        placeholder="What do you need to remember?"
+        className={`${field} w-full font-medium placeholder-gray-300 dark:placeholder-slate-500`}
+      />
+      <textarea
+        value={v.note}
+        onChange={e => set({ note: e.target.value })}
+        placeholder="Add a note… (optional)"
+        rows={2}
+        className={`${field} w-full py-2 resize-none placeholder-gray-300 dark:placeholder-slate-500`}
+      />
+      <div className="flex items-end gap-3 flex-wrap">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Date</span>
+          <input type="date" value={v.date} onChange={e => set(e.target.value ? { date: e.target.value } : { date: '', time: '', repeat: 'none' })} className={field} />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Time <span className="normal-case font-normal">(optional)</span></span>
+          <input type="time" value={v.time} disabled={!v.date} onChange={e => set({ time: e.target.value })} className={`${field} disabled:opacity-40`} />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Repeat</span>
+          <select value={v.repeat} disabled={!v.date} onChange={e => set({ repeat: e.target.value as ReminderRepeat })} className={`${field} disabled:opacity-40`}>
+            {(Object.keys(REPEAT_LABELS) as ReminderRepeat[]).map(r => <option key={r} value={r}>{REPEAT_LABELS[r]}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" onClick={onCancel} className="text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700 px-3 min-h-[44px] transition-colors">{t.cancel}</button>
+        <button type="submit" disabled={!v.title.trim()} className="text-sm bg-xero-green text-white px-5 min-h-[44px] rounded-lg font-medium disabled:opacity-40 hover:bg-xero-green-dark transition-colors">{submitLabel}</button>
+      </div>
+    </form>
+  )
+}
+
+type DueGroup = 'overdue' | 'today' | 'upcoming'
+
+// One pending reminder: tap the text to edit; check off, snooze and delete are always
+// reachable on touch screens (hover-only on desktop).
+function ReminderRow({ r, group, labelCls, onToggle, onEdit, onSnooze, onDelete }: {
+  r: Reminder
+  group: DueGroup | null
+  labelCls: string
+  onToggle: () => void
+  onEdit: () => void
+  onSnooze: (dueAt: string) => void
+  onDelete: () => void
+}) {
+  const [snoozeOpen, setSnoozeOpen] = useState(false)
+  const snoozeRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!snoozeOpen) return
+    function h(e: MouseEvent) { if (!snoozeRef.current?.contains(e.target as Node)) setSnoozeOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [snoozeOpen])
+  const repeat = r.repeat as ReminderRepeat
+  const actionCls = `${isTouch ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'} transition-opacity`
+
+  return (
+    <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl pr-1 group hover:shadow-sm transition-shadow">
+      <button onClick={onToggle} title={repeat !== 'none' ? 'Done — schedule next' : 'Mark done'}
+        className="flex-shrink-0 w-11 h-11 flex items-center justify-center">
+        <span className="w-[18px] h-[18px] rounded border-2 border-gray-300 dark:border-slate-500 hover:border-xero-green transition-colors" />
+      </button>
+      <button onClick={onEdit} className="flex-1 min-w-0 text-left py-2.5">
+        <p className="text-sm font-medium text-gray-800 dark:text-slate-100 break-words">{r.title}</p>
+        {r.note && <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 break-words">{r.note}</p>}
+        {(r.due_at || repeat !== 'none') && (
+          <p className="text-[10px] font-semibold mt-1 flex items-center gap-2">
+            {r.due_at && group && <span className={labelCls}>{fmtDueLabel(r.due_at, group)}</span>}
+            {repeat !== 'none' && <span className="text-violet-500 dark:text-violet-400">↻ {REPEAT_LABELS[repeat]}</span>}
+          </p>
+        )}
+      </button>
+      <div className={`flex items-center flex-shrink-0 ${actionCls}`}>
+        <div className="relative" ref={snoozeRef}>
+          <button onClick={() => setSnoozeOpen(o => !o)} title="Snooze"
+            className="w-11 h-11 flex items-center justify-center text-gray-400 hover:text-amber-500 transition-colors">
+            <IconClock className="w-4 h-4" strokeWidth={2} />
+          </button>
+          {snoozeOpen && (
+            <div className="absolute right-0 top-full mt-1 z-40 bg-white dark:bg-slate-800 border border-xero-border dark:border-slate-700 rounded-xl shadow-2xl py-1 min-w-[160px]">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-slate-500 px-3 pt-1.5 pb-1">Snooze until</p>
+              {snoozeOptions().map(o => (
+                <button key={o.label} onClick={() => { setSnoozeOpen(false); onSnooze(o.dueAt) }}
+                  className="w-full text-left text-xs px-3 py-2.5 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">{o.label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button onClick={onDelete} title="Delete"
+          className="w-11 h-11 flex items-center justify-center text-gray-300 dark:text-slate-500 hover:text-red-400 transition-colors">
+          <IconClose className="w-4 h-4" strokeWidth={2} />
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export function RemindersView({ standalone }: { standalone?: boolean } = {}) {
   const { t } = useLanguage()
-  const { reminders, isLoading, toggle, remove, add } = useAllReminders()
+  const { reminders, isLoading, toggle, remove, add, update } = useAllReminders()
   const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newNote,  setNewNote]  = useState('')
-  const [newDate,  setNewDate]  = useState('')
-  const [newHour,  setNewHour]  = useState('')
-  const [newMin,   setNewMin]   = useState('00')
+  const [editingId, setEditingId] = useState<number | null>(null)
 
-  function resetForm() {
-    setNewTitle(''); setNewNote(''); setNewDate(''); setNewHour(''); setNewMin('00')
+  async function handleAdd(v: ReminderFormValues) {
+    await add({ title: v.title.trim(), note: v.note.trim() || undefined, due_at: fromLocalParts(v.date, v.time) ?? undefined, repeat: v.repeat })
     setShowForm(false)
   }
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newTitle.trim()) return
-    const due_at = newDate
-      ? (newHour !== '' ? `${newDate}T${newHour}:${newMin}:00` : newDate)
-      : undefined
-    await add({ title: newTitle.trim(), note: newNote.trim() || undefined, due_at })
-    resetForm()
+  async function handleEdit(id: number, v: ReminderFormValues) {
+    await update(id, { title: v.title.trim(), note: v.note.trim() || null, due_at: fromLocalParts(v.date, v.time), repeat: v.date ? v.repeat : 'none' })
+    setEditingId(null)
+  }
+
+  // Checking off a repeating reminder schedules its next occurrence instead of completing it.
+  function handleToggle(r: Reminder) {
+    const repeat = r.repeat as ReminderRepeat
+    if (repeat !== 'none' && r.due_at) update(r.id, { due_at: nextOccurrence(r.due_at, repeat) })
+    else toggle(r.id)
   }
 
   const now      = new Date()
@@ -2492,193 +2609,98 @@ export function RemindersView({ standalone }: { standalone?: boolean } = {}) {
   const upcoming = pending.filter(r => r.due_at && !isBeforeDay(new Date(r.due_at), now) && !sameDay(new Date(r.due_at), now))
   const noDate   = pending.filter(r => !r.due_at)
 
-  type Group = 'overdue' | 'today' | 'upcoming'
+  function renderRows(items: Reminder[], group: DueGroup | null, labelCls: string) {
+    return (
+      <div className="space-y-2">
+        {items.map(r => editingId === r.id ? (
+          <ReminderForm
+            key={r.id}
+            initial={{ title: r.title, note: r.note ?? '', ...toLocalParts(r.due_at), repeat: (r.repeat as ReminderRepeat) ?? 'none' }}
+            submitLabel={t.save}
+            onSubmit={v => handleEdit(r.id, v)}
+            onCancel={() => setEditingId(null)}
+          />
+        ) : (
+          <ReminderRow
+            key={r.id} r={r} group={group} labelCls={labelCls}
+            onToggle={() => handleToggle(r)}
+            onEdit={() => { setEditingId(r.id); setShowForm(false) }}
+            onSnooze={dueAt => update(r.id, { due_at: dueAt })}
+            onDelete={() => setConfirmRemoveId(r.id)}
+          />
+        ))}
+      </div>
+    )
+  }
 
-  function renderGroup(
-    label: string,
-    items: typeof reminders,
-    group: Group,
-    labelCls: string,
-    badgeCls: string,
-  ) {
+  function renderGroup(label: string, items: Reminder[], group: DueGroup, labelCls: string, badgeCls: string) {
     if (items.length === 0) return null
     return (
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-2.5">
-          <span className={`text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${badgeCls}`}>
-            {label}
-          </span>
+          <span className={`text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${badgeCls}`}>{label}</span>
           <span className="text-[10px] text-gray-400">{items.length}</span>
         </div>
-        <div className="space-y-2">
-          {items.map(r => (
-            <div key={r.id} className="flex items-start gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 group hover:shadow-sm transition-shadow">
-              <button
-                onClick={() => toggle(r.id)}
-                className="mt-0.5 flex-shrink-0 w-4 h-4 rounded border-2 border-gray-300 hover:border-xero-green transition-colors"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800">{r.title}</p>
-                {r.note && <p className="text-xs text-gray-400 mt-0.5">{r.note}</p>}
-                {r.due_at && (
-                  <p className={`text-[10px] font-semibold mt-1 ${labelCls}`}>
-                    {fmtDueLabel(r.due_at, group)}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => setConfirmRemoveId(r.id)}
-                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none flex-shrink-0 mt-0.5"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
+        {renderRows(items, group, labelCls)}
       </div>
     )
   }
 
   const inner = (
-    <div className="p-6 overflow-y-auto h-full">
+    <div className="p-4 md:p-6 overflow-y-auto h-full">
       <div className="max-w-xl">
 
-        {/* New reminder button / form toggle */}
+        {/* New reminder button / form */}
         <div className="mb-5">
           {!showForm ? (
             <button
-              onClick={() => setShowForm(true)}
-              className="text-sm bg-xero-green text-white px-4 py-2 rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
+              onClick={() => { setShowForm(true); setEditingId(null) }}
+              className="text-sm bg-xero-green text-white px-4 min-h-[44px] rounded-lg font-medium hover:bg-xero-green-dark transition-colors"
             >
               + New Reminder
             </button>
           ) : (
-            <form onSubmit={handleAdd} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
-              <input
-                autoFocus
-                value={newTitle}
-                onChange={e => setNewTitle(e.target.value)}
-                placeholder="What do you need to remember?"
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-xero-green font-medium placeholder-gray-300"
-              />
-              <textarea
-                value={newNote}
-                onChange={e => setNewNote(e.target.value)}
-                placeholder="Add a note… (optional)"
-                rows={2}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green resize-none placeholder-gray-300"
-              />
-              <div className="flex items-end gap-4 flex-wrap">
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Date</p>
-                  <input
-                    type="date"
-                    value={newDate}
-                    onChange={e => { setNewDate(e.target.value); if (!e.target.value) { setNewHour(''); setNewMin('00') } }}
-                    className="text-sm border border-gray-200 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green"
-                  />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">
-                    Time <span className="normal-case font-normal">(optional)</span>
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={newHour}
-                      onChange={e => setNewHour(e.target.value)}
-                      disabled={!newDate}
-                      className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <option value="">--</option>
-                      {HOURS.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                    <span className="text-gray-400 font-bold">:</span>
-                    <input
-                      type="text"
-                      list="minute-opts"
-                      value={newMin}
-                      onChange={e => setNewMin(e.target.value)}
-                      disabled={!newDate || newHour === ''}
-                      placeholder="00"
-                      maxLength={2}
-                      className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-xero-green disabled:opacity-40 disabled:cursor-not-allowed w-14 text-center"
-                    />
-                    <datalist id="minute-opts">
-                      {MINS.map(m => <option key={m} value={m} />)}
-                    </datalist>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="text-sm text-gray-400 hover:text-gray-600 px-3 py-2 transition-colors"
-                >
-                  {t.cancel}
-                </button>
-                <button
-                  type="submit"
-                  disabled={!newTitle.trim()}
-                  className="text-sm bg-xero-green text-white px-5 py-2 rounded-lg font-medium disabled:opacity-40 hover:bg-xero-green-dark transition-colors"
-                >
-                  {t.addReminder}
-                </button>
-              </div>
-            </form>
+            <ReminderForm
+              initial={{ title: '', note: '', date: '', time: '', repeat: 'none' }}
+              submitLabel={t.addReminder}
+              onSubmit={handleAdd}
+              onCancel={() => setShowForm(false)}
+            />
           )}
         </div>
 
         {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
 
-        {/* Grouped sections */}
-        {renderGroup(t.overdue,  overdue,  'overdue',  'text-red-500',      'bg-red-100 text-red-600')}
-        {renderGroup(t.today,    todayGrp, 'today',    'text-xero-green',   'bg-xero-green/10 text-xero-green')}
-        {renderGroup(t.upcoming, upcoming, 'upcoming', 'text-blue-500',     'bg-blue-50 text-blue-600')}
+        {renderGroup(t.overdue,  overdue,  'overdue',  'text-red-500',    'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400')}
+        {renderGroup(t.today,    todayGrp, 'today',    'text-xero-green', 'bg-xero-green/10 text-xero-green')}
+        {renderGroup(t.upcoming, upcoming, 'upcoming', 'text-blue-500',   'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400')}
 
-        {/* No date */}
         {noDate.length > 0 && (
           <div className="mb-5">
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2.5">{t.noDate}</p>
-            <div className="space-y-2">
-              {noDate.map(r => (
-                <div key={r.id} className="flex items-start gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 group hover:shadow-sm transition-shadow">
-                  <button
-                    onClick={() => toggle(r.id)}
-                    className="mt-0.5 flex-shrink-0 w-4 h-4 rounded border-2 border-gray-300 hover:border-xero-green transition-colors"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800">{r.title}</p>
-                    {r.note && <p className="text-xs text-gray-400 mt-0.5">{r.note}</p>}
-                  </div>
-                  <button
-                    onClick={() => setConfirmRemoveId(r.id)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all text-base leading-none flex-shrink-0 mt-0.5"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
+            {renderRows(noDate, null, '')}
           </div>
         )}
 
         {/* Done */}
         {done.length > 0 && (
-          <div className="mt-2 border-t border-gray-100 pt-4">
-            <p className="text-[11px] font-bold text-gray-300 uppercase tracking-wide mb-2.5">
+          <div className="mt-2 border-t border-gray-100 dark:border-slate-700 pt-4">
+            <p className="text-[11px] font-bold text-gray-300 dark:text-slate-500 uppercase tracking-wide mb-2.5">
               {t.completed} ({done.length})
             </p>
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {done.map(r => (
-                <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 rounded-xl group opacity-50 hover:opacity-100 transition-opacity">
-                  <div className="flex-shrink-0 w-4 h-4 rounded bg-xero-green border-2 border-xero-green flex items-center justify-center">
+                <div key={r.id} className="flex items-center gap-1 pl-3 pr-1 rounded-xl group opacity-60 hover:opacity-100 transition-opacity">
+                  <div className="flex-shrink-0 w-[18px] h-[18px] rounded bg-xero-green border-2 border-xero-green flex items-center justify-center">
                     <span className="text-white font-bold" style={{ fontSize: 8 }}>✓</span>
                   </div>
-                  <p className="text-sm text-gray-500 line-through flex-1">{r.title}</p>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <button onClick={() => toggle(r.id)} className="text-[10px] text-gray-400 hover:text-xero-green transition-colors">undo</button>
-                    <button onClick={() => setConfirmRemoveId(r.id)} className="p-0.5 text-gray-300 hover:text-red-400 transition-colors rounded"><IconClose className="w-3.5 h-3.5" strokeWidth={2} /></button>
+                  <p className="text-sm text-gray-500 dark:text-slate-400 line-through flex-1 min-w-0 truncate pl-2">{r.title}</p>
+                  <div className={`flex items-center flex-shrink-0 ${isTouch ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                    <button onClick={() => toggle(r.id)} className="text-xs text-gray-400 hover:text-xero-green transition-colors px-2 min-h-[44px]">undo</button>
+                    <button onClick={() => setConfirmRemoveId(r.id)} title="Delete"
+                      className="w-11 h-11 flex items-center justify-center text-gray-300 dark:text-slate-500 hover:text-red-400 transition-colors">
+                      <IconClose className="w-4 h-4" strokeWidth={2} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -2689,7 +2711,7 @@ export function RemindersView({ standalone }: { standalone?: boolean } = {}) {
         {pending.length === 0 && done.length === 0 && !isLoading && (
           <div className="text-center py-16">
             <p className="text-4xl mb-3">📝</p>
-            <p className="text-sm font-medium text-gray-600 mb-1">{t.noReminders}</p>
+            <p className="text-sm font-medium text-gray-600 dark:text-slate-300 mb-1">{t.noReminders}</p>
             <p className="text-xs text-gray-400">Click "+ New Reminder" to get started</p>
           </div>
         )}

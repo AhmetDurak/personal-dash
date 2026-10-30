@@ -36,7 +36,7 @@ export async function sendToUser(pool: Pool, uid: number, msg: PushMessage): Pro
 
 async function loadSnapshot(pool: Pool, uid: number, localDate: string): Promise<DueSnapshot> {
   const [reminders, vocab, sentences, scenarios, checkpoints] = await Promise.all([
-    pool.query('SELECT id, title, note FROM reminders WHERE user_id=$1 AND done=FALSE AND due_at <= now()', [uid]),
+    pool.query('SELECT id, title, note, due_at::text AS due_at FROM reminders WHERE user_id=$1 AND done=FALSE AND due_at <= now()', [uid]),
     pool.query('SELECT COUNT(*)::int AS n FROM vocabulary WHERE user_id=$1 AND due_at <= $2::date', [uid, localDate]),
     pool.query('SELECT COUNT(*)::int AS n FROM language_sentences WHERE user_id=$1 AND due_at <= $2::date', [uid, localDate]),
     pool.query('SELECT COUNT(*)::int AS n FROM language_scenarios WHERE user_id=$1 AND due_at <= $2::date', [uid, localDate]),

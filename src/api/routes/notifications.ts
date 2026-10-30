@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express'
+import { parseReminderPatch } from '../../lib/reminders'
 import { Pool } from 'pg'
 
 export function notificationsRouter(pool: Pool): Router {
@@ -63,6 +64,26 @@ export function notificationsRouter(pool: Pool): Router {
       [title.trim(), note ?? null, due_at ?? null, repeat, uid]
     )
     res.json(rows[0] ?? null)
+  })
+
+  // PATCH /api/notifications/reminders/:id  (edit title / note / due_at / repeat)
+  router.patch('/reminders/:id', async (req: Request, res: Response) => {
+    const uid = (req.user as Express.User).id
+    const patch = parseReminderPatch(req.body)
+    if (!patch) { res.status(400).json({ error: 'invalid reminder update' }); return }
+    const cols = Object.keys(patch) as (keyof typeof patch)[]
+    const sets = cols.map((c, i) => `${c} = $${i + 3}`).join(', ')
+    try {
+      const { rows } = await pool.query(
+        `UPDATE reminders SET ${sets} WHERE id = $1 AND user_id = $2 RETURNING *`,
+        [req.params.id, uid, ...cols.map(c => patch[c])]
+      )
+      res.json(rows[0] ?? null)
+    } catch (err) {
+      // unique (user_id, title, due_at): an identical reminder already exists at that time
+      if ((err as { code?: string }).code === '23505') { res.status(409).json({ error: 'duplicate reminder' }); return }
+      throw err
+    }
   })
 
   // PATCH /api/notifications/reminders/:id/done  (toggles done)

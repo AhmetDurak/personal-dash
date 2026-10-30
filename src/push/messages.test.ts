@@ -9,20 +9,21 @@ describe('buildMessages', () => {
     expect(buildMessages(snapshot(), '2026-10-28', 12)).toEqual([])
   })
 
-  it('keys reminders by id and local date', () => {
-    const msgs = buildMessages(snapshot({ reminders: [{ id: 7, title: 'Pay rent', note: null }] }), '2026-10-28', 3)
-    expect(msgs).toEqual([{ key: 'reminder:7:2026-10-28', title: 'Reminder: Pay rent', body: '', url: '/reminders' }])
+  it('keys reminders by id and due time, so a snoozed or repeating reminder notifies again', () => {
+    const due = '2026-10-28 09:00:00+00'
+    const msgs = buildMessages(snapshot({ reminders: [{ id: 7, title: 'Pay rent', note: null, due_at: due }] }), '2026-10-28', 3)
+    expect(msgs).toEqual([{ key: `reminder:7:${due}`, title: 'Reminder: Pay rent', body: '', url: '/reminders' }])
   })
 
   it('holds daily digests before the digest hour but still sends reminders', () => {
     const d = snapshot({
-      reminders: [{ id: 1, title: 'x', note: 'n' }],
+      reminders: [{ id: 1, title: 'x', note: 'n', due_at: 'd1' }],
       sentencesDue: 2, vocabDue: VOCAB_THRESHOLD,
       missedCheckpoints: [{ id: 'c1', challenge: 'Run', scope: 'sport', label: '5k', target_date: '2026-10-20' }],
     })
-    expect(buildMessages(d, '2026-10-28', DIGEST_HOUR - 1).map(m => m.key)).toEqual(['reminder:1:2026-10-28'])
+    expect(buildMessages(d, '2026-10-28', DIGEST_HOUR - 1).map(m => m.key)).toEqual(['reminder:1:d1'])
     expect(buildMessages(d, '2026-10-28', DIGEST_HOUR).map(m => m.key)).toEqual([
-      'reminder:1:2026-10-28', 'challenge:c1:2026-10-28', 'language:due:2026-10-28', 'vocab:2026-10-28',
+      'reminder:1:d1', 'challenge:c1:2026-10-28', 'language:due:2026-10-28', 'vocab:2026-10-28',
     ])
   })
 

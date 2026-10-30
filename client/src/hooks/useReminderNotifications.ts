@@ -19,8 +19,9 @@ function addFired(key: string) {
   localStorage.setItem(FIRED_KEY, JSON.stringify(arr))
 }
 
+// Once per due time — a snoozed or repeating reminder notifies again at its new time.
 function firingKey(r: Reminder): string {
-  return `${r.id}:${new Date().toISOString().slice(0, 10)}`
+  return `${r.id}:${r.due_at}`
 }
 
 function isDue(r: Reminder): boolean {

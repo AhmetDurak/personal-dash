@@ -471,7 +471,16 @@ export function useAllReminders() {
     await mutate()
   }
 
-  return { reminders: data ?? [], isLoading, add, toggle, remove }
+  async function update(id: number, patch: { title?: string; note?: string | null; due_at?: string | null; repeat?: string }) {
+    await fetch(`/api/notifications/reminders/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    await mutate()
+  }
+
+  return { reminders: data ?? [], isLoading, add, toggle, remove, update }
 }
 
 // ─── Language Sentences ───────────────────────────────────────────────────────
