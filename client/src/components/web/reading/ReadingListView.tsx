@@ -7,7 +7,7 @@ import { ItemFolderTree, isTouch } from '../ItemFolderTree'
 import { ResizableSidebar } from '../ResizableSidebar'
 import { buildFolderTree, getItemsInFolder } from '../../../lib/folderTree'
 import { useTreeSort } from '../../../hooks/useTreeSort'
-import { IconAdd, IconDelete, IconReading, IconMenu } from '../../../lib/icons'
+import { IconAdd, IconDelete, IconReading, IconFolder } from '../../../lib/icons'
 import { formatDate } from '../../../utils/format'
 
 function SessionCard({ session, onDeleteClick }: { session: ReadingSession; onDeleteClick: () => void }) {
@@ -112,9 +112,9 @@ export function ReadingListView() {
         <div className="max-w-3xl mx-auto space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-1.5 min-w-0">
-              <button onClick={() => setMobileTreeOpen(true)}
+              <button title="Folders" aria-label="Folders" onClick={() => setMobileTreeOpen(true)}
                 className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
-                <IconMenu className="w-4 h-4" strokeWidth={2} />
+                <IconFolder className="w-4 h-4" strokeWidth={2} />
               </button>
               <h1 className="text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">{scopeLabel}</h1>
             </div>

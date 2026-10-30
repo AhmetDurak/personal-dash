@@ -1558,11 +1558,11 @@ function MindmapView() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile top bar */}
         <div className="md:hidden flex items-center gap-2 px-3 py-2 bg-xero-navy border-b border-xero-navy-light flex-shrink-0">
-          <button
+          <button title="Folders" aria-label="Folders"
             onClick={() => setMobileOpen(true)}
             className="text-gray-400 hover:text-white transition-colors p-2.5"
           >
-            <IconMenu className="w-4 h-4" strokeWidth={2} />
+            <IconFolder className="w-4 h-4" strokeWidth={2} />
           </button>
           <span className="text-sm text-gray-300 font-medium truncate">{selectedTitle}</span>
         </div>
@@ -2089,9 +2089,9 @@ function VocabView() {
       {/* Item list column */}
       <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={editCard !== null || reviewView ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
-          <button onClick={() => setMobileTreeOpen(true)}
+          <button title="Folders" aria-label="Folders" onClick={() => setMobileTreeOpen(true)}
             className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
-            <IconMenu className="w-4 h-4" strokeWidth={2} />
+            <IconFolder className="w-4 h-4" strokeWidth={2} />
           </button>
           <span className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate flex-1">{scopeLabel}</span>
           {!sel.selecting && listItems.length > 0 && (
@@ -3566,9 +3566,9 @@ function SentenceView() {
       {/* Item list column */}
       <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={editingId !== null || reviewView ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
-          <button onClick={() => setMobileTreeOpen(true)}
+          <button title="Folders" aria-label="Folders" onClick={() => setMobileTreeOpen(true)}
             className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
-            <IconMenu className="w-4 h-4" strokeWidth={2} />
+            <IconFolder className="w-4 h-4" strokeWidth={2} />
           </button>
           <span className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate flex-1">{sentScopeLabel}</span>
           {!sel.selecting && listSentences.length > 0 && (
@@ -4077,9 +4077,9 @@ function ScenarioView() {
       {/* Item list column */}
       <ResizableSidebar storageKey="notebook:list-width" defaultWidth={288} mobileClassName={activeId !== null || reviewView ? 'hidden' : 'flex w-full'} className="border-r border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
         <div className="flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
-          <button onClick={() => setMobileTreeOpen(true)}
+          <button title="Folders" aria-label="Folders" onClick={() => setMobileTreeOpen(true)}
             className="md:hidden text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-2 -m-1 min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0">
-            <IconMenu className="w-4 h-4" strokeWidth={2} />
+            <IconFolder className="w-4 h-4" strokeWidth={2} />
           </button>
           <span className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate flex-1">{scenScopeLabel}</span>
           {!sel.selecting && listScenarios.length > 0 && (
@@ -5392,8 +5392,8 @@ function MemoryPalaceView() {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <div className="md:hidden flex items-center gap-2 px-3 py-2 border-b border-xero-border dark:border-slate-700 flex-shrink-0">
-          <button onClick={() => setMobileOpen(true)} className="text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-3 -m-1">
-            <IconMenu className="w-4 h-4" strokeWidth={2} />
+          <button title="Folders" aria-label="Folders" onClick={() => setMobileOpen(true)} className="text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 transition-colors p-3 -m-1">
+            <IconFolder className="w-4 h-4" strokeWidth={2} />
           </button>
           <span className="text-sm text-gray-700 dark:text-slate-200 font-medium truncate">{selectedTitle}</span>
         </div>
