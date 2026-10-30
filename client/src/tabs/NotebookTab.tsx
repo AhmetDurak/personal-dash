@@ -3414,7 +3414,8 @@ function SentenceView() {
     return (
       <div className="space-y-2">
         <textarea
-          autoFocus
+          // Focus only a brand-new sentence — on phones focusing pops the keyboard every time it opens
+          autoFocus={!draft.source_text}
           value={draft.source_text ?? ''}
           onChange={e => {
             const v = e.target.value
