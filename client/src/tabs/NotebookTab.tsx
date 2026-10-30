@@ -18,6 +18,7 @@ import { useNotes, useMindmap, useMindmapList, useVocabulary, useAllReminders, u
 import { retentionSeries, type RetentionPoint } from '../lib/retention'
 import { dueStatus, type SRItem } from '../lib/dueStatus'
 import { useRememberedSelection } from '../hooks/useRememberedSelection'
+import { useEdgeSwipe } from '../hooks/useEdgeSwipe'
 import { LogTab } from './LogTab'
 import { MealTab } from './MealTab'
 import { SportTab } from './SportTab'
@@ -1431,6 +1432,7 @@ function MindmapView() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [swipeResetKey, setSwipeResetKey] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
+  useEdgeSwipe(mobileOpen, setMobileOpen)
   const [activeFolder, setActiveFolder] = useState<string | null>(null)
   const [newFolderInput, setNewFolderInput] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
@@ -1806,6 +1808,7 @@ function VocabView() {
   const [vocabSearch, setVocabSearch] = useState('')
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
+  useEdgeSwipe(mobileTreeOpen, setMobileTreeOpen)
   const { sort: vocabSort, sortItems: sortVocab, sortTree: sortVocabTree } = useTreeSort<VocabCard>(
     'tree-sort:vocab', { label: v => v.word, created: v => v.created_at, due: v => v.due_at }, 'created')
   const vocabTree = sortVocabTree(buildFolderTree(vocab))
@@ -3330,6 +3333,7 @@ function SentenceView() {
   const [singleReviewItem, setSingleReviewItem] = useState<LanguageSentence[] | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
+  useEdgeSwipe(mobileTreeOpen, setMobileTreeOpen)
   const [sentSearch, setSentSearch] = useState('')
 
   const { sort: sentSort, sortItems: sortSentences, sortTree: sortSentTree } = useTreeSort<LanguageSentence>(
@@ -3916,6 +3920,7 @@ function ScenarioView() {
   const [singleReviewItem, setSingleReviewItem] = useState<LanguageScenario[] | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false)
+  useEdgeSwipe(mobileTreeOpen, setMobileTreeOpen)
   const [scenSearch, setScenSearch] = useState('')
   const [scenPreview, setScenPreview] = useState(true)
 
@@ -5340,6 +5345,7 @@ function MemoryPalaceView() {
   useRememberedSelection('palaces:lastSelected', selectedId, !isLoading,
     id => setSelectedId(Number(id)), id => palaces.some(p => String(p.id) === id))
   const [mobileOpen, setMobileOpen] = useState(false)
+  useEdgeSwipe(mobileOpen, setMobileOpen)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<string | null>(null)
 
